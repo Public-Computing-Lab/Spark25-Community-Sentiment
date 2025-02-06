@@ -95,17 +95,25 @@ def load_csv_from_drive():
     except Exception as e:
         print(f"❌ Error loading CSV from Google Drive: {e}")
         return None
-    
+
+df = load_csv_from_drive() 
 app = Flask(__name__, template_folder="templates")
 
 @app.route("/")
 def home():
+    global df  # Ensure df is accessible
+    df = load_csv_from_drive()
     """Serves the chatbot frontend."""
     return render_template("index.html")
 
 @app.route("/ask", methods=["POST"])
 def ask():
     """Handles user questions and sends them to the LLM."""
+    global df  # Ensure df is accessible
+
+    if df is None or df.empty:
+        return jsonify({"error": "Dataset not loaded or empty"}), 500
+    
     data = request.get_json()
     user_question = data.get("question", "")
 
@@ -173,35 +181,36 @@ def feedback():
 
 
 if __name__ == "__main__":
-    file_path = os.getenv("DATASET_FILE_PATH")
-    df = load_csv_from_drive()  
-    df = df.iloc[:1001]
+    app.run(host="0.0.0.0", port=5000,debug=False)
+    # file_path = os.getenv("DATASET_FILE_PATH")
+    # df = load_csv_from_drive()  
+    # df = df.iloc[:1001]
 
-    if df is not None:
-        print("\n✅ Sending dataset to Gemini... (one-time cost)")
+    # if df is not None:
+    #     print("\n✅ Sending dataset to Gemini... (one-time cost)")
         
-        # **Step 1: Load dataset once and store it in Gemini's session**
-        print(f"\n✅ Dataset Size: {len(df)}")
-        dataset_prompt = generate_initial_prompt(df)
-        model = genai.GenerativeModel("gemini-1.5-pro")
-        chat_session = model.start_chat(history=[])  # Stores the dataset in session memory
+    #     # **Step 1: Load dataset once and store it in Gemini's session**
+    #     print(f"\n✅ Dataset Size: {len(df)}")
+    #     dataset_prompt = generate_initial_prompt(df)
+    #     model = genai.GenerativeModel("gemini-1.5-pro")
+    #     chat_session = model.start_chat(history=[])  # Stores the dataset in session memory
 
-        print("\n🔄 Sending dataset to Gemini (One-time process)...")
-        asyncio.run(get_gemini_response(dataset_prompt, chat_session))
+    #     print("\n🔄 Sending dataset to Gemini (One-time process)...")
+    #     asyncio.run(get_gemini_response(dataset_prompt, chat_session))
         
-        print("\n✅ Dataset is now loaded. You can ask unlimited questions without reloading the dataset!")
+    #     print("\n✅ Dataset is now loaded. You can ask unlimited questions without reloading the dataset!")
 
-        app.run(host="0.0.0.0", port=5000,debug=False)
+    #     app.run(host="0.0.0.0", port=5000,debug=False)
 
-        print("\n💬 Ask questions about the dataset. Type 'exit' to quit.")
-        while True:
-            user_question = input("\n💬 Enter your question: ")
-            if user_question.lower() in ['exit', 'quit']:
-                print("👋 Exiting... Have a great day!")
-                break
+    #     print("\n💬 Ask questions about the dataset. Type 'exit' to quit.")
+    #     while True:
+    #         user_question = input("\n💬 Enter your question: ")
+    #         if user_question.lower() in ['exit', 'quit']:
+    #             print("👋 Exiting... Have a great day!")
+    #             break
             
-            # **Step 2: Send only the question, not the dataset**
-            prompt = f"Based on the dataset I provided earlier, answer this: {user_question}"
-            response = asyncio.run(get_gemini_response(prompt, chat_session))
-            log_query(user_question, response)
-            print("\n🤖 **AI Response:**\n", response)
+    #         # **Step 2: Send only the question, not the dataset**
+    #         prompt = f"Based on the dataset I provided earlier, answer this: {user_question}"
+    #         response = asyncio.run(get_gemini_response(prompt, chat_session))
+    #         log_query(user_question, response)
+    #         print("\n🤖 **AI Response:**\n", response)
