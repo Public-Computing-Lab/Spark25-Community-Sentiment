@@ -169,7 +169,7 @@ if __name__ == "__main__":
         
         print("\n✅ Dataset is now loaded. You can ask unlimited questions without reloading the dataset!")
 
-        app.run(debug=True)
+        app.run(host="0.0.0.0", port=5000,debug=False)
 
         print("\n💬 Ask questions about the dataset. Type 'exit' to quit.")
         while True:
