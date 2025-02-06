@@ -14,7 +14,8 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  
 genai.configure(api_key=GEMINI_API_KEY)
 
-app = Flask(__name__, template_folder="templates")
+
+
 
 LOG_FILE = "llm_query_log.csv"
 
@@ -77,6 +78,13 @@ def log_query(question, answer):
         log_entry.to_csv(LOG_FILE, mode='a', header=False, index=False)
 
     return query_id 
+
+file_path = 'Boston_Crime_Cleaned_v2.csv'
+df = load_csv(file_path, max_rows=1000)  # Load dataset globally
+if df is None:
+    raise RuntimeError("❌ Dataset failed to load. Ensure the file exists and is correctly formatted.")
+
+app = Flask(__name__, template_folder="templates")
 
 @app.route("/")
 def home():
