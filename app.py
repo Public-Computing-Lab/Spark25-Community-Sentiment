@@ -79,7 +79,7 @@ def log_query(question, answer):
 
     return query_id 
 
-file_path = 'Boston_Crime_Cleaned_v2.csv'
+file_path = 'file_path = "https://raw.githubusercontent.com/your-username/your-repo/main/Boston_Crime_Cleaned_v2.csv"'
 df = load_csv(file_path, max_rows=1000)  # Load dataset globally
 if df is None:
     raise RuntimeError("❌ Dataset failed to load. Ensure the file exists and is correctly formatted.")
