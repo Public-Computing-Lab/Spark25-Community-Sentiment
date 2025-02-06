@@ -7,11 +7,15 @@ import google.generativeai as genai
 import asyncio
 from datetime import datetime
 import uuid
+import requests
+import io
 from dotenv import load_dotenv
 
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+CSV_FILE_URL = os.getenv("CSV_FILE_URL")
+
 genai.configure(api_key=GEMINI_API_KEY)
 
 
@@ -79,11 +83,19 @@ def log_query(question, answer):
 
     return query_id 
 
-file_path = 'file_path = "https://raw.githubusercontent.com/your-username/your-repo/main/Boston_Crime_Cleaned_v2.csv"'
-df = load_csv(file_path, max_rows=1000)  # Load dataset globally
-if df is None:
-    raise RuntimeError("❌ Dataset failed to load. Ensure the file exists and is correctly formatted.")
-
+def load_csv_from_drive():
+    """Loads CSV from Google Drive using a direct download link."""
+    try:
+        response = requests.get(CSV_FILE_URL)
+        response.raise_for_status()  # Ensure successful response
+        csv_data = response.content.decode('utf-8')  # Convert to string
+        df = pd.read_csv(io.StringIO(csv_data))  # Read into DataFrame
+        print(f"✅ Successfully loaded {len(df)} rows from Google Drive.")
+        return df.iloc[:1001]
+    except Exception as e:
+        print(f"❌ Error loading CSV from Google Drive: {e}")
+        return None
+    
 app = Flask(__name__, template_folder="templates")
 
 @app.route("/")
@@ -161,13 +173,15 @@ def feedback():
 
 
 if __name__ == "__main__":
-    file_path = 'Boston_Crime_Cleaned_v2.csv'
-    df = load_csv(file_path, max_rows=1000)  
+    file_path = os.getenv("DATASET_FILE_PATH")
+    df = load_csv_from_drive()  
+    df = df.iloc[:1001]
 
     if df is not None:
         print("\n✅ Sending dataset to Gemini... (one-time cost)")
         
         # **Step 1: Load dataset once and store it in Gemini's session**
+        print(f"\n✅ Dataset Size: {len(df)}")
         dataset_prompt = generate_initial_prompt(df)
         model = genai.GenerativeModel("gemini-1.5-pro")
         chat_session = model.start_chat(history=[])  # Stores the dataset in session memory
