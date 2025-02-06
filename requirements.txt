@@ -15,12 +15,14 @@ google-generativeai==0.8.4
 googleapis-common-protos==1.66.0
 grpcio==1.70.0
 grpcio-status==1.70.0
+gunicorn==23.0.0
 httplib2==0.22.0
 idna==3.10
 itsdangerous==2.2.0
 Jinja2==3.1.5
 MarkupSafe==3.0.2
 numpy==2.2.2
+packaging==24.2
 pandas==2.2.3
 pip==25.0
 proto-plus==1.26.0
