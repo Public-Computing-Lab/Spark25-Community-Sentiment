@@ -69,4 +69,5 @@ build/
 *.bak
 *.tmp
 *.log
+gemini_api.key.txt
 
