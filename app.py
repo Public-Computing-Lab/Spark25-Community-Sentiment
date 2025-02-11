@@ -30,10 +30,11 @@ def load_csv(file_path, max_rows=1000):
         return None
 
 # ✅ Determine dataset path (works for local & server)
-if os.path.exists("/app/ReThink_AI_Chatbot/db/Boston_Crime_Cleaned_v2.csv"):  # Correct path for Fly.io
+if os.path.exists("/app/ReThink_AI_Chatbot/db/Boston_Crime_Cleaned_v2.csv"):  # ✅ Adjust for Fly.io
     file_path = "/app/ReThink_AI_Chatbot/db/Boston_Crime_Cleaned_v2.csv"
 else:
-    file_path = "db/Boston_Crime_Cleaned_v2.csv"  # Fallback for local testing
+    file_path = os.path.join(os.getcwd(), "db", "Boston_Crime_Cleaned_v2.csv")  # ✅ Local fallback
+
 
 
 df = load_csv(file_path, max_rows=1000)  # ✅ Load dataset globally
@@ -171,7 +172,7 @@ def feedback():
 # ✅ Run Flask App (Supports Local & Server Deployment)
 def start_app():
     """Starts the Flask application (for local & server)."""
-    print("\n🚀 Server is running on 0.0.0.0:8002")
+    print("\n🚀 Server is running on 0.0.0.0:8080")
     app.run(host="0.0.0.0", port=8080)
 
 if __name__ == "__main__":
