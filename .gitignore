@@ -47,7 +47,7 @@ gunicorn.error.log
 
 # 8️⃣ Docker and Build Files (If Used)
 docker-compose.yml
-Dockerfile
+# Dockerfile
 __docker_temp/
 *.dockerfile
 *.whl
