@@ -172,7 +172,7 @@ def feedback():
 def start_app():
     """Starts the Flask application (for local & server)."""
     print("\n🚀 Server is running on 0.0.0.0:8002")
-    app.run(host="0.0.0.0", port=8002)
+    app.run(host="0.0.0.0", port=8080)
 
 if __name__ == "__main__":
     start_app()
