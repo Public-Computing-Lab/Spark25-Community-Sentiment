@@ -66,9 +66,14 @@ async def get_gemini_response(prompt):
         model = genai.GenerativeModel("gemini-1.5-pro")
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(None, lambda: model.generate_content(prompt))
+        
+        print(f"\n✅ Gemini Response: {response.text}")  # ✅ Log the response!
+        
         return response.text
     except Exception as e:
+        print(f"❌ Error generating response: {e}")  # ✅ Log the error!
         return f"❌ Error generating response: {e}"
+
 
 # ✅ Log query function
 def log_query(question, answer):
@@ -172,7 +177,7 @@ def feedback():
 # ✅ Run Flask App (Supports Local & Server Deployment)
 def start_app():
     """Starts the Flask application (for local & server)."""
-    print("\n🚀 Server is running on 0.0.0.0:8080")
+    print("\n🚀 Server is running on 0.0.0.0:8080")  # ✅ Fixed!
     app.run(host="0.0.0.0", port=8080)
 
 if __name__ == "__main__":
