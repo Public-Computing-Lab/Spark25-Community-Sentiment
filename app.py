@@ -8,6 +8,8 @@ from datetime import datetime
 import uuid
 from dotenv import load_dotenv
 
+APP_VERSION = "0.01"
+
 # ✅ Load environment variables
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -99,8 +101,8 @@ def log_query(question, answer):
 # ✅ Flask Routes
 @app.route("/")
 def home():
-    """Serves the chatbot frontend."""
-    return render_template("index.html")
+    """Serves the chatbot frontend with version info."""
+    return render_template("index.html", version=APP_VERSION)
 
 @app.route("/ask", methods=["POST"])
 def ask():
