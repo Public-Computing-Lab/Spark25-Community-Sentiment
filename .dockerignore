@@ -50,7 +50,6 @@ docker-compose.yml
 __docker_temp/
 *.whl
 
-# 🚨 DO NOT IGNORE `Dockerfile` OR `fly.toml` 🚨
 # If you ignore them, Fly.io cannot build or deploy your app.
 
 # 9️⃣ System Files (Mac & Windows)
