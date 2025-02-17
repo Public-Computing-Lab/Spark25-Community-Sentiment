@@ -1,74 +1,72 @@
-# flyctl launch added from .gitignore
 # 1️⃣ Python Cache and Bytecode
-**\__pycache__
-**\*.pyc
-**\*.pyo
-**\*.pyd
-**\*.cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.cache
 
 # 2️⃣ Virtual Environment (venv)
-**\venv
-**\env
-**\*.venv
-**\pip-log.txt
-**\pip-delete-this-directory.txt
+venv/
+env/
+*.venv
+pip-log.txt
+pip-delete-this-directory.txt
 
 # 3️⃣ Environment Variables (SECURITY: Protect API Keys & Secrets)
-**\.env
-**\*.env
-**\config.json  # If sensitive configs are stored here
-**\secrets.json
+.env
+*.env
+config.json  # If sensitive configs are stored here
+secrets.json
 
 # 4️⃣ Logs and Databases
-**\*.log
-**\logs
-**\*.sqlite
-**\*.db
-**\*.sqlite3
-**\*.sql
+*.log
+logs/
+*.sqlite
+*.db
+*.sqlite3
+*.sql
 
 # 5️⃣ Flask & Gunicorn Deployment Files
-**\instance
-**\*.pid
-**\*.sock
-**\gunicorn.log
-**\gunicorn.error.log
+instance/
+*.pid
+*.sock
+gunicorn.log
+gunicorn.error.log
 
 # 6️⃣ IDE and Editor Configurations
-**\.vscode
-**\.idea
-**\*.swp
-**\*.swo
-**\*.swn
-**\*.sublime-workspace
-**\*.sublime-project
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.sublime-workspace
+*.sublime-project
 
 # 7️⃣ Jupyter Notebook Checkpoints
-**\.ipynb_checkpoints
+.ipynb_checkpoints/
 
 # 8️⃣ Docker and Build Files (If Used)
-**\docker-compose.yml
-**\Dockerfile
-**\__docker_temp
-**\*.dockerfile
-**\*.whl
+docker-compose.yml
+__docker_temp/
+*.whl
+
+# 🚨 DO NOT IGNORE `Dockerfile` OR `fly.toml` 🚨
+# If you ignore them, Fly.io cannot build or deploy your app.
 
 # 9️⃣ System Files (Mac & Windows)
-**\.DS_Store
-**\Thumbs.db
-**\desktop.ini
+.DS_Store
+Thumbs.db
+desktop.ini
 
 # 1️⃣0️⃣ Node.js & Frontend Build Files (If Applicable)
-**\node_modules
-**\npm-debug.log*
-**\yarn.lock
-**\dist
-**\build
+node_modules/
+npm-debug.log*
+yarn.lock
+dist/
+build/
 
 # 1️⃣1️⃣ Miscellaneous
-**\*.bak
-**\*.tmp
-**\*.log
-**\gemini_api.key.txt
-
-fly.toml
+*.bak
+*.tmp
+*.log
+gemini_api.key.txt
