@@ -126,7 +126,7 @@
             loadingSpinner.style.display = "block";
 
             try {
-                let response = await fetch("/ask", {
+                let response = await fetch(document.URL+"/ask", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ question: userQuestion })
@@ -208,7 +208,7 @@
             console.log("🟡 Sending feedback for Query ID:", queryId, "Feedback:", feedback);
 
             // ✅ Send feedback to backend
-            let response = await fetch("/feedback", {
+            let response = await fetch(document.URL+"/feedback", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -229,7 +229,7 @@
 
 
         async function loadCrimeStats() {
-            let res = await fetch("/crime-stats");
+            let res = await fetch(document.URL+"/crime-stats");
             let data = await res.json();
 
             document.getElementById("mostCommonCrime").innerText = data.most_common_crime;
