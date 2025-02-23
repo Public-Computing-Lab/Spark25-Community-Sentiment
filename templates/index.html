@@ -146,7 +146,7 @@
             loadingSpinner.querySelector("p").textContent = "Generating response...";
     
             try {
-                let response = await fetch("/ask", {
+                let response = await fetch(document.URL+"/ask", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ question: userQuestion })
@@ -225,7 +225,7 @@
     
             console.log("🟡 Sending feedback for Query ID:", queryId, "Feedback:", feedback);
     
-            let response = await fetch("/feedback", {
+            let response = await fetch(document.URL+"/feedback", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ query_id: queryId, feedback: feedback })
@@ -237,7 +237,7 @@
     
         async function loadCrimeStats() {
             try {
-                let res = await fetch("/crime-stats");
+                let res = await fetch(document.URL+"/crime-stats");
                 let data = await res.json();
     
                 if (data.error) {
@@ -271,7 +271,7 @@
             loadingSpinner.style.display = "block"; 
             loadingSpinner.querySelector("p").textContent = "Generating visualization...";
 
-            let response = await fetch("/visualize", { 
+            let response = await fetch(document.URL+"/visualize", { 
                 method: "POST", 
                 headers: { "Content-Type": "application/json" }, 
                 body: JSON.stringify({ query: userQuery }) 
