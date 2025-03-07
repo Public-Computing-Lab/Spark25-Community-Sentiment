@@ -1,0 +1,426 @@
+objectid,reporting_event_number,ruleddate,homicidedate,district,victimage,race,gender,weapon,hour_of_day,day_of_week,year,quarter,month,neighborhood,ethnicity_nibrs
+409,172068628,2017-08-20,2017-08-20,A1,28,Black or African American,Male,GSW,2,1,2017,3,8,Downtown,Hispanic or Latinx
+410,172035480,2017-05-06,2017-05-06,C6,59,White,Male,STAB,20,6,2017,2,5,South Boston,Not Hispanic or Latinx
+412,162085432,2016-10-27,2016-10-18,C11,41,Black or African American,Male,GSW,17,3,2016,4,10,Dorchester,Not Hispanic or Latinx
+415,162044119,2016-06-06,2016-06-05,B3,33,Black or African American,Male,GSW,23,7,2016,2,6,Dorchester,Not Hispanic or Latinx
+418,152096420,2015-11-20,2015-11-20,E13,24,White,Male,GSW,17,6,2015,4,11,Jamaica Plain,Hispanic or Latinx
+423,182102684,2018-12-21,2018-12-21,B2,43,Black or African American,Male,GSW,0,6,2018,4,12,Roxbury,Not Hispanic or Latinx
+424,I172018048,2017-03-07,2017-03-07,B2,35,Black or African American,Male,STAB,7,3,2017,1,3,Dorchester,Not Hispanic or Latinx
+425,172047249,2017-06-13,2017-06-13,B3,19,Black or African American,Male,GSW,18,3,2017,2,6,Mattapan,Not Hispanic or Latinx
+426,172101369,2017-12-06,2017-12-07,B2,19,White,Male,GSW,19,4,2017,4,12,Mission Hill,Hispanic or Latinx
+429,152005273,2015-01-21,2015-01-20,B2,44,White,Male,GSW,11,3,2015,1,1,Longwood,Not Hispanic or Latinx
+431,182002786,2018-01-11,2018-01-11,B2,22,Black or African American,Male,GSW,13,5,2018,1,1,Roxbury,Not Hispanic or Latinx
+438,152071596,2015-08-31,2015-08-29,B2,27,Black or African American,Male,GSW,2,7,2015,3,8,Dorchester,Not Hispanic or Latinx
+439,152104401,2015-12-19,2015-12-18,B2,17,Black or African American,Male,GSW,16,6,2015,4,12,Mission Hill,Not Hispanic or Latinx
+440,192002129,2019-01-08,2019-01-08,B2,28,Black or African American,Male,GSW,16,3,2019,1,1,Roxbury,Not Hispanic or Latinx
+441,182094714,2019-02-24,2018-11-24,E13,49,Black or African American,Male,GSW,1,7,2018,4,11,Roxbury,Not Hispanic or Latinx
+443,172096502,2017-11-19,2017-11-19,E5,40,White,Male,STAB,6,1,2017,4,11,West Roxbury,Not Hispanic or Latinx
+444,182067317,2018-08-22,2018-08-22,B2,18,Black or African American,Male,GSW,19,4,2018,3,8,Roxbury,Not Hispanic or Latinx
+445,182080967,2018-10-07,2018-10-07,C11,62,Black or African American,Male,GSW,23,7,2018,4,10,Dorchester,Not Hispanic or Latinx
+448,162103433,2016-12-20,2016-12-20,B2,34,Black or African American,Female,STAB,0,3,2016,4,12,Dorchester,Not Hispanic or Latinx
+449,182026852,2018-04-11,2018-04-11,A1,53,Black or African American,Male,STAB,21,3,2018,2,4,West End,Not Hispanic or Latinx
+450,152054787,2015-07-02,2015-07-03,B2,22,Black or African American,Male,GSW,23,5,2015,3,7,Roxbury,Hispanic or Latinx
+451,080644488,2016-05-19,2008-11-05,C11,24,Black or African American,Male,GSW,12,4,2008,4,11,Dorchester,Not Hispanic or Latinx
+452,172062994,2017-08-02,2017-08-02,C11,32,Black or African American,Male,GSW,16,4,2017,3,8,Dorchester,Not Hispanic or Latinx
+457,162090597,2016-11-05,2016-11-05,C11,29,Black or African American,Male,GSW,0,7,2016,4,11,Dorchester,Not Hispanic or Latinx
+458,182041332,2018-05-29,2018-05-29,E18,41,Black or African American,Male,STAB,17,3,2018,2,5,Hyde Park,Not Hispanic or Latinx
+460,162082657,2016-10-09,2016-10-09,E13,19,White,Male,GSW,22,7,2016,4,10,Jamaica Plain,Hispanic or Latinx
+461,152077031,2015-09-17,2015-09-16,B2,23,Black or African American,Male,GSW,12,4,2015,3,9,Mission Hill,Not Hispanic or Latinx
+463,162008434,2016-02-03,2016-02-01,B2,3,Black or African American,Male,Trauma,21,1,2016,1,1,Roxbury,Not Hispanic or Latinx
+465,142049954,2015-03-09,2014-11-18,E18,47,White,Female,Other,2,3,2014,4,11,Hyde Park,Not Hispanic or Latinx
+470,162048538,2016-06-19,2016-06-19,B3,31,Black or African American,Male,GSW,23,7,2016,2,6,Mattapan,Not Hispanic or Latinx
+472,172037777,2017-05-14,2017-05-14,C11,22,Black or African American,Male,GSW,22,7,2017,2,5,Dorchester,Not Hispanic or Latinx
+473,182080649,2018-10-05,2018-10-05,B2,22,White,Male,GSW,18,6,2018,4,10,Dorchester,Hispanic or Latinx
+474,142048794,2016-02-02,2014-11-12,B2,75,Black or African American,Male,Other,0,4,2014,4,11,Roxbury,Not Hispanic or Latinx
+475,182093688,2018-11-19,2018-11-19,E13,23,Black or African American,Female,GSW,17,2,2018,4,11,Jamaica Plain,Not Hispanic or Latinx
+476,172104845,2017-12-20,2017-12-20,C11,17,Black or African American,Male,GSW,19,3,2017,4,12,Dorchester,Not Hispanic or Latinx
+477,182003714,2018-01-14,2018-01-14,C11,17,Black or African American,Male,GSW,17,1,2018,1,1,Dorchester,Not Hispanic or Latinx
+479,172031721,2017-04-24,2017-04-24,B3,29,Black or African American,Male,GSW,20,1,2017,2,4,Dorchester,Not Hispanic or Latinx
+481,162003560,2016-01-14,2016-01-14,B2,30,Black or African American,Male,GSW,19,4,2016,1,1,Mission Hill,Not Hispanic or Latinx
+482,192009132,2019-02-04,2019-02-04,D4,32,Black or African American,Male,GSW,12,2,2019,1,2,Roxbury,Not Hispanic or Latinx
+483,162065072,2016-08-13,2016-08-13,B3,34,Black or African American,Male,GSW,23,6,2016,3,8,Dorchester,Hispanic or Latinx
+488,172057407,2017-07-15,2017-07-16,D4,32,Black or African American,Male,GSW,22,7,2017,3,7,Roxbury,Not Hispanic or Latinx
+490,152056250,2015-07-10,2015-07-08,A1,72,Asian,Female,Other,7,4,2015,3,7,Chinatown,Not Hispanic or Latinx
+491,162085838,2016-10-24,2016-10-20,B2,24,Black or African American,Male,GSW,22,4,2016,4,10,Roxbury,Not Hispanic or Latinx
+492,182023600,2018-03-30,2018-03-30,B2,34,Black or African American,Male,GSW,9,6,2018,1,3,Dorchester,Not Hispanic or Latinx
+493,172091222,2017-11-01,2017-11-01,E13,16,Black or African American,Male,GSW,23,3,2017,4,10,Jamaica Plain,Not Hispanic or Latinx
+494,182076789,2018-09-23,2018-09-23,E13,25,White,Male,GSW,21,7,2018,3,9,Jamaica Plain,Hispanic or Latinx
+497,152101248,2015-12-08,2015-12-08,B3,28,Black or African American,Male,STAB,0,3,2015,4,12,Dorchester,Not Hispanic or Latinx
+498,182033779,2018-05-06,2018-05-05,E13,58,Black or African American,Male,GSW,21,6,2018,2,5,Jamaica Plain,Not Hispanic or Latinx
+500,182059055,2018-07-26,2018-07-26,B3,77,White,Male,STAB,18,5,2018,3,7,Dorchester,Hispanic or Latinx
+502,172066626,2017-08-14,2017-08-14,B2,36,Black or African American,Male,GSW,23,1,2017,3,8,Roxbury,Not Hispanic or Latinx
+503,172075277,2017-09-11,2017-09-11,C11,24,White,Female,GSW,22,1,2017,3,9,Dorchester,Not Hispanic or Latinx
+505,152066828,2015-08-13,2015-08-13,E13,28,Black or African American,Male,GSW,22,4,2015,3,8,Jamaica Plain,Not Hispanic or Latinx
+506,182043561,2018-06-06,2018-06-06,C11,25,White,Male,GSW,22,3,2018,2,6,Dorchester,Hispanic or Latinx
+509,162039242,2016-05-20,2016-05-20,B3,22,Black or African American,Male,GSW,21,5,2016,2,5,Dorchester,Not Hispanic or Latinx
+511,162086825,2016-10-23,2016-10-23,E18,24,Black or African American,Male,GSW,11,1,2016,4,10,Hyde Park,Not Hispanic or Latinx
+513,152026045,2015-04-02,2015-03-31,B3,37,Black or African American,Male,GSW,11,3,2015,1,3,Dorchester,Not Hispanic or Latinx
+515,152088337,2015-10-25,2015-10-24,E18,49,Black or African American,Male,GSW,12,7,2015,4,10,Hyde Park,Not Hispanic or Latinx
+517,162013863,2016-02-22,2016-02-21,B2,15,Black or African American,Male,STAB,16,1,2016,1,2,Dorchester,Not Hispanic or Latinx
+518,162047273,2016-06-16,2016-06-15,A7,18,White,Female,STAB,8,4,2016,2,6,East Boston,Hispanic or Latinx
+522,172009839,2017-02-05,2017-02-05,C11,22,Black or African American,Female,GSW,17,1,2017,1,2,Dorchester,Not Hispanic or Latinx
+523,182009897,2018-02-07,2018-02-07,C11,27,Black or African American,Male,GSW,19,3,2018,1,2,Dorchester,Not Hispanic or Latinx
+526,182083479,2018-10-16,2018-10-16,C11,24,Black or African American,Female,GSW,21,2,2018,4,10,Dorchester,Not Hispanic or Latinx
+527,182060953,2018-12-08,2018-08-02,B3,23,Black or African American,Male,GSW,23,4,2018,3,8,Dorchester,Not Hispanic or Latinx
+528,172032945,2017-04-27,2017-04-28,B3,30,Black or African American,Male,GSW,21,5,2017,2,4,Mattapan,Not Hispanic or Latinx
+530,142008830,2015-01-15,2014-07-13,B2,39,White,Female,Other,18,1,2014,3,7,Roxbury,Not Hispanic or Latinx
+532,172093007,2017-11-07,2017-11-07,D4,37,Black or African American,Male,GSW,20,2,2017,4,11,Fenway,Not Hispanic or Latinx
+535,162069476,2016-08-27,2016-08-27,E13,28,Black or African American,Male,GSW,3,7,2016,3,8,Jamaica Plain,Not Hispanic or Latinx
+538,182078305,2018-09-27,2018-09-27,B3,27,Black or African American,Male,GSW,12,5,2018,3,9,Mattapan,Not Hispanic or Latinx
+540,152101585,2015-12-09,2015-12-09,D4,25,White,Male,GSW,1,4,2015,4,12,South End,Hispanic or Latinx
+541,162090653,2017-06-29,2016-11-05,B2,29,White,Female,Other,8,7,2016,4,11,Roxbury,Not Hispanic or Latinx
+542,182025532,2018-04-06,2018-04-06,C6,22,Black or African American,Male,GSW,23,5,2018,2,4,South Boston,Not Hispanic or Latinx
+543,172081437,2017-09-30,2017-09-29,C11,39,White,Male,GSW,19,6,2017,3,9,Dorchester,Not Hispanic or Latinx
+546,182064056,2018-08-12,2018-08-12,B3,55,Black or African American,Male,GSW,23,7,2018,3,8,Mattapan,Not Hispanic or Latinx
+547,172057934,2017-07-17,2017-07-17,B3,18,Black or African American,Male,GSW,17,2,2017,3,7,Dorchester,Not Hispanic or Latinx
+548,182034835,2018-05-08,2018-05-08,C6,50,Black or African American,Male,STAB,12,3,2018,2,5,South Boston,Hispanic or Latinx
+554,182052365,2018-07-03,2018-07-03,B2,31,Black or African American,Male,GSW,11,3,2018,3,7,Roxbury,Hispanic or Latinx
+555,162081907,2016-10-06,2016-10-06,B2,20,Black or African American,Male,GSW,17,5,2016,4,10,Roxbury,Not Hispanic or Latinx
+556,152056746,2017-08-04,2015-07-02,E13,50,White,Male,Other,8,5,2015,3,7,Jamaica Plain,Not Hispanic or Latinx
+559,172035480,2017-05-06,2017-05-06,C6,38,White,Female,STAB,20,6,2017,2,5,South Boston,Not Hispanic or Latinx
+561,162088581,2016-10-29,2016-10-29,C11,36,Black or African American,Female,GSW,14,7,2016,4,10,Dorchester,Not Hispanic or Latinx
+564,162045234,2016-06-09,2016-06-08,B2,17,Black or African American,Male,GSW,13,4,2016,2,6,Dorchester,Not Hispanic or Latinx
+567,152097957,2015-11-28,2015-11-26,D4,29,Black or African American,Male,GSW,2,5,2015,4,11,Fenway,Not Hispanic or Latinx
+569,152048199,2015-06-12,2015-06-10,B3,16,Black or African American,Male,GSW,19,4,2015,2,6,Dorchester,Not Hispanic or Latinx
+571,172102399,2017-12-10,2017-12-10,A7,19,Black or African American,Male,GSW,16,1,2017,4,12,East Boston,Not Hispanic or Latinx
+575,182104066,2018-12-27,2018-12-27,B3,18,Black or African American,Male,GSW,0,5,2018,4,12,Mattapan,Not Hispanic or Latinx
+576,162023617,2016-03-27,2016-03-27,B3,26,Black or African American,Male,GSW,2,1,2016,1,3,Mattapan,Not Hispanic or Latinx
+579,172028837,2017-04-14,2017-04-14,C11,21,Black or African American,Male,GSW,16,6,2017,2,4,Dorchester,Not Hispanic or Latinx
+580,182094352,2018-11-22,2018-11-22,E13,48,White,Male,GSW,0,5,2018,4,11,Jamaica Plain,Hispanic or Latinx
+581,172054029,2017-07-05,2017-07-05,B2,29,Black or African American,Male,GSW,2,4,2017,3,7,Roxbury,Not Hispanic or Latinx
+582,152066827,2015-08-13,2015-08-13,B3,21,Black or African American,Male,GSW,22,4,2015,3,8,Mattapan,Not Hispanic or Latinx
+583,172002376,2017-01-10,2017-01-10,B2,19,Black or African American,Male,GSW,19,2,2017,1,1,Roxbury,Not Hispanic or Latinx
+587,172070801,2017-10-13,2017-08-27,C11,48,Asian,Male,Trauma,0,1,2017,3,8,Dorchester,Not Hispanic or Latinx
+588,172098716,2017-11-28,2017-11-28,C6,16,Black or African American,Male,GSW,23,2,2017,4,11,South Boston,Hispanic or Latinx
+590,152107190,2015-12-30,2015-12-29,B3,18,Black or African American,Male,GSW,8,3,2015,4,12,Mattapan,Hispanic or Latinx
+591,182022148,2018-03-25,2018-03-25,B2,33,Black or African American,Male,STAB,3,1,2018,1,3,Dorchester,Not Hispanic or Latinx
+592,182031717,2018-04-28,2018-04-28,B2,34,Black or African American,Male,GSW,2,7,2018,2,4,Roxbury,Not Hispanic or Latinx
+593,192003304,2019-01-13,2019-01-13,B2,70,Black or African American,Male,STAB,21,7,2019,1,1,Roxbury,Not Hispanic or Latinx
+594,152055311,2015-07-05,2015-07-05,B2,26,Black or African American,Male,GSW,22,7,2015,3,7,Roxbury,Not Hispanic or Latinx
+595,182071662,2018-09-06,2018-09-06,A15,54,White,Male,Trauma,3,5,2018,3,9,Charlestown,Hispanic or Latinx
+601,162075905,2016-09-17,2016-09-17,B3,23,Black or African American,Male,GSW,2,7,2016,3,9,Dorchester,Not Hispanic or Latinx
+602,162091710,2016-11-10,2016-11-09,B3,33,Black or African American,Male,GSW,22,3,2016,4,11,Mattapan,Not Hispanic or Latinx
+603,172065378,2017-08-10,2017-08-10,B2,27,Black or African American,Male,GSW,22,4,2017,3,8,Dorchester,Hispanic or Latinx
+604,182057654,2018-07-22,2018-07-22,E18,28,Black or African American,Male,GSW,4,1,2018,3,7,Hyde Park,Not Hispanic or Latinx
+606,152081264,2015-09-30,2015-09-30,E18,30,White,Male,GSW,4,4,2015,3,9,Hyde Park,Not Hispanic or Latinx
+612,152087774,2015-10-23,2015-10-22,E13,17,Black or African American,Male,STAB,15,5,2015,4,10,Jamaica Plain,Hispanic or Latinx
+614,152020647,2015-03-15,2015-03-14,B2,40,White,Male,GSW,15,7,2015,1,3,Roxbury,Hispanic or Latinx
+617,152100585,2015-12-06,2015-12-06,C6,37,Black or African American,Male,GSW,20,7,2015,4,12,South Boston,Not Hispanic or Latinx
+618,152042211,2015-05-23,2015-05-23,B2,27,Black or African American,Male,GSW,0,7,2015,2,5,Roxbury,Not Hispanic or Latinx
+621,172041830,2017-05-27,2017-05-27,A1,22,Black or African American,Male,GSW,2,7,2017,2,5,Chinatown,Not Hispanic or Latinx
+622,182082113,2018-10-11,2018-10-11,C11,19,Black or African American,Male,GSW,2,5,2018,4,10,Dorchester,Not Hispanic or Latinx
+624,172106125,2017-12-25,2017-12-25,B3,19,Black or African American,Male,GSW,21,1,2017,4,12,Mattapan,Not Hispanic or Latinx
+625,182008316,2018-02-01,2018-02-01,B2,33,Black or African American,Male,GSW,21,4,2018,1,1,Roxbury,Not Hispanic or Latinx
+626,130719749,2016-01-07,2013-11-12,D4,2,White,Female,Trauma,16,3,2013,4,11,Roxbury,Not Hispanic or Latinx
+628,182096701,2018-12-01,2018-12-01,B3,19,Black or African American,Male,GSW,19,6,2018,4,11,Dorchester,Not Hispanic or Latinx
+629,172031211,2017-04-22,2017-04-22,B2,17,Black or African American,Male,GSW,20,6,2017,2,4,Roxbury,Hispanic or Latinx
+631,162066422,2016-08-17,2016-08-17,A7,23,Black or African American,Male,STAB,6,4,2016,3,8,East Boston,Not Hispanic or Latinx
+633,172054624,2017-07-06,2017-07-06,B2,17,Black or African American,Male,GSW,18,5,2017,3,7,Dorchester,Not Hispanic or Latinx
+635,162007065,2016-01-27,2016-01-27,C11,19,Black or African American,Male,GSW,1,4,2016,1,1,Dorchester,Not Hispanic or Latinx
+636,172005625,2017-01-21,2017-01-21,B3,27,Black or African American,Male,GSW,18,7,2017,1,1,Dorchester,Not Hispanic or Latinx
+638,182023966,2018-03-31,2018-03-31,B3,38,Black or African American,Male,GSW,15,7,2018,1,3,Dorchester,Not Hispanic or Latinx
+641,152057348,2015-07-12,2015-07-11,C11,20,Black or African American,Male,GSW,17,7,2015,3,7,Dorchester,Not Hispanic or Latinx
+643,172051446,2017-06-27,2017-06-26,B3,29,Black or African American,Male,GSW,19,2,2017,2,6,Mattapan,Not Hispanic or Latinx
+645,162098498,2016-12-04,2016-12-03,E18,23,Black or African American,Male,GSW,0,7,2016,4,12,Hyde Park,Not Hispanic or Latinx
+646,172090526,2017-10-29,2017-10-30,C6,30,Black or African American,Male,GSW,20,1,2017,4,10,Dorchester,Not Hispanic or Latinx
+647,192012484,2019-02-17,2019-02-17,A7,31,Black or African American,Male,STAB,1,1,2019,1,2,East Boston,Not Hispanic or Latinx
+650,162077078,2016-09-21,2016-09-21,C11,21,Black or African American,Male,GSW,20,3,2016,3,9,Dorchester,Not Hispanic or Latinx
+652,172078494,2017-09-21,2017-09-21,B3,43,Black or African American,Male,STAB,8,5,2017,3,9,Dorchester,Not Hispanic or Latinx
+653,182058835,2018-07-26,2018-07-26,B3,27,White,Male,GSW,22,4,2018,3,7,Dorchester,Hispanic or Latinx
+656,152059883,2015-07-21,2015-07-20,E5,28,Black or African American,Male,GSW,10,2,2015,3,7,Roslindale,Hispanic or Latinx
+658,182051210,2018-06-30,2018-06-30,D14,27,White,Male,GSW,0,7,2018,2,6,Brighton,Not Hispanic or Latinx
+660,162086661,2016-10-22,2016-10-22,C6,50,White,Male,Trauma,17,7,2016,4,10,Roxbury,Not Hispanic or Latinx
+661,182002801,2018-01-11,2018-01-11,B2,21,Black or African American,Male,GSW,14,5,2018,1,1,Dorchester,Not Hispanic or Latinx
+663,172073486,2017-09-05,2017-09-05,C11,21,Black or African American,Male,GSW,10,3,2017,3,9,Dorchester,Not Hispanic or Latinx
+664,152091104,2015-11-03,2015-11-03,C11,21,White,Male,GSW,0,3,2015,4,11,Dorchester,Hispanic or Latinx
+666,162042228,2016-05-29,2016-05-29,B2,31,Black or African American,Male,GSW,10,1,2016,2,5,Dorchester,Not Hispanic or Latinx
+668,152028582,2015-04-13,2015-04-09,C11,33,Black or African American,Male,GSW,20,4,2015,2,4,Dorchester,Not Hispanic or Latinx
+671,182011931,2018-02-14,2018-02-14,B2,37,Black or African American,Male,GSW,18,4,2018,1,2,Roxbury,Not Hispanic or Latinx
+673,172014254,2017-02-21,2017-02-21,B2,19,Black or African American,Male,GSW,17,3,2017,1,2,Roxbury,Hispanic or Latinx
+674,182081058,2018-10-07,2018-10-07,B3,36,Black or African American,Male,GSW,11,1,2018,4,10,Mattapan,Not Hispanic or Latinx
+675,182099711,2018-12-11,2018-12-11,B3,25,Black or African American,Male,GSW,21,2,2018,4,12,Mattapan,Not Hispanic or Latinx
+677,152007197,2015-01-26,2015-01-27,B2,28,Black or African American,Male,STAB,20,2,2015,1,1,Roxbury,Hispanic or Latinx
+680,182093233,2018-11-18,2018-11-18,B3,28,Black or African American,Male,GSW,1,1,2018,4,11,Mattapan,Not Hispanic or Latinx
+681,162021883,2016-03-22,2016-03-21,B2,28,Black or African American,Male,GSW,3,2,2016,1,3,Roxbury,Not Hispanic or Latinx
+683,182025962,2018-04-07,2018-04-07,E18,27,Black or African American,Male,GSW,17,7,2018,2,4,Hyde Park,Not Hispanic or Latinx
+686,162104752,2016-12-25,2016-12-25,A7,18,White,Male,STAB,22,7,2016,4,12,East Boston,Hispanic or Latinx
+687,172094879,2017-11-15,2017-11-13,C11,55,White,Male,Other,14,2,2017,4,11,Dorchester,Hispanic or Latinx
+690,162050266,2016-06-24,2016-06-24,B3,43,Black or African American,Male,GSW,15,6,2016,2,6,Mattapan,Not Hispanic or Latinx
+691,182064699,2018-08-14,2018-08-14,B3,29,Black or African American,Male,GSW,9,3,2018,3,8,Mattapan,Not Hispanic or Latinx
+693,172054261,2017-07-05,2017-07-05,B2,51,Black or African American,Male,STAB,17,4,2017,3,7,Dorchester,Not Hispanic or Latinx
+696,172086572,2017-10-17,2017-10-17,C6,22,Black or African American,Male,GSW,4,3,2017,4,10,Dorchester,Not Hispanic or Latinx
+698,172058253,2017-07-18,2017-07-18,B2,58,White,Male,GSW,16,3,2017,3,7,Mission Hill,Hispanic or Latinx
+700,162069471,2016-08-27,2016-08-27,C11,24,Black or African American,Male,GSW,1,7,2016,3,8,Dorchester,Not Hispanic or Latinx
+701,162082007,2016-10-07,2016-10-07,B2,37,Black or African American,Male,STAB,0,6,2016,4,10,Mission Hill,Not Hispanic or Latinx
+704,182042108,2018-06-01,2018-06-01,B3,58,Black or African American,Male,STAB,2,6,2018,2,6,Mattapan,Not Hispanic or Latinx
+705,182052602,2018-07-05,2018-07-05,B2,36,Black or African American,Male,GSW,21,4,2018,3,7,Roxbury,Not Hispanic or Latinx
+707,152078371,2015-09-21,2015-09-20,A7,15,White,Male,STAB,17,1,2015,3,9,East Boston,Hispanic or Latinx
+709,182051210,2018-06-30,2018-06-30,D14,26,Black or African American,Male,GSW,0,7,2018,2,6,Brighton,Not Hispanic or Latinx
+710,182003512,2018-01-14,2018-01-14,D4,24,Black or African American,Male,GSW,21,7,2018,1,1,Back Bay,Not Hispanic or Latinx
+712,172074007,2017-09-07,2017-09-07,C11,16,Black or African American,Male,GSW,23,4,2017,3,9,Dorchester,Not Hispanic or Latinx
+713,172035478,2017-05-06,2017-05-06,B3,25,Black or African American,Male,GSW,21,6,2017,2,5,Mattapan,Not Hispanic or Latinx
+715,152037218,2015-05-11,2015-05-07,B2,24,Black or African American,Male,GSW,4,5,2015,2,5,Roxbury,Not Hispanic or Latinx
+716,162090649,2016-11-05,2016-11-05,B2,24,Black or African American,Male,GSW,10,7,2016,4,11,Roxbury,Not Hispanic or Latinx
+718,162046995,2016-06-15,2016-06-14,B3,31,Black or African American,Male,GSW,12,3,2016,2,6,Mattapan,Not Hispanic or Latinx
+721,172101369,2017-12-10,2017-12-07,B2,17,Black or African American,Male,GSW,19,4,2017,4,12,Mission Hill,Not Hispanic or Latinx
+722,182013918,2018-02-22,2018-02-22,C6,43,White,Male,GSW,0,5,2018,1,2,South Boston,Hispanic or Latinx
+723,192000054,2019-01-01,2019-01-01,B3,32,Black or African American,Male,GSW,3,3,2019,1,1,Dorchester,Hispanic or Latinx
+724,182080989,2018-10-07,2018-10-07,B3,42,Black or African American,Male,GSW,19,1,2018,4,10,Mattapan,Not Hispanic or Latinx
+725,152011169,2015-02-11,2015-02-11,E13,21,Black or African American,Male,GSW,10,4,2015,1,2,Jamaica Plain,Not Hispanic or Latinx
+727,162022418,2016-03-23,2016-03-23,A7,32,White,Male,GSW,22,3,2016,1,3,East Boston,Not Hispanic or Latinx
+729,182094270,2018-11-21,2018-11-21,B2,63,White,Male,STAB,16,4,2018,4,11,Dorchester,Not Hispanic or Latinx
+730,162064334,2016-11-16,2016-08-10,A1,54,Black or African American,Male,Other,18,4,2016,3,8,Chinatown,Not Hispanic or Latinx
+732,172054474,2017-07-06,2017-07-06,B2,18,Black or African American,Male,STAB,9,5,2017,3,7,Roxbury,Not Hispanic or Latinx
+733,162002573,2016-01-10,2016-01-10,A7,16,White,Male,GSW,1,1,2016,1,1,East Boston,Hispanic or Latinx
+737,182033779,2018-05-06,2018-05-05,E13,23,Black or African American,Male,GSW,21,6,2018,2,5,Jamaica Plain,Not Hispanic or Latinx
+738,162053997,2016-07-08,2016-07-07,C11,27,Black or African American,Male,GSW,11,5,2016,3,7,Dorchester,Not Hispanic or Latinx
+739,172087538,2017-10-20,2017-10-20,C11,38,White,Male,GSW,0,6,2017,4,10,Dorchester,Hispanic or Latinx
+740,192008843,2019-02-03,2019-02-03,B3,29,White,Male,GSW,9,1,2019,1,2,Mattapan,Hispanic or Latinx
+741,182074555,2018-09-16,2018-09-16,B2,29,Black or African American,Male,GSW,20,7,2018,3,9,Dorchester,Not Hispanic or Latinx
+744,162092746,2016-11-13,2016-11-12,B3,28,Black or African American,Male,GSW,16,7,2016,4,11,Dorchester,Not Hispanic or Latinx
+748,182042418,2018-06-02,2018-06-02,A7,29,Black or African American,Male,GSW,23,6,2018,2,6,East Boston,Not Hispanic or Latinx
+749,182053414,2018-07-07,2018-07-07,B2,30,Black or African American,Male,GSW,15,7,2018,3,7,Roxbury,Hispanic or Latinx
+751,152066828,2015-08-13,2015-08-13,E13,20,White,Male,GSW,22,4,2015,3,8,Jamaica Plain,Hispanic or Latinx
+752,152079378,2015-09-24,2015-09-24,B2,21,Black or African American,Male,GSW,20,4,2015,3,9,Dorchester,Not Hispanic or Latinx
+753,162073020,2016-09-07,2016-09-07,B3,21,Black or African American,Male,GSW,19,4,2016,3,9,Dorchester,Not Hispanic or Latinx
+754,172065378,2017-08-10,2017-08-10,B2,42,Black or African American,Male,GSW,22,4,2017,3,8,Dorchester,Not Hispanic or Latinx
+758,152020804,2015-03-15,2015-03-15,E18,21,Black or African American,Male,GSW,3,1,2015,1,3,Hyde Park,Not Hispanic or Latinx
+760,172035483,2017-05-05,2017-05-06,B2,18,Black or African American,Male,STAB,22,6,2017,2,5,Dorchester,Not Hispanic or Latinx
+763,152087906,2015-10-23,2015-10-23,D14,30,Black or African American,Male,GSW,1,6,2015,4,10,Brighton,Not Hispanic or Latinx
+765,152002215,2015-01-09,2015-01-09,B2,24,Black or African American,Male,GSW,22,5,2015,1,1,Roxbury,Not Hispanic or Latinx
+767,172046900,2017-06-13,2017-06-13,B3,37,Black or African American,Male,GSW,20,2,2017,2,6,Mattapan,Not Hispanic or Latinx
+770,172099946,2017-12-02,2017-12-02,C11,31,Black or African American,Male,GSW,23,6,2017,4,12,Dorchester,Not Hispanic or Latinx
+771,182008982,2018-02-03,2018-02-03,C11,20,Black or African American,Male,GSW,13,7,2018,1,2,Dorchester,Not Hispanic or Latinx
+773,172008070,2017-01-31,2017-01-30,C11,49,Black or African American,Male,GSW,6,2,2017,1,1,Dorchester,Not Hispanic or Latinx
+775,182082677,2018-10-13,2018-10-13,B3,33,Black or African American,Male,GSW,21,6,2018,4,10,Dorchester,Not Hispanic or Latinx
+776,050514974,2016-01-01,2005-09-24,B2,16,Black or African American,Male,GSW,1,7,2005,3,9,Roxbury,Not Hispanic or Latinx
+778,172105745,2017-12-23,2017-12-23,C11,48,White,Male,GSW,3,7,2017,4,12,Dorchester,Not Hispanic or Latinx
+781,162009550,2016-02-05,2016-02-04,B2,22,Black or African American,Male,GSW,17,5,2016,1,2,Roxbury,Not Hispanic or Latinx
+783,152062504,2015-07-29,2015-07-29,B2,31,White,Female,GSW,22,3,2015,3,7,Dorchester,Hispanic or Latinx
+784,162067346,2016-08-21,2016-08-20,B2,35,Black or African American,Male,GSW,0,7,2016,3,8,Dorchester,Hispanic or Latinx
+785,162101250,2016-12-13,2016-12-12,C11,24,Black or African American,Male,GSW,14,2,2016,4,12,Dorchester,Not Hispanic or Latinx
+789,182080411,2018-10-05,2018-10-05,C6,26,Black or African American,Male,GSW,3,6,2018,4,10,Roxbury,Not Hispanic or Latinx
+794,152101840,2015-12-10,2015-12-10,B3,27,Black or African American,Male,GSW,20,4,2015,4,12,Dorchester,Not Hispanic or Latinx
+795,192015793,2019-03-02,2019-03-02,B3,32,Black or African American,Male,GSW,2,7,2019,1,3,Dorchester,Not Hispanic or Latinx
+797,162029672,2016-04-20,2016-04-17,C11,45,White,Male,Trauma,1,1,2016,2,4,Dorchester,Not Hispanic or Latinx
+798,172051926,2017-07-01,2017-06-28,C11,20,Black or African American,Male,GSW,9,4,2017,2,6,Dorchester,Not Hispanic or Latinx
+799,182036836,2018-05-15,2018-05-15,B3,33,Black or African American,Male,GSW,10,3,2018,2,5,Mattapan,Not Hispanic or Latinx
+803,172079527,2017-09-24,2017-09-24,C6,33,White,Male,GSW,6,1,2017,3,9,South Boston,Hispanic or Latinx
+806,172068857,2017-08-21,2017-08-21,B2,30,Black or African American,Female,GSW,21,1,2017,3,8,Roxbury,Not Hispanic or Latinx
+807,152075106,2015-09-10,2015-09-10,B2,32,Black or African American,Male,GSW,4,5,2015,3,9,Roxbury,Not Hispanic or Latinx
+808,162078997,2016-09-27,2016-09-27,E13,42,Black or African American,Male,GSW,0,3,2016,3,9,Jamaica Plain,Not Hispanic or Latinx
+1219,192025403,2019-04-06,2019-04-06,B3,74,Black or African American,Female,GSW,16,7,2019,2,4,Mattapan,Not Hispanic or Latinx
+1220,192027439,2019-04-14,2019-04-14,B3,53,Black or African American,Male,GSW,23,7,2019,2,4,Mattapan,Not Hispanic or Latinx
+1221,192027439,2019-04-14,2019-04-14,B3,53,Black or African American,Male,GSW,23,7,2019,2,4,Mattapan,Not Hispanic or Latinx
+1222,192032179,2019-05-02,2019-05-01,C11,34,Black or African American,Male,GSW,18,4,2019,2,5,Dorchester,Not Hispanic or Latinx
+1223,192033997,2019-05-09,2019-05-08,B3,24,Black or African American,Male,GSW,10,4,2019,2,5,Dorchester,Not Hispanic or Latinx
+1224,192037998,2019-05-22,2019-05-22,B3,23,Black or African American,Male,GSW,20,3,2019,2,5,Dorchester,Not Hispanic or Latinx
+1225,192040692,2019-06-02,2019-05-31,C11,47,Black or African American,Male,STAB,22,5,2019,2,5,Dorchester,Not Hispanic or Latinx
+1226,192041946,2019-06-04,2019-06-04,D4,60,Black or African American,Male,GSW,10,3,2019,2,6,Back Bay,Not Hispanic or Latinx
+1227,192045000,2019-06-14,2019-06-14,B2,59,Black or African American,Male,GSW,3,6,2019,2,6,Dorchester,Hispanic or Latinx
+1228,192045558,2019-06-16,2019-06-16,B3,23,Black or African American,Male,GSW,1,1,2019,2,6,Dorchester,Not Hispanic or Latinx
+1229,192046078,2019-06-18,2019-06-18,E13,32,White,Male,GSW,21,2,2019,2,6,Jamaica Plain,Hispanic or Latinx
+1230,192046078,2019-06-18,2019-06-18,E13,33,White,Male,GSW,21,2,2019,2,6,Jamaica Plain,Hispanic or Latinx
+1231,192047704,2019-06-23,2019-06-23,B3,25,Black or African American,Male,GSW,15,1,2019,2,6,Mattapan,Not Hispanic or Latinx
+1232,192054283,2019-07-15,2019-07-15,B2,22,Black or African American,Male,GSW,23,1,2019,3,7,Dorchester,Not Hispanic or Latinx
+1233,I192055085,2019-07-17,2019-07-17,E5,24,Asian,Male,GSW,15,4,2019,3,7,Roslindale,Not Hispanic or Latinx
+1234,192058537,2019-07-29,2019-07-29,C11,20,Black or African American,Male,GSW,23,1,2019,3,7,Dorchester,Not Hispanic or Latinx
+1235,192059525,2019-08-01,2019-08-01,C11,30,Black or African American,Male,GSW,0,5,2019,3,8,Dorchester,Not Hispanic or Latinx
+1236,192062795,2019-08-11,2019-08-11,B2,38,Black or African American,Female,STAB,12,1,2019,3,8,Roxbury,Not Hispanic or Latinx
+1237,192061117,2019-08-06,2019-08-06,B3,18,Black or African American,Male,GSW,1,3,2019,3,8,Dorchester,Not Hispanic or Latinx
+1238,192070453,2019-09-04,2019-09-04,A7,22,White,Male,STAB,23,3,2019,3,9,East Boston,Hispanic or Latinx
+1239,192074613,2019-09-17,2019-09-17,C11,27,Black or African American,Male,GSW,23,2,2019,3,9,Dorchester,Not Hispanic or Latinx
+1240,I192075250,2019-09-19,2019-09-19,D4,32,Black or African American,Male,STAB,21,4,2019,3,9,Roxbury,Not Hispanic or Latinx
+1241,192078316,2019-09-28,2019-09-28,D14,19,White,Male,Trauma,1,7,2019,3,9,Allston,Not Hispanic or Latinx
+1242,192086707,2019-10-26,2019-10-26,E13,25,Black or African American,Male,GSW,3,7,2019,4,10,Roxbury,Not Hispanic or Latinx
+1243,192088243,2019-10-31,2019-10-31,E18,44,White,Male,GSW,14,5,2019,4,10,Roslindale,Hispanic or Latinx
+1244,192088750,2019-11-02,2019-11-02,E18,35,Black or African American,Male,GSW,22,6,2019,4,11,Roslindale,Not Hispanic or Latinx
+1245,192094784,2019-11-23,2019-11-23,A1,25,White,Male,GSW,2,7,2019,4,11,West End,Not Hispanic or Latinx
+1246,192103637,2019-12-25,2019-12-25,D4,1,White,Male,Trauma,13,4,2019,4,12,Roxbury,Not Hispanic or Latinx
+1247,192103637,2019-12-25,2019-12-25,D4,4,White,Female,Trauma,13,4,2019,4,12,Roxbury,Not Hispanic or Latinx
+1248,202002920,2020-01-12,2020-01-12,B2,19,Black or African American,Male,GSW,20,7,2020,1,1,Dorchester,Not Hispanic or Latinx
+1249,202005879,2020-01-23,2020-01-23,C11,23,Black or African American,Male,GSW,19,4,2020,1,1,Dorchester,Not Hispanic or Latinx
+1250,202006716,2020-01-25,2020-01-25,B2,16,Black or African American,Male,STAB,16,7,2020,1,1,Roxbury,Hispanic or Latinx
+1251,202010471,2020-02-07,2020-02-07,B2,62,Black or African American,Male,GSW,18,6,2020,1,2,Dorchester,Not Hispanic or Latinx
+1252,202009888,2020-02-05,2020-02-05,B2,31,Black or African American,Male,GSW,18,4,2020,1,2,Dorchester,Hispanic or Latinx
+1253,202012769,2020-02-16,2020-02-16,B3,18,Black or African American,Male,GSW,21,7,2020,1,2,Mattapan,Not Hispanic or Latinx
+1254,202014058,2020-02-21,2020-02-21,B3,46,White,Male,GSW,23,5,2020,1,2,Dorchester,Hispanic or Latinx
+1255,202015077,2020-02-25,2020-02-25,B3,29,Black or African American,Male,GSW,19,2,2020,1,2,Mattapan,Not Hispanic or Latinx
+1256,202015868,2020-02-27,2020-02-27,C11,51,Black or African American,Female,Trauma,14,5,2020,1,2,Dorchester,Not Hispanic or Latinx
+1257,202021807,2020-03-20,2020-03-20,B3,18,Black or African American,Male,GSW,19,6,2020,1,3,Dorchester,Not Hispanic or Latinx
+1258,202027248,2020-04-15,2020-04-15,C11,17,Black or African American,Female,GSW,15,4,2020,2,4,Dorchester,Not Hispanic or Latinx
+1259,202031103,2020-05-04,2020-05-04,B2,41,Black or African American,Male,GSW,22,1,2020,2,5,Roxbury,Not Hispanic or Latinx
+1260,202034010,2020-05-16,2020-05-16,C11,56,Black or African American,Male,GSW,19,7,2020,2,5,Dorchester,Not Hispanic or Latinx
+1261,202034336,2020-05-18,2020-05-18,B3,49,Black or African American,Male,GSW,12,2,2020,2,5,Dorchester,Not Hispanic or Latinx
+1262,202035190,2020-05-22,2020-05-22,E13,24,Black or African American,Male,GSW,21,5,2020,2,5,Jamaica Plain,Not Hispanic or Latinx
+1263,202036660,2020-05-28,2020-05-28,B3,42,White,Male,GSW,23,4,2020,2,5,Dorchester,Hispanic or Latinx
+1264,202038748,2020-06-04,2020-06-04,B3,33,Black or African American,Male,GSW,2,5,2020,2,6,Dorchester,Not Hispanic or Latinx
+1265,202041368,2020-06-13,2020-06-13,B3,28,Black or African American,Male,GSW,15,7,2020,2,6,Dorchester,Not Hispanic or Latinx
+1266,202043876,2020-06-23,2020-06-23,B3,19,Black or African American,Male,GSW,1,3,2020,2,6,Dorchester,Not Hispanic or Latinx
+1267,202046020,2020-06-30,2020-06-30,B2,19,Black or African American,Male,GSW,19,3,2020,2,6,Roxbury,Hispanic or Latinx
+1268,202046395,2020-07-02,2020-07-02,B3,45,Black or African American,Male,GSW,0,5,2020,3,7,Dorchester,Not Hispanic or Latinx
+1269,202046620,2020-07-03,2020-07-03,B3,22,Black or African American,Male,GSW,20,5,2020,3,7,Mattapan,Not Hispanic or Latinx
+1270,202046657,2020-07-03,2020-07-03,B2,15,White,Male,GSW,22,5,2020,3,7,Roxbury,Hispanic or Latinx
+1271,202047204,2020-07-05,2020-07-05,C11,34,Black or African American,Female,GSW,3,1,2020,3,7,Dorchester,Not Hispanic or Latinx
+1272,202046952,2020-07-04,2020-07-04,C11,36,White,Male,STAB,23,6,2020,3,7,Dorchester,Hispanic or Latinx
+1273,202046944,2020-07-03,2020-07-04,B3,50,Black or African American,Male,STAB,22,6,2020,3,7,Dorchester,Not Hispanic or Latinx
+1274,202049124,2020-07-12,2020-07-12,B3,35,Black or African American,Male,GSW,1,1,2020,3,7,Mattapan,Not Hispanic or Latinx
+1275,202049078,2020-07-12,2020-07-12,B2,49,Black or African American,Male,GSW,0,1,2020,3,7,Roxbury,Not Hispanic or Latinx
+1276,202051043,2020-07-19,2020-07-19,B3,17,Black or African American,Male,GSW,16,1,2020,3,7,Dorchester,Not Hispanic or Latinx
+1277,202051043,2020-07-19,2020-07-19,B3,16,Black or African American,Male,GSW,16,1,2020,3,7,Dorchester,Not Hispanic or Latinx
+1278,202052816,2020-07-26,2020-07-26,C11,28,Black or African American,Male,GSW,2,1,2020,3,7,Dorchester,Not Hispanic or Latinx
+1279,202052804,2020-07-26,2020-07-26,B3,39,Black or African American,Male,GSW,1,1,2020,3,7,Dorchester,Not Hispanic or Latinx
+1280,202053871,2020-07-30,2020-07-30,C11,28,Black or African American,Male,GSW,23,4,2020,3,7,Dorchester,Not Hispanic or Latinx
+1281,202054205,2020-08-01,2020-07-31,C6,27,Black or African American,Male,STAB,7,6,2020,3,7,South Boston,Not Hispanic or Latinx
+1282,202055355,2020-08-04,2020-08-04,B2,48,Black or African American,Male,STAB,0,3,2020,3,8,Roxbury,Not Hispanic or Latinx
+1283,202055998,2020-08-06,2020-08-06,B3,26,Black or African American,Male,GSW,9,5,2020,3,8,Mattapan,Not Hispanic or Latinx
+1284,202020108,2020-07-28,2020-03-13,D4,29,White,Female,Trauma,12,6,2020,1,3,Fenway,Not Hispanic or Latinx
+1285,202054954,2020-08-06,2020-08-03,B3,25,Black or African American,Male,GSW,21,1,2020,3,8,Dorchester,Not Hispanic or Latinx
+1286,202049803,2020-08-22,2020-07-15,B2,24,Unknown,Male,GSW,21,3,2020,3,7,Roxbury,Unknown
+1287,202061868,2020-08-27,2020-08-27,C11,26,Black or African American,Male,GSW,22,4,2020,3,8,Dorchester,Not Hispanic or Latinx
+1288,202041578,2020-09-04,2020-06-14,B2,53,Black or African American,Female,Trauma,14,1,2020,2,6,Roxbury,Not Hispanic or Latinx
+1289,202068185,2020-09-17,2020-09-17,A15,24,Black or African American,Male,GSW,19,5,2020,3,9,Charlestown,Hispanic or Latinx
+1290,202068459,2020-09-18,2020-09-18,D4,43,White,Male,GSW,19,6,2020,3,9,Roxbury,Hispanic or Latinx
+1291,202062720,2020-09-19,2020-08-30,B3,41,Black or African American,Male,GSW,2,1,2020,3,8,Dorchester,Not Hispanic or Latinx
+1292,202068185,2020-09-22,2020-09-17,A15,28,Black or African American,Male,GSW,19,5,2020,3,9,Charlestown,Hispanic or Latinx
+1293,202070693,2020-09-27,2020-09-27,C11,28,Black or African American,Male,GSW,1,1,2020,3,9,Dorchester,Not Hispanic or Latinx
+1294,202075514,2020-10-18,2020-10-14,B3,18,Black or African American,Male,GSW,21,3,2020,4,10,Dorchester,Not Hispanic or Latinx
+1295,202077762,2020-10-21,2020-10-21,E13,45,Black or African American,Male,GSW,18,4,2020,4,10,Jamaica Plain,Not Hispanic or Latinx
+1296,202078749,2020-10-25,2020-10-25,B2,24,Black or African American,Male,GSW,0,1,2020,4,10,Roxbury,Hispanic or Latinx
+1297,202080009,2020-10-29,1991-10-02,B2,15,Black or African American,Male,GSW,14,4,1991,4,10,Roxbury,Not Hispanic or Latinx
+1298,182043571,2020-10-29,2018-06-06,B3,74,White,Male,Trauma,23,3,2018,2,6,Dorchester,Not Hispanic or Latinx
+1299,202082172,2020-11-07,2020-11-07,E13,28,White,Male,GSW,23,6,2020,4,11,Jamaica Plain,Hispanic or Latinx
+1300,202084756,2020-11-17,2020-11-17,E18,20,Black or African American,Male,GSW,22,2,2020,4,11,Hyde Park,Hispanic or Latinx
+1301,202090225,2020-12-09,2020-12-09,E13,58,Black or African American,Female,Trauma,19,3,2020,4,12,Roxbury,Not Hispanic or Latinx
+1302,202091439,2020-12-13,2020-12-14,E18,22,Black or African American,Male,GSW,19,1,2020,4,12,Hyde Park,Not Hispanic or Latinx
+1303,202094063,2020-12-24,2020-12-25,A7,28,Black or African American,Male,STAB,21,5,2020,4,12,East Boston,Not Hispanic or Latinx
+1304,212000828,2021-01-04,2021-01-05,C6,33,White,Male,STAB,19,2,2021,1,1,South Boston,Not Hispanic or Latinx
+1305,212001090,2021-01-22,2021-01-06,B3,22,Black or African American,Male,GSW,0,4,2021,1,1,Mattapan,Not Hispanic or Latinx
+1306,212003327,2021-01-15,2021-01-15,B3,17,Black or African American,Male,GSW,18,6,2021,1,1,Dorchester,Not Hispanic or Latinx
+1307,202094084,2021-01-14,2020-12-25,B2,66,Black or African American,Male,Trauma,23,5,2020,4,12,Roxbury,Not Hispanic or Latinx
+1308,212004677,2021-01-22,2021-01-22,C11,19,Black or African American,Female,GSW,12,6,2021,1,1,Dorchester,Not Hispanic or Latinx
+1309,212007684,2021-02-04,2021-02-05,B3,32,Black or African American,Male,GSW,22,5,2021,1,2,Dorchester,Not Hispanic or Latinx
+1310,212007688,2021-02-04,2021-02-05,A1,17,Black or African American,Female,GSW,23,5,2021,1,2,Downtown,Not Hispanic or Latinx
+1311,212011262,2021-02-21,2021-02-21,A1,21,White,Male,STAB,23,7,2021,1,2,West End,Not Hispanic or Latinx
+1312,212012715,2021-02-27,2021-02-27,C6,40,Black or African American,Male,STAB,5,7,2021,1,2,Roxbury,Not Hispanic or Latinx
+1313,212017718,2021-03-20,2021-03-20,A15,33,Black or African American,Male,GSW,3,7,2021,1,3,Charlestown,Not Hispanic or Latinx
+1314,212023091,2021-04-10,2021-04-10,C11,73,Black or African American,Female,GSW,17,7,2021,2,4,Dorchester,Not Hispanic or Latinx
+1315,212028413,2021-05-02,2021-05-02,C11,42,Unknown,Female,STAB,12,1,2021,2,5,Dorchester,Unknown
+1316,212028413,2021-05-02,2021-05-02,C11,27,White,Female,STAB,12,1,2021,2,5,Dorchester,Hispanic or Latinx
+1317,212031592,2021-05-14,2021-05-15,D4,24,White,Male,STAB,20,6,2021,2,5,South End,Hispanic or Latinx
+1318,212034069,2021-05-23,2021-05-24,B2,26,Black or African American,Male,GSW,22,1,2021,2,5,Dorchester,Not Hispanic or Latinx
+1319,212034323,2021-05-24,2021-05-25,B3,40,Black or African American,Male,GSW,20,2,2021,2,5,Dorchester,Not Hispanic or Latinx
+1320,212035337,2021-05-28,2021-05-28,B3,37,Black or African American,Male,GSW,11,6,2021,2,5,Dorchester,Not Hispanic or Latinx
+1321,212038114,2021-06-07,2021-06-08,B2,32,Black or African American,Male,GSW,20,2,2021,2,6,Mission Hill,Hispanic or Latinx
+1322,212021041,2021-04-02,2021-04-02,C6,23,White,Male,Suffocation/Stab,11,6,2021,2,4,Roxbury,Not Hispanic or Latinx
+1323,212041733,2021-06-21,2021-06-21,B2,33,Black or African American,Male,GSW,20,1,2021,2,6,Roxbury,Not Hispanic or Latinx
+1324,212045699,2021-07-05,2021-07-05,B2,29,Black or African American,Male,GSW,3,2,2021,3,7,Roxbury,Not Hispanic or Latinx
+1325,212052395,2021-07-29,2021-07-29,E5,42,Black or African American,Female,GSW,13,5,2021,3,7,Roslindale,Not Hispanic or Latinx
+1326,212055190,2021-08-08,2021-08-08,B2,34,White,Male,STAB,8,1,2021,3,8,Roxbury,Hispanic or Latinx
+1327,212055384,2021-08-09,2021-08-09,B3,38,Black or African American,Female,GSW,0,2,2021,3,8,Dorchester,Not Hispanic or Latinx
+1328,212056861,2021-08-14,2021-08-14,B3,39,Black or African American,Male,GSW,3,7,2021,3,8,Mattapan,Not Hispanic or Latinx
+1329,212059080,2021-08-24,2021-08-22,B3,30,Black or African American,Male,GSW,0,1,2021,3,8,Mattapan,Hispanic or Latinx
+1330,212061019,2021-08-28,2021-08-28,B3,31,Black or African American,Male,GSW,18,7,2021,3,8,Dorchester,Not Hispanic or Latinx
+1331,212060871,2021-08-28,2021-08-28,B3,17,Black or African American,Male,STAB,9,7,2021,3,8,Dorchester,Hispanic or Latinx
+1332,212059355,2021-08-23,2021-08-23,C6,29,Black or African American,Male,STAB,6,2,2021,3,8,South Boston,Not Hispanic or Latinx
+1333,212064025,2021-09-08,2021-09-08,E13,34,Black or African American,Male,GSW,14,4,2021,3,9,Jamaica Plain,Not Hispanic or Latinx
+1334,130253160,2021-09-16,2013-04-29,B2,19,White,Male,GSW,0,2,2013,2,4,Roxbury,Hispanic or Latinx
+1335,212069153,2021-09-26,2021-09-26,B3,31,Black or African American,Female,GSW,21,7,2021,3,9,Dorchester,Not Hispanic or Latinx
+1336,212072410,2021-10-06,2021-10-07,B3,25,Black or African American,Male,GSW,22,4,2021,4,10,Mattapan,Not Hispanic or Latinx
+1337,212073444,2021-10-10,2021-10-10,E18,20,Black or African American,Male,GSW,14,1,2021,4,10,Hyde Park,Not Hispanic or Latinx
+1338,212073779,2021-10-11,2021-10-11,B2,43,White,Male,STAB,18,2,2021,4,10,Dorchester,Not Hispanic or Latinx
+1339,212007210,2021-07-21,2021-02-03,A7,91,White,Female,Trauma,12,4,2021,1,2,East Boston,Not Hispanic or Latinx
+1340,212082297,2021-11-10,2021-11-10,B3,48,Black or African American,Female,GSW,23,3,2021,4,11,Mattapan,Not Hispanic or Latinx
+1341,212085753,2021-11-23,2021-11-23,E18,30,White,Male,GSW,21,2,2021,4,11,Hyde Park,Hispanic or Latinx
+1342,212091961,2021-12-16,2021-12-16,A7,27,Black or African American,Male,GSW,12,5,2021,4,12,East Boston,Not Hispanic or Latinx
+1343,050538334,2021-05-27,2005-10-07,D14,23,Black or African American,Male,GSW,6,6,2005,4,10,Allston,Not Hispanic or Latinx
+1344,222000342,2022-01-02,2022-01-02,C11,17,Black or African American,Female,GSW,18,1,2022,1,1,Dorchester,Unknown
+1345,222006027,2022-01-26,2022-01-27,B2,33,Black or African American,Male,STAB,20,4,2022,1,1,Roxbury,Not Hispanic or Latinx
+1346,222009080,2022-02-07,2022-02-08,A1,29,Black or African American,Male,STAB,22,2,2022,1,2,Downtown,Not Hispanic or Latinx
+1347,222018038,2022-03-15,2022-03-15,D4,58,Black or African American,Female,STAB,9,3,2022,1,3,Roxbury,Not Hispanic or Latinx
+1348,222019284,2022-03-19,2022-03-19,A1,23,White,Male,STAB,18,7,2022,1,3,Downtown,Hispanic or Latinx
+1349,222024777,2022-04-08,2022-04-09,E5,23,Black or African American,Male,GSW,21,6,2022,2,4,Roslindale,Not Hispanic or Latinx
+1350,222025490,2022-04-12,2022-04-11,B2,31,Black or African American,Male,GSW,17,2,2022,2,4,Unknown,Not Hispanic or Latinx
+1351,222025866,2022-04-12,2022-04-13,E13,27,Unknown,Male,GSW,22,3,2022,2,4,Roxbury,Hispanic or Latinx
+1352,222029636,2022-04-27,2022-04-27,B2,51,Black or African American,Male,GSW,11,4,2022,2,4,Roxbury,Not Hispanic or Latinx
+1353,222033321,2022-05-10,2022-05-11,E18,40,Black or African American,Female,STAB,21,3,2022,2,5,Mattapan,Not Hispanic or Latinx
+1354,222039270,2022-05-30,2022-05-31,B2,39,Black or African American,Male,STAB,20,2,2022,2,5,Roxbury,Not Hispanic or Latinx
+1355,222040203,2022-06-02,2022-06-03,C11,37,Black or African American,Male,GSW,22,5,2022,2,6,Dorchester,Not Hispanic or Latinx
+1356,222043221,2022-06-12,2022-06-13,B2,20,Black or African American,Male,GSW,21,1,2022,2,6,Roxbury,Not Hispanic or Latinx
+1357,222053028,2022-07-16,2022-07-16,C11,48,Black or African American,Male,STAB,1,7,2022,3,7,Unknown,Not Hispanic or Latinx
+1358,222053517,2022-07-17,2022-07-18,B3,33,Black or African American,Male,GSW,21,1,2022,3,7,Unknown,Not Hispanic or Latinx
+1359,222054787,2022-07-21,2022-07-22,B3,21,Black or African American,Male,GSW,22,5,2022,3,7,Mattapan,Not Hispanic or Latinx
+1360,222056542,2022-07-27,2022-07-27,C11,15,Black or African American,Male,GSW,19,4,2022,3,7,Unknown,Not Hispanic or Latinx
+1361,222057902,2022-08-01,2022-08-01,B3,33,Black or African American,Male,GSW,12,2,2022,3,8,Dorchester,Not Hispanic or Latinx
+1362,222061630,2022-08-13,2022-08-14,D4,26,Black or African American,Male,GSW,22,7,2022,3,8,South End,Hispanic or Latinx
+1363,222060964,2022-08-11,2022-08-12,B3,19,Black or African American,Male,GSW,20,5,2022,3,8,Mattapan,Unknown
+1364,222065701,2022-08-27,2022-08-27,B3,33,Black or African American,Male,GSW,17,7,2022,3,8,Dorchester,Not Hispanic or Latinx
+1365,222066832,2022-09-01,2022-08-31,C11,26,Black or African American,Male,GSW,17,4,2022,3,8,Dorchester,Not Hispanic or Latinx
+1366,222067867,2022-09-04,2022-09-04,C11,32,Black or African American,Male,GSW,2,1,2022,3,9,Dorchester,Not Hispanic or Latinx
+1367,222067867,2022-09-04,2022-09-04,C11,33,Black or African American,Male,GSW,2,1,2022,3,9,Dorchester,Not Hispanic or Latinx
+1368,222066903,2022-08-31,2022-09-01,B2,28,Black or African American,Male,GSW,20,4,2022,3,8,Roxbury,Not Hispanic or Latinx
+1369,222075243,2022-09-29,2022-09-29,D4,26,Black or African American,Male,GSW,18,5,2022,3,9,Roxbury,Hispanic or Latinx
+1370,222076415,2022-10-04,2022-10-04,C11,19,Unknown,Unknown,GSW,0,3,2022,4,10,Dorchester,Unknown
+1371,222066965,2022-09-01,2022-09-01,E13,39,Black or African American,Male,Trauma,4,5,2022,3,9,Jamaica Plain,Not Hispanic or Latinx
+1372,222078096,2022-10-10,2022-10-10,B2,14,Unknown,Male,GSW,12,2,2022,4,10,Roxbury,Unknown
+1373,222079944,2022-10-16,2022-10-17,C11,24,Black or African American,Female,GSW,20,1,2022,4,10,Dorchester,Not Hispanic or Latinx
+1374,222081486,2022-10-23,2022-10-22,B3,36,Black or African American,Male,GSW,0,7,2022,4,10,Dorchester,Not Hispanic or Latinx
+1375,222081761,2022-10-24,2022-10-23,E18,33,Black or African American,Female,GSW,4,1,2022,4,10,Mattapan,Not Hispanic or Latinx
+1377,222081951,2022-10-23,2022-10-24,C11,21,Black or African American,Male,GSW,22,1,2022,4,10,Dorchester,Unknown
+1378,222082764,2022-10-26,2022-10-26,C11,43,Black or African American,Male,GSW,19,4,2022,4,10,Dorchester,Unknown
+1379,222086068,2022-11-06,2022-11-07,B3,48,White,Male,GSW,21,1,2022,4,11,Mattapan,Hispanic or Latinx
+1380,222085581,2022-11-04,2022-11-05,D4,39,Black or African American,Male,GSW,22,6,2022,4,11,South End,Not Hispanic or Latinx
+1381,222086858,2022-11-09,2022-11-09,B3,35,Black or African American,Male,GSW,13,4,2022,4,11,Dorchester,Not Hispanic or Latinx
+1382,222095809,2022-12-11,2022-12-12,D4,43,White,Male,STAB,20,1,2022,4,12,Roxbury,Hispanic or Latinx
+1383,222096629,2022-12-16,2022-12-16,B2,22,White,Male,GSW,23,5,2022,4,12,Unknown,Hispanic or Latinx
+1384,222099235,2022-12-24,2022-12-25,B3,18,Black or African American,Male,GSW,23,7,2022,4,12,Dorchester,Not Hispanic or Latinx
+1385,232000070,2023-01-01,2023-01-01,B3,33,Black or African American,Male,GSW,5,1,2023,1,1,Mattapan,Not Hispanic or Latinx
+1386,232007576,2023-01-29,2023-01-29,B3,13,Black or African American,Male,GSW,11,1,2023,1,1,Mattapan,Not Hispanic or Latinx
+1387,232011353,2023-02-11,2023-02-11,E13,21,White,Female,STAB,16,7,2023,1,2,Jamaica Plain,Hispanic or Latinx
+1388,232011907,2023-02-14,2023-02-14,B2,31,Black or African American,Male,GSW,20,2,2023,1,2,Roxbury,Not Hispanic or Latinx
+1389,232013356,2023-02-19,2023-02-19,B3,33,Black or African American,Female,GSW,20,7,2023,1,2,Dorchester,Not Hispanic or Latinx
+1390,232013379,2023-02-18,2023-02-19,D4,37,Black or African American,Male,GSW,23,7,2023,1,2,Roxbury,Not Hispanic or Latinx
+1391,232014078,2023-02-21,2023-02-22,C11,21,Black or African American,Male,GSW,19,3,2023,1,2,Dorchester,Unknown
+1392,232017019,2023-03-04,2023-03-04,B2,56,Black or African American,Male,GSW,15,7,2023,1,3,Roxbury,Not Hispanic or Latinx
+1393,232017322,2023-03-05,2023-03-06,E13,44,Black or African American,Male,GSW,23,1,2023,1,3,Jamaica Plain,Not Hispanic or Latinx
+1394,232012577,2023-03-03,2023-02-16,A1,75,White,Male,STAB,11,5,2023,1,2,West End,Not Hispanic or Latinx
+1879,232021346,2023-03-24,2023-03-18,A1,46,White,Male,Trauma,20,6,2023,1,3,Downtown,Not Hispanic or Latinx
+2272,232027272,2023-04-08,2023-04-09,E13,43,Black or African American,Male,GSW,22,7,2023,2,4,Jamaica Plain,Not Hispanic or Latinx
+2599,222092383,2023-04-21,2022-11-30,D4,55,Black or African American,Male,STAB,21,3,2022,4,11,Roxbury,Not Hispanic or Latinx
+2650,232031186,2023-04-23,2023-04-23,E18,21,Black or African American,Male,GSW,21,7,2023,2,4,Hyde Park,Not Hispanic or Latinx
+2651,232031186,2023-04-23,2023-04-23,E18,23,Black or African American,Male,GSW,21,7,2023,2,4,Hyde Park,Not Hispanic or Latinx
+2995,232035541,2023-05-07,2023-05-08,B3,37,Black or African American,Male,GSW,20,1,2023,2,5,Mattapan,Not Hispanic or Latinx
+2996,232035584,2023-05-07,2023-05-08,C11,23,Black or African American,Male,GSW,20,1,2023,2,5,Dorchester,Hispanic or Latinx
+3342,232040051,2023-05-22,2023-05-22,C11,33,Black or African American,Male,GSW,16,2,2023,2,5,Dorchester,Not Hispanic or Latinx
+3972,232051641,2023-07-02,2023-07-01,B2,30,White,Male,GSW,0,7,2023,3,7,Mission Hill,Hispanic or Latinx
+4083,232053295,2023-07-06,2023-07-07,B2,19,Black or African American,Male,GSW,23,5,2023,3,7,Dorchester,Not Hispanic or Latinx
+4212,222049692,2023-07-13,2022-07-05,B3,33,Black or African American,Male,GSW,9,3,2022,3,7,Dorchester,Not Hispanic or Latinx
+4218,232055224,2023-07-13,2023-07-13,B3,12,Black or African American,Male,GSW,14,5,2023,3,7,Mattapan,Not Hispanic or Latinx
+4318,232056565,2023-07-18,2023-07-18,E13,45,Black or African American,Male,GSW,1,3,2023,3,7,Jamaica Plain,Not Hispanic or Latinx
+4425,232057539,2023-07-27,2023-07-21,A1,21,Black or African American,Female,STAB,23,5,2023,3,7,Downtown,Not Hispanic or Latinx
+4426,232060443,2023-07-30,2023-07-31,B2,27,White,Male,GSW,23,1,2023,3,7,Roxbury,Hispanic or Latinx
+4427,232060395,2023-07-30,2023-07-30,B2,33,Black or African American,Male,GSW,19,1,2023,3,7,Roxbury,Not Hispanic or Latinx
+5039,232070897,2023-09-02,2023-09-03,B3,22,Black or African American,Male,GSW,23,7,2023,3,9,Dorchester,Hispanic or Latinx
+5199,232072799,2023-09-09,2023-09-09,B3,29,Black or African American,Female,GSW,5,7,2023,3,9,Dorchester,Not Hispanic or Latinx
+5442,232066270,2023-10-02,2023-08-19,C6,38,Black or African American,Female,STAB,0,7,2023,3,8,South Boston,Not Hispanic or Latinx
+5443,232082860,2023-10-13,2023-10-13,C11,30,Black or African American,Male,GSW,14,6,2023,4,10,Dorchester,Not Hispanic or Latinx
+5444,232083024,2023-10-14,2023-10-14,B3,25,Black or African American,Male,GSW,0,7,2023,4,10,Mattapan,Not Hispanic or Latinx
+5445,232084591,2023-10-19,2023-10-19,E18,78,Black or African American,Male,STAB,11,5,2023,4,10,Mattapan,Not Hispanic or Latinx
+5446,232095738,2023-11-25,2023-11-25,D14,24,White,Male,GSW,14,7,2023,4,11,Allston,Hispanic or Latinx
+5447,232100807,2023-12-11,2023-12-11,E5,18,White,Male,STAB,17,2,2023,4,12,Roslindale,Hispanic or Latinx
+5448,232101811,2023-12-15,2023-12-15,A7,34,White,Male,STAB,6,6,2023,4,12,East Boston,Hispanic or Latinx
+5449,232106072,2023-12-30,2023-12-30,C11,41,Black or African American,Male,GSW,0,7,2023,4,12,Dorchester,Not Hispanic or Latinx
+5450,242000085,2024-01-01,2024-01-01,C11,24,Black or African American,Male,GSW,5,2,2024,1,1,Dorchester,Not Hispanic or Latinx
+5451,242015780,2024-03-08,2024-02-26,A1,35,Black or African American,Female,GSW,12,2,2024,1,2,Downtown,Not Hispanic or Latinx
+5452,242033721,2024-04-28,2024-04-27,B3,42,Black or African American,Male,GSW,4,7,2024,2,4,Mattapan,Not Hispanic or Latinx
+5453,242035353,2024-08-08,2024-05-02,B3,28,Black or African American,Male,GSW,15,5,2024,2,5,Dorchester,Not Hispanic or Latinx
+5454,242044595,2024-06-01,2024-06-01,B3,27,Unknown,Female,GSW,23,6,2024,2,5,Dorchester,Unknown
+5455,242053267,2024-06-28,2024-06-29,C11,19,Unknown,Male,GSW,20,6,2024,2,6,Dorchester,Unknown
+5456,242055071,2024-07-05,2024-07-05,D4,40,Unknown,Male,GSW,1,6,2024,3,7,Roxbury,Unknown
+5457,242055178,2024-07-05,2024-07-05,C11,17,Black or African American,Male,GSW,12,6,2024,3,7,Mattapan,Unknown
+5458,242057984,2024-07-14,2024-07-15,E13,35,Unknown,Male,GSW,22,1,2024,3,7,Jamaica Plain,Hispanic or Latinx
+5459,242064537,2024-08-05,2024-08-04,E13,45,Black or African American,Male,STAB,4,1,2024,3,8,Jamaica Plain,Unknown
+5460,242067102,2024-08-12,2024-08-12,C11,49,Unknown,Male,GSW,18,2,2024,3,8,Dorchester,Unknown
+5461,242071666,2024-08-23,2024-08-24,C11,52,Black or African American,Male,STAB,21,6,2024,3,8,Dorchester,Not Hispanic or Latinx
+5462,242071965,2024-08-24,2024-08-25,C11,38,Black or African American,Male,GSW,21,7,2024,3,8,Dorchester,Not Hispanic or Latinx
+5463,242074601,2024-09-03,2024-09-02,C11,20,Black or African American,Male,GSW,12,2,2024,3,9,Dorchester,Hispanic or Latinx
