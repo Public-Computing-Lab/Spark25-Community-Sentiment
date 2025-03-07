@@ -70,3 +70,5 @@ build/
 *.log
 gemini_api.key.txt
 
+# Nova
+.nova
