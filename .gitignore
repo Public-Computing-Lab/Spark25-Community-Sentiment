@@ -70,5 +70,8 @@ build/
 *.log
 gemini_api.key.txt
 
+# nova
+.nova
 
+# vercel
 .vercel
