@@ -22,6 +22,8 @@ APP_VERSION = "0.02"
 # ✅ Load environment variables
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+PORT = os.getenv("EXPERIMENT_2_PORT")
+
 genai.configure(api_key=GEMINI_API_KEY)
 
 app = Flask(__name__, template_folder="templates")
