@@ -13,6 +13,8 @@ APP_VERSION = "0.01"
 # ✅ Load environment variables
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+PORT = os.getenv("EXPERIMENT_1_PORT")
+
 genai.configure(api_key=GEMINI_API_KEY)
 
 app = Flask(__name__, template_folder="templates")
@@ -180,7 +182,7 @@ def feedback():
 def start_app():
     """Starts the Flask application (for local & server)."""
     print("\n🚀 Server is running on 0.0.0.0:8080")  # ✅ Fixed!
-    app.run(host="0.0.0.0", port=8080)
+    app.run(host="0.0.0.0", port=PORT)
 
 if __name__ == "__main__":
     start_app()
