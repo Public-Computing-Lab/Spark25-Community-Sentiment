@@ -11,7 +11,8 @@ import google.generativeai as genai
 
 load_dotenv()  
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')  
-
+PORT = os.getenv("EXPERIMENT_3_PORT")
+DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_3_DASH_REQUESTS_PATHNAME")
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -116,7 +117,7 @@ def ask_chatbot(user_query):
     return response.text  
 
 # Initialize Dash app
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],serve_locally=False, requests_pathname_prefix='/experimenting/3/')
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],serve_locally=False, requests_pathname_prefix=DASH_REQUESTS_PATHNAME)
 app.title = "Dorchester Crime Dashboard"
 
 # Layout with filters and graphs
@@ -534,7 +535,7 @@ def process_chat(n_clicks, n_submit, user_input, chat_history):
 server = app.server 
 
 if __name__ == '__main__':
-    app.run_server(host='0.0.0.0', port=8030)
+    app.run_server(host='0.0.0.0', port=PORT)
 
 
 
