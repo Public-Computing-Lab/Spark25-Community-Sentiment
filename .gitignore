@@ -25,6 +25,7 @@ logs/
 *.db
 *.sqlite3
 *.sql
+llm_query_log.csv
 
 # 5️⃣ Flask & Gunicorn Deployment Files
 instance/
