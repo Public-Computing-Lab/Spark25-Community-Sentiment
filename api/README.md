@@ -14,19 +14,21 @@ POST: Stores new data with a UUID
 **/chat**
 
 POST: Accepts query string parameter 'prompt'
+prompt=structured for structured data prompt preamble
+prompt=unstructured for unstructured data prompt preamble
 Returns LLM response
-'Prompt' specifies pre-generated prompts to aid context
+
 
 **/chat/context** endpoint:**
 
 POST: Accepts context in request body
-Updates the LLM content-cache, does not return a response
+Updates the LLM content-cache
 
 **/log**
 
-POST: Stores interaction logs in SQL database
-Validates fields
-Includes timestamp automatically
+POST: Accepts query string parameter 'log_action'
+log_action=insert creates new log entry
+log_action=update_feedback updates the feedback field of existing entry w/ session_id and timestamp
 
 ---
 
@@ -36,7 +38,7 @@ Includes timestamp automatically
 
 ```sh
 git clone https://github.com/yourusername/RethinkAI.git
-cd RethinkAI/experiment-1/
+cd RethinkAI/api
 
 ```
 
