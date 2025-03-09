@@ -174,7 +174,7 @@ def chat():
 		user_query,
 		llm_response,
 		None
-	):		
+	)		
 	
 	response = {
 		'session_id': session_id,		
@@ -197,12 +197,12 @@ def chat_context():
 	return jsonify(response)
 
 # query string log_action [insert, update_feedback]
-@app.route('/log', methods=['POST'])
-	def log():
-		log_switch = request.args.get('log_action', '')
-		data = request.get_json()
-		
-		elif log_switch == 'insert':		
+@api.route('/log', methods=['POST'])
+def log():
+	log_switch = request.args.get('log_action', '')
+	data = request.get_json()
+	
+	if log_switch == 'insert':		
 		if log_chat(
 			session_id=data.get('session_id', ''),
 			timestamp=data.get('timestamp', ''),
@@ -216,17 +216,17 @@ def chat_context():
 			return jsonify({'message': 'Log entry created successfully'}), 201
 		else:
 			return jsonify({'error': 'Failed to create log entry'}), 500
-			
-		if log_switch == 'update_feedback':
-			if log_chat_feedback(
-				session_id=data.get('session_id', ''),
-				timestamp=data.get('timestamp', ''),
-				user_rating=data.get('user_rating', '')
-			):
-				return jsonify({'message': 'Log entry created successfully'}), 201
-			else:
-				return jsonify({'error': 'Failed to create log entry'}), 500
 		
+	if log_switch == 'update_feedback':
+		if log_chat_feedback(
+			session_id=data.get('session_id', ''),
+			timestamp=data.get('timestamp', ''),
+			user_rating=data.get('user_rating', '')
+		):
+			return jsonify({'message': 'Log entry created successfully'}), 201
+		else:
+			return jsonify({'error': 'Failed to create log entry'}), 500
+	
 		
 
 if __name__ == '__main__':
