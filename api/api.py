@@ -12,6 +12,7 @@ import asyncio
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 PORT = os.getenv("API_PORT")
+HOST = os.getenv("API_HOST")
 
 api = Flask(__name__)
 
@@ -155,13 +156,15 @@ def chat():
 	data_attributes = data.get('data_attributes', '')
 	user_query = data.get('user_query', '')
 	
+	prompt_preamble = '';
 	if prompt_switch == 'structured':
 		prompt_preamble = 'PLACEHODER TEXT FOR STRUCTURED DATA PROMPT'
 	elif prompt_switch == 'unsctructured':
 		prompt_preamble = 'PLACEHODLDER TEXT FOR UNSTRUCTURED DATA PROMPT'
 		
 	full_prompt = f"{prompt_preamble}\n\nUser question: {user_query}"
-	# Process chat logic here
+	
+	# Process chat 
 	llm_response = get_gemini_response(prompt)
 	response_timestamp = datetime.now().isoformat()
 	
@@ -225,9 +228,7 @@ def log():
 		):
 			return jsonify({'message': 'Log entry created successfully'}), 201
 		else:
-			return jsonify({'error': 'Failed to create log entry'}), 500
+			return jsonify({'error': 'Failed to create log entry'}), 500	
 	
-		
-
-if __name__ == '__main__':
-	api.run(debug=True)
+if __name__ == '__main__':	
+	api.run(host=HOST, port=PORT, debug=True)
