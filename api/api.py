@@ -14,6 +14,7 @@ from typing import List, Dict, Union
 # Load environment variables
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL")
 PORT = os.getenv("API_PORT")
 HOST = os.getenv("API_HOST")
 DATASTORE_PATH = Path(os.getenv("DATASTORE_PATH"))
@@ -96,7 +97,7 @@ def get_db_connection():
 async def get_gemini_response(prompt, cache_name):
 	"""Sends the prompt to Google Gemini and returns the response."""	
 	try:	
-		model = "models/gemini-1.5-pro-001"		
+		model = GEMINI_MODEL
 		#config=types.GenerateContentConfig(context_cache[context])
 		loop = asyncio.get_event_loop()
 		response = await loop.run_in_executor(None, lambda: client.models.generate_content(model=model,contents=prompt,config=types.GenerateContentConfig(cached_content=cache_name)))
@@ -159,7 +160,7 @@ def create_gemini_context(context_request, files, preamble):
 		
 		#create the cache
 		cache = client.caches.create(
-			model = "models/gemini-1.5-pro-001",
+			model = GEMINI_MODEL,
 			config=types.CreateCachedContentConfig(
 			  display_name=display_name, 
 			  system_instruction=(prompt_content),

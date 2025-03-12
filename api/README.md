@@ -264,7 +264,7 @@ nano .env
 
 ```sh
 GEMINI_API_KEY=<google_gemini_api_key>
-
+GEMINI_MODEL=<models/gemini-1.5-pro-{revision}>
 API_PORT=<port>
 
 # Database config

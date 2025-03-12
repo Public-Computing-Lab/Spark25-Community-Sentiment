@@ -166,26 +166,25 @@ test_chat() {
 		-H "Content-Type: application/json" \
 		-d "$chat_data" \
 		"${API_URL}/chat?context_request=structured")
-	echo response
+	echo "Response: $response"
 		
 	echo -e "\n${GREEN}Testing POST /chat?context_request=unstructured${NC}"
 	response=$(curl -s -X POST \
 		-H "Content-Type: application/json" \
 		-d "$chat_data" \
 		"${API_URL}/chat?context_request=unstructured")
-	echo response
+	echo "Response: $response"
 
 	echo -e "\n${GREEN}Testing POST /chat?context_request=all${NC}"
 	response=$(curl -s -X POST \
 		-H "Content-Type: application/json" \
 		-d "$chat_data" \
 		"${API_URL}/chat?context_request=all")
-	echo response
+	echo "Response: $response"
 	
 	LOG_ID=$(echo "$response" | jq ".log_id")
 	# Check if curl command was successful
 	if [ $? -eq 0 ]; then
-		echo "Response: $response"
 		echo -e "${GREEN}Chat endpoint test completed${NC}"
 	else
 		echo -e "${RED}Chat endpoint test failed${NC}"
