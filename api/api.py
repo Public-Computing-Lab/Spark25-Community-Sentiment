@@ -164,8 +164,7 @@ def create_gemini_context(context_request, files, preamble):
 			config=types.CreateCachedContentConfig(
 			  display_name=display_name, 
 			  system_instruction=(prompt_content),
-			  contents=content["parts"],
-			  ttl="600s",
+			  contents=content["parts"]			  
 		  )
 		)
 		context_meta = {
