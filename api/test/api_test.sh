@@ -191,6 +191,32 @@ test_chat() {
 	fi
 }
 
+test_chat_single() {
+	echo -e "\n${GREEN}Testing POST /chat${NC}"
+	
+	chat_data='{
+		"client_query": "What are the key take aways from the data?",		
+		"app_version": "API_TEST",
+		"data_selected": "",
+		"data_attributes": ""
+	}'
+		
+	echo -e "\n${GREEN}Testing POST /chat?context_request=unstructured${NC}"
+	response=$(curl -s -X POST \
+		-H "Content-Type: application/json" \
+		-d "$chat_data" \
+		"${API_URL}/chat?context_request=unstructured")
+	echo "Response: $response"
+	
+	LOG_ID=$(echo "$response" | jq ".log_id")
+	# Check if curl command was successful
+	if [ $? -eq 0 ]; then
+		echo -e "${GREEN}Chat endpoint test completed${NC}"
+	else
+		echo -e "${RED}Chat endpoint test failed${NC}"
+	fi
+}
+
 # Function to test /log endpoint
 test_log_insert() {
 	echo -e "\n${GREEN}Testing POST /log?log_action=insert${NC}"
@@ -277,6 +303,9 @@ case "$1" in
 	"chat")
 		test_chat
 		;;
+	"chat_single")
+		test_chat_single
+		;;
 	"log")
 		test_log_insert
 		test_log_update
@@ -285,7 +314,7 @@ case "$1" in
 		run_all_tests
 		;;
 	*)
-		echo "Usage: $0 [cache_create | cache_list | cache_clear | data | chat | log | all]"
+		echo "Usage: $0 [cache_create | cache_list | cache_clear | data | chat | chat_single | log | all]"
 		exit 1
 		;;
 esac
