@@ -75,7 +75,8 @@ gemini_api.key.txt
 # nova
 .nova
 
-# exclude api datastore
+# exclude data files from data folders
+**/data/*
 api/datastore/*
 
 # exception to the rule
