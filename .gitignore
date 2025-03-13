@@ -80,5 +80,6 @@ gemini_api.key.txt
 api/datastore/*
 
 # exception to the rule
+**/data/.gitkeep
 !api/datastore/.gitkeep 
 !api/*.sql
