@@ -184,7 +184,6 @@ POST /chat/context?context_request={structured | unstructured | all | specific}
 ### /log \[ POST \]
 ---
 #### **POST chat log to logging database**
-Primarily for testing; event logging trigged internally in relevant endpoints
 ```
 POST /log?log_action=insert
 ```
