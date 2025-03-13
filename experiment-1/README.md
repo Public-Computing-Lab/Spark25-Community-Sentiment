@@ -11,6 +11,12 @@ This project is a **Flask-based chatbot** that interacts with **Google Gemini AP
 - **Logging System** to track user queries and responses.
 - **Feedback System** (👍 / 👎) to collect user feedback.
 
+### Data
+
+Data for the dashboard are from public [BPD Crime Hub](https://boston-pd-crime-hub-boston.hub.arcgis.com/pages/data):  
+
+1. [Offenses](https://boston-pd-crime-hub-boston.hub.arcgis.com/datasets/d42bd4040bca419a824ae5062488aced/explore)  
+
 ---
 
 ## Getting Started
