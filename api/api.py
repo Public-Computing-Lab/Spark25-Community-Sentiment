@@ -97,11 +97,9 @@ def get_db_connection():
 async def get_gemini_response(prompt, cache_name):
 	"""Sends the prompt to Google Gemini and returns the response."""	
 	try:	
-		model = GEMINI_MODEL
-		#config=types.GenerateContentConfig(context_cache[context])
+		model = GEMINI_MODEL		
 		loop = asyncio.get_event_loop()
 		response = await loop.run_in_executor(None, lambda: client.models.generate_content(model=model,contents=prompt,config=types.GenerateContentConfig(cached_content=cache_name)))
-		response = client.models.generate_content(model=model,contents=prompt,config=types.GenerateContentConfig(cached_content=cache_name))
 		print(f"\n✅ Gemini Response: {response.text}")  # ✅ Log the response!		
 		return response.text
 	except Exception as e:
