@@ -6,6 +6,9 @@ import plotly.express as px
 import plotly.figure_factory as ff
 import plotly.graph_objects as go
 
+load_dotenv()  
+PORT = os.getenv("EXPERIMENT_4_PORT")
+DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_4_DASH_REQUESTS_PATHNAME")
 
 # Load Arrests Data
 arrests_df = pd.read_csv('./data/Arrests_cleaned.csv', low_memory=False)
@@ -60,7 +63,7 @@ time_labels = monthly_arrests['monthyear_dt'].dt.strftime('%Y-%m').tolist()
 slider_marks = {i: label for i, label in enumerate(time_labels) if i % 3 == 0}
 
 
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, serve_locally=False, requests_pathname_prefix=DASH_REQUESTS_PATHNAME)
 app.layout = html.Div(
     style={'backgroundColor': '#F7F0FA', 'padding': '15px'},
     children=[
@@ -525,4 +528,4 @@ px.defaults.color_continuous_scale = px.colors.sequential.Purples
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(host='0.0.0.0', port=PORT, debug=True)
