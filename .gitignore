@@ -19,13 +19,14 @@ config.json  # If sensitive configs are stored here
 secrets.json
 
 # 4️⃣ Logs and Databases
+llm_query_log.csv
 *.log
 logs/
 *.sqlite
 *.db
 *.sqlite3
 *.sql
-llm_query_log.csv
+
 
 # 5️⃣ Flask & Gunicorn Deployment Files
 instance/
