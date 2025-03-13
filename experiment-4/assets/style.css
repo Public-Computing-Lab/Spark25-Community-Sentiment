@@ -1,0 +1,29 @@
+.rc-slider {
+  height: 50px !important;
+  padding: 0 !important;
+  z-index: 1000 !important; /* slider above everything */
+  position: relative !important;
+}
+
+.rc-slider-handle {
+  height: 650px !important; /* graphs (300+300) + slider (50) = 650px total */
+  width: 2px !important;
+  background-color: #6a5acd !important;
+  border-radius: 0 !important;
+  border: none !important;
+  margin-top: -325px !important; /* half the height to center handle */
+  cursor: ew-resize !important;
+  opacity: 1 !important;
+  z-index: 1000 !important; /* handle always on top */
+}
+
+.rc-slider-track,
+.rc-slider-rail {
+  background-color: transparent !important; /* remove slider background */
+}
+
+/* Remove all slider labels completely (numbers and dates) */
+.rc-slider-mark,
+.rc-slider-mark-text {
+  display: none !important;
+}
