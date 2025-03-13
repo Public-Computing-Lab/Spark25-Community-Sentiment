@@ -527,7 +527,7 @@ def update_crime_type_chart(selected_index):
 px.defaults.template = "plotly_white"
 px.defaults.color_continuous_scale = px.colors.sequential.Purples
 
-
+server = app.server
 
 if __name__ == '__main__':
     app.run_server(host='0.0.0.0', port=PORT, debug=True)
