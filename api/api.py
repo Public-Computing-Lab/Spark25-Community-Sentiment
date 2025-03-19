@@ -186,7 +186,7 @@ def log_chat(session_id, app_version, data_selected, data_attributes, prompt_pre
 		cursor = conn.cursor()
 	
 		query = """
-		INSERT INTO chat_logs (
+		INSERT INTO interaction_log (
 			session_id,			
 			app_version,
 			data_selected,
@@ -231,7 +231,7 @@ def log_chat_response_rating(log_id, client_response_rating):
 		cursor = conn.cursor()
 		
 		query = f"""
-		UPDATE chat_logs
+		UPDATE interaction_log
 		SET client_response_rating = "{client_response_rating}"
 		WHERE id = "{log_id}"		
 		"""		
