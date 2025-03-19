@@ -156,7 +156,7 @@ test_chat() {
 	
 	chat_data='{
 		"client_query": "What are the key take aways from the data?",		
-		"app_version": "API_TEST",
+		"app_version": "0",
 		"data_selected": "",
 		"data_attributes": ""
 	}'
@@ -196,7 +196,7 @@ test_chat_single() {
 	
 	chat_data='{
 		"client_query": "What are the key take aways from the data?",		
-		"app_version": "API_TEST",
+		"app_version": "0",
 		"data_selected": "",
 		"data_attributes": ""
 	}'
@@ -225,7 +225,7 @@ test_log_insert() {
 	#timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 	log_data='{
 		"session_id": '${SESSION_ID}',		
-		"app_version": "API_TEST",
+		"app_version": "0",
 		"data_selected": "NONE",
 		"data_attributes": "NONE",
 		"client_query": "Test log entry: QUERY",
