@@ -20,6 +20,9 @@ test_context_create(){
 	
 	echo -e "\n${GREEN}Testing POST /chat/context?context_request=structured${NC}"
 	response=$(curl -s -X POST \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$context_data" \
 		"${API_URL}/chat/context?context_request=structured")
@@ -33,6 +36,9 @@ test_context_create(){
 	
 	echo -e "\n${GREEN}Testing POST /chat/context?context_request=unstructured${NC}"
 	response=$(curl -s -X POST \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$context_data" \
 		"${API_URL}/chat/context?context_request=unstructured")
@@ -46,6 +52,9 @@ test_context_create(){
 	
 	echo -e "\n${GREEN}Testing POST /chat/context?context_request=all${NC}"
 	response=$(curl -s -X POST \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$context_data" \
 		"${API_URL}/chat/context?context_request=all")
@@ -62,6 +71,9 @@ test_context_create(){
 test_context_list(){
 	echo -e "\n${GREEN}Testing GET /chat/context${NC}"
 	response=$(curl -X GET \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		"${API_URL}/chat/context")
 	
@@ -76,6 +88,9 @@ test_context_list(){
 test_context_clear(){
 	echo -e "\n${GREEN}Testing POST /chat/context/clear${NC}"
 	response=$(curl -s -X POST \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		"${API_URL}/chat/context/clear")
 	
@@ -91,6 +106,9 @@ test_context_clear(){
 test_data(){
 	echo -e "\n${GREEN}Testing GET /data?request=list${NC}"
 	response=$(curl -X GET \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		"${API_URL}/data?data_request=list")
 	
@@ -103,6 +121,9 @@ test_data(){
 	
 	echo -e "\n${GREEN}Testing GET /data?request=structured${NC}"
 	response=$(curl -X GET \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		"${API_URL}/data?data_request=structured")
 	
@@ -115,6 +136,9 @@ test_data(){
 	
 	echo -e "\n${GREEN}Testing GET /data?request=unstructured${NC}"
 	response=$(curl -X GET \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		"${API_URL}/data?data_request=unstructured")
 	
@@ -127,6 +151,9 @@ test_data(){
 	
 	echo -e "\n${GREEN}Testing GET /data?request=all${NC}"
 	response=$(curl -X GET \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		"${API_URL}/data?data_request=all")
 	
@@ -139,6 +166,9 @@ test_data(){
 	
 	echo -e "\n${GREEN}Testing GET /data?request=file1.csv,file2.txt${NC}"
 	response=$(curl -X GET \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		"${API_URL}/data?data_request=Arrests_cleaned.csv,Transcript_4.txt")
 	
@@ -163,6 +193,9 @@ test_chat() {
 	
 	echo -e "\n${GREEN}Testing POST /chat?context_request=structured${NC}"
 	response=$(curl -s -X POST \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$chat_data" \
 		"${API_URL}/chat?context_request=structured")
@@ -170,6 +203,9 @@ test_chat() {
 		
 	echo -e "\n${GREEN}Testing POST /chat?context_request=unstructured${NC}"
 	response=$(curl -s -X POST \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$chat_data" \
 		"${API_URL}/chat?context_request=unstructured")
@@ -177,6 +213,9 @@ test_chat() {
 
 	echo -e "\n${GREEN}Testing POST /chat?context_request=all${NC}"
 	response=$(curl -s -X POST \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$chat_data" \
 		"${API_URL}/chat?context_request=all")
@@ -203,6 +242,9 @@ test_chat_single() {
 		
 	echo -e "\n${GREEN}Testing POST /chat?context_request=unstructured${NC}"
 	response=$(curl -s -X POST \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$chat_data" \
 		"${API_URL}/chat?context_request=unstructured")
@@ -223,9 +265,7 @@ test_log_insert() {
 
 	# Current timestamp in ISO format
 	#timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-	log_data='{
-		"session_id": '${SESSION_ID}',		
-		"app_version": "0",
+	log_data='{		
 		"data_selected": "NONE",
 		"data_attributes": "NONE",
 		"client_query": "Test log entry: QUERY",
@@ -234,6 +274,9 @@ test_log_insert() {
 	}'
 	
 	response=$(curl -s -X POST \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$log_data" \
 		"${API_URL}/log?log_action=insert")
@@ -260,9 +303,68 @@ test_log_update() {
 	}'
 	
 	response=$(curl -s -X POST \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$log_data" \
 		"${API_URL}/log?log_action=update_client_response_rating")
+
+	# Check if curl command was successful
+	if [ $? -eq 0 ]; then
+		echo "Response: $response"
+		echo -e "${GREEN}Log endpoint test completed${NC}"
+	else
+		echo -e "${RED}Log endpoint test failed${NC}"
+	fi
+}
+
+# Function to test /data/query?request=
+test_data_query() {
+	echo -e "\n${GREEN}Testing GET /data/query?request=311_geo;options=living_conditions${NC}"
+	
+	# Current timestamp in ISO format
+	#timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+	# log_data='{
+	# 	"log_id": '${LOG_ID}',			
+	# 	"client_response_rating": "UPDATED"
+	# }'
+	
+	response=$(curl -X GET \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
+		-H "Content-Type: application/json" \
+		-d "$log_data" \
+		"${API_URL}/data/query?request=311_geo&options=living_conditions")
+
+	# Check if curl command was successful
+	if [ $? -eq 0 ]; then
+		echo "Response: $response"
+		echo -e "${GREEN}Log endpoint test completed${NC}"
+	else
+		echo -e "${RED}Log endpoint test failed${NC}"
+	fi
+}
+
+# Function to test /data/zipcode?request=
+test_data_zip() {
+	echo -e "\n${GREEN}Testing GET /data/zipcode?request=02115${NC}"
+	
+	# Current timestamp in ISO format
+	#timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+	# log_data='{
+	# 	"log_id": '${LOG_ID}',			
+	# 	"client_response_rating": "UPDATED"
+	# }'
+	
+	response=$(curl -X GET \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
+		-H "Content-Type: application/json" \
+		-d "$log_data" \
+		"${API_URL}/data/zipcode?request=02115,02115")
 
 	# Check if curl command was successful
 	if [ $? -eq 0 ]; then
@@ -309,6 +411,12 @@ case "$1" in
 	"log")
 		test_log_insert
 		test_log_update
+		;;
+	"zip")
+		test_data_zip
+		;;
+	"db")
+		test_data_query
 		;;
 	"all")
 		run_all_tests

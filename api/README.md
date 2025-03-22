@@ -4,11 +4,49 @@ This project is a **Flask-based REST-ish API** supporting the RethinkAI experime
 
 ##  Endpoints
 
-### /data \[ GET | POST \]
+### /data/zipzode \[ GET \]
+---
+#### **GET zipcode geoJson objects***
+```
+GET /data/zipcode?request=<zipcode>,<zipcode>,<zipcode>...
+```
+*Response*
+
+geoJson object with zipcode boundaries
+
+### /data/query \[ GET \]
+
+---
+#### **GET zipcode geoJson objects***
+```
+GET /data/query?request=<request_type>&options=<request_options>
+```
+request expects one of: 
+- 911_shots_fired - return shots fired w/ location
+- 911_shots_fired_confirmed - return count of confirmed shots fired by year with totals by quarter, and month
+- 911_shots_fired_unconfirmed - return count of unconfirmed shots fired by year with totals by quarter, and month
+- 911_homicides - return counts for homicides by year with totals by quarter, and month
+- 911_homicides_and_shots_fired - return matches where a homicide and shot_fired occurred same date, same police district
+- 311_geo - return locations of 311 data, by type option below
+- 311_total - return total counts by year with quarter and month, by type option below
+- 311_by_type - return counts for each type in type option below
+
+All of the 311* requests require one option:
+
+- living_conditions
+- trash
+- streets
+- parking
+
+*Response*
+
+json object 
+
+### /data/file \[ GET | POST \]
 ---
 #### **GET a LIST of available files**
 ```
-GET /data?data_request=list
+GET /data/file?request=list
 ```
 *Response*
 ```
@@ -22,7 +60,7 @@ GET /data?data_request=list
 
 #### **GET CSV files**
 ```
-GET /data?data_request=structured
+GET /data/file?request=structured
 ```
 *Response*
 ```
@@ -40,7 +78,7 @@ GET /data?data_request=structured
 
 #### **GET TXT files**
 ```
-GET /data?data_request=unstructured
+GET /data/file?request=unstructured
 ```
 *Response*
 ```
@@ -57,7 +95,7 @@ GET /data?data_request=unstructured
 ```
 #### **GET all (CSV & TXT) files**
 ```
-GET /data?data_request=all
+GET /data/file?request=all
 ```
 *Response*
 ```
@@ -76,7 +114,7 @@ GET /data?data_request=all
 #### **GET specific files**
 Untested – works in theory.
 ```
-GET /data?data_request=file1.csv,file2.txt
+GET /data/file?request=file1.csv,file2.txt
 ```
 *Response*
 ```
@@ -95,7 +133,7 @@ GET /data?data_request=file1.csv,file2.txt
 #### **POST files to datastore**
 Incomplete
 ```
-POST /data
+POST /data/file
 ```
 *Json Data object*
 ```
@@ -192,7 +230,7 @@ POST /log?log_action=insert
 {
     "session_id": "{session_id}",		
     "app_version": "{experiment_versio}n",
-    data_selected = "'{file1.csv}', '{file2.txt}'",
+    "data_selected": "'{file1.csv}', '{file2.txt}'",
     "data_attributes": ["{attrib1}", "{attrib2}", "{attrib3}"],
     "prompt_preamble": "{Prompt preamble}"
     "client_query": "{User chat query}",
