@@ -20,5 +20,5 @@ CREATE TABLE `interaction_log` (
   `client_query` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci,
   `app_response` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
