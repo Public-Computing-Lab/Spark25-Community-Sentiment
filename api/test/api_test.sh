@@ -261,7 +261,7 @@ test_chat_single() {
 
 # Function to test /log endpoint
 test_log_insert() {
-	echo -e "\n${GREEN}Testing POST /log?log_action=insert${NC}"
+	echo -e "\n${GREEN}Testing POST /log${NC}"
 
 	# Current timestamp in ISO format
 	#timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -279,9 +279,10 @@ test_log_insert() {
 		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$log_data" \
-		"${API_URL}/log?log_action=insert")
+		"${API_URL}/log")
 	
 	LOG_ID=$(echo "$response" | jq ".log_id")
+	echo $LOG_ID
 	# Check if curl command was successful
 	if [ $? -eq 0 ]; then
 		echo "Response: $response"
@@ -293,10 +294,11 @@ test_log_insert() {
 
 # Function to test /log?log_action=update_client_response_rating endpoint
 test_log_update() {
-	echo -e "\n${GREEN}Testing POST /log?log_action=update_client_response_rating${NC}"
+	echo -e "\n${GREEN}Testing POST /log${NC}"
 	
 	# Current timestamp in ISO format
 	#timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+	echo $LOG_ID
 	log_data='{
 		"log_id": '${LOG_ID}',			
 		"client_response_rating": "UPDATED"
@@ -308,7 +310,7 @@ test_log_update() {
 		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$log_data" \
-		"${API_URL}/log?log_action=update_client_response_rating")
+		"${API_URL}/log")
 
 	# Check if curl command was successful
 	if [ $? -eq 0 ]; then
