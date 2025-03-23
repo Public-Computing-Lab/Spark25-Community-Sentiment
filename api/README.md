@@ -17,30 +17,32 @@ geoJson object with zipcode boundaries
 ### /data/query \[ GET \]
 
 ---
-#### **GET zipcode geoJson objects***
+#### **GET crime and 311 data as geoJson objects***
 ```
-GET /data/query?request=<request_type>&options=<request_options>
+GET /data/query?request=<request_type>&date=%Y-%m&zipcode=<zipcode>
 ```
-request expects one of: 
-- 911_shots_fired - return shots fired w/ location
-- 911_shots_fired_confirmed - return count of confirmed shots fired by year with totals by quarter, and month
-- 911_shots_fired_unconfirmed - return count of unconfirmed shots fired by year with totals by quarter, and month
-- 911_homicides - return counts for homicides by year with totals by quarter, and month
-- 911_homicides_and_shots_fired - return matches where a homicide and shot_fired occurred same date, same police district
-- 311_geo - return locations of 311 data, by type option below
-- 311_total - return total counts by year with quarter and month, by type option below
-- 311_by_type - return counts for each type in type option below
+```<request_type>``` is one of: 
+##### Crime Data
+- **911_shots_fired** - return shots fired w/ location
+- **911_shots_fired_count_confirmed** - return count of confirmed shots fired by year with totals by quarter, and month
+- **911_shots_fired_count_unconfirmed** - return count of unconfirmed shots fired by year with totals by quarter, and month
+- **911_homicides** - return counts for homicides by year with totals by quarter, and month
+- **911_homicides_and_shots_fired** - return matches where a homicide and shot_fired occurred same date, same police district
 
-All of the 311* requests require one option:
-
-- living_conditions
-- trash
-- streets
-- parking
+##### 311 Data
+> 311_by\* requires ?category={living_conditions | trash | streets | parking}  
+> 311_on\* requires ?date=%Y-%m  
+> 311_on_date_count optionally takes &zipcode=\<zipcode\> to filter by zip (for hover chart)  
+- **311_by_geo** - return locations of 311 data, by type option below
+- **311_by_total** - return total counts by year with quarter and month, by type option below
+- **311_by_type** - return counts for each type in type option below
+- **311_year_month** - return all 311 dates in %Y-%m format
+- **311_on_date_count** - return category counts by date, 
+- **311_on_date_geo** - returns all lat/longs for 311 categories by date, requires '?date=%Y-%m'
 
 *Response*
 
-json object 
+{json object}
 
 ### /data/file \[ GET | POST \]
 ---

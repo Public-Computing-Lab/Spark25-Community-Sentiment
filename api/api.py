@@ -10,6 +10,7 @@ import uuid
 import asyncio
 from pathlib import Path
 from typing import List, Dict, Union
+import re
 
 # Load environment variables
 load_dotenv()
@@ -45,6 +46,17 @@ api.config.update(
 #
 # Helper functions
 #
+
+# Checks if a string is in 'YYYY-MM' format.
+def is_ym_format(date_string):
+	pattern = r"^\d{4}-\d{2}$"
+	match = re.match(pattern, date_string)
+	if match:
+		year, month = map(int, date_string.split('-'))
+		if 1 <= month <= 12:
+			return True
+	return False
+
 def allowed_file(filename: str) -> bool:
 	return '.' in filename and \
 		filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -345,23 +357,81 @@ def route_data_query():
 				'error': 'Missing data_request parameter'
 			}), 400
 		
-		request_options = request.args.get('options','')
-		if data_request.startswith('311') and not request_options:
+		request_options = request.args.get('category','')
+		if data_request.startswith('311_by') and not request_options:
 			return jsonify({
 				'error': 'Missing required options parameter for 311 request'
 			}), 400
+			
+		request_date = request.args.get('date','')
+		if data_request.startswith('311_on_date') and not request_date:
+			return jsonify({
+				'error': 'Missing required options parameter for 311 request'
+			}), 400
+		request_zipcode = request.args.get('zipcode','')
 		
-		# Specifying the types to include. Alternative would be to pass them from the 	
-		if request_options == 'living_conditions':
-			type_selector = "'Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential'"
-		elif request_options == 'trash':
-			type_selector = "'Missed Trash\/Recycling\/Yard Waste\/Bulk Item', 'Illegal Dumping'"
-		elif request_options == 'streets':
-			type_selector = "'Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair'"
-		elif request_options == 'parking':	
-			type_selector = "'Parking Enforcement', 'Space Savers', 'Parking on Front\/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints'"
-		
-		if data_request == '311_by_type':		
+		# Switch for 311_by queries using the 311 types listed below	
+		if data_request.startswith('311_by'):
+			if request_options == 'living_conditions':
+				category_types = "'Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential'"
+			elif request_options == 'trash':
+				category_types = "'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping'"
+			elif request_options == 'streets':
+				category_types = "'Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair'"
+			elif request_options == 'parking':	
+				category_types = "'Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints'"
+
+		if data_request == '311_on_date_geo':
+			if not is_ym_format(request_date):
+				return jsonify({
+					'error': 'Incorrect date format. Expects "YYYY-MM"'
+				}), 400
+			query = f"""
+			SELECT latitude, longitude
+			FROM bos311_data
+			WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
+				AND type IN ('Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential', 'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping','Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair','Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints')				
+				AND police_district IN ('B3', 'B2', 'C11')
+				AND neighborhood = 'Dorchester';
+			"""
+		elif data_request == '311_on_date_count':
+			if not is_ym_format(request_date):
+				return jsonify({
+					'error': 'Incorrect date format. Expects "YYYY-MM"'
+				}), 400
+			query = f"""
+			SELECT
+				CASE
+					WHEN type IN ('Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential') THEN 'Living Conditions'
+					WHEN type IN ('Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping') THEN 'Trash, Recycling, And Waste'
+					WHEN type IN ('Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair') THEN 'Streets, Sidewalks, And Parks'
+					WHEN type IN ('Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints')
+					THEN 'Parking'
+				END AS request_category,
+				COUNT(*) AS request_count,
+				DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
+			FROM bos311_data
+			WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
+			  AND police_district IN ('B3', 'B2', 'C11')
+			"""			
+			if request_zipcode:				
+				query += f"""
+				AND location_zipcode = {request_zipcode}
+				"""
+			query +=  """
+			AND neighborhood = 'Dorchester'
+			GROUP BY request_category, monthyear
+			HAVING request_category IS NOT NULL;
+			"""
+		elif data_request == '311_year_month':
+			query= f"""
+			SELECT DISTINCT DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
+			FROM bos311_data
+			WHERE police_district IN ('B3', 'B2', 'C11')
+			AND neighborhood = 'Dorchester';
+			ORDER BY monthyear;
+			"""
+		elif data_request == '311_by_type':		
 			query = f"""
 			SELECT
 				police_district,
@@ -387,15 +457,15 @@ def route_data_query():
 			FROM
 				bos311_data
 			WHERE
-				type IN ({type_selector})
-				police_district IN ('B2','B3','C11') 
+				type IN ({category_types})
+				AND police_district IN ('B2','B3','C11') 
 				AND neighborhood = 'Dorchester'				
 			GROUP BY
 				police_district, type, year 
 			ORDER BY
 				police_district, type, year;
 			"""				
-		elif data_request == '311_total':
+		elif data_request == '311_by_total':
 			query = f"""
 			SELECT
 				YEAR(open_dt) AS year,
@@ -420,14 +490,14 @@ def route_data_query():
 			FROM
 				bos311_data
 			WHERE
-				type IN ({type_selector})
+				type IN ({category_types})
 				AND police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' 
 			GROUP BY
 				year
 			ORDER BY
 				year
 			"""				
-		elif data_request == '311_geo':	
+		elif data_request == '311_by_geo':	
 			query = f"""
 			SELECT
 				type,
@@ -439,7 +509,7 @@ def route_data_query():
 			FROM 
 				bos311_data
 			WHERE 
-				type IN ({type_selector})
+				type IN ({category_types})
 				AND police_district IN ('B2', 'B3', 'C11')
 				AND neighborhood = 'Dorchester'
 			"""									
@@ -619,6 +689,7 @@ def route_data_zipcode():
 		return jsonify(result)
 	
 	except Exception as e:
+		log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
 		return jsonify({
 			'error': str(e)
 		}), 500
@@ -677,6 +748,7 @@ def route_data_file():
 			})
 		
 		except Exception as e:
+			log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
 			return jsonify({
 				'error': str(e)
 			}), 500
@@ -733,6 +805,7 @@ def route_data_file():
 			return jsonify(response), 200 if saved_files else 400
 		
 		except Exception as e:
+			log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
 			return jsonify({
 				'error': str(e)
 			}), 500
@@ -791,6 +864,7 @@ def route_chat():
 		return jsonify(response)
 	
 	except Exception as e:
+		log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
 		print(f"❌ Exception in /chat: {e}")
 		return jsonify({"error": f"Internal server error: {e}"}), 500
 

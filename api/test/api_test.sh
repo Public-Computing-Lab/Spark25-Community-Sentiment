@@ -321,8 +321,8 @@ test_log_update() {
 
 # Function to test /data/query?request=
 test_data_query() {
-	echo -e "\n${GREEN}Testing GET /data/query?request=311_geo;options=living_conditions${NC}"
-	
+	echo -e "\n${GREEN}Testing GET /data/query?${NC}"
+	echo $query_string
 	# Current timestamp in ISO format
 	#timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 	# log_data='{
@@ -336,7 +336,7 @@ test_data_query() {
 		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$log_data" \
-		"${API_URL}/data/query?request=311_geo&options=living_conditions")
+		"${API_URL}/data/query?request=311_on_date_count&date=2023-04")
 
 	# Check if curl command was successful
 	if [ $? -eq 0 ]; then
