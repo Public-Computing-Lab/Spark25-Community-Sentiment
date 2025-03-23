@@ -1,7 +1,7 @@
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response, render_template_string, session
 import mysql.connector
-from datetime import datetime
+import datetime
 import os
 from dotenv import load_dotenv
 from google import genai
@@ -10,6 +10,7 @@ import uuid
 import asyncio
 from pathlib import Path
 from typing import List, Dict, Union
+import re
 
 # Load environment variables
 load_dotenv()
@@ -34,10 +35,28 @@ db_config = {
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 api = Flask(__name__)
+# Set up configuration
+api.config.update(
+	SECRET_KEY='rethinkAI2025!',
+	PERMANENT_SESSION_LIFETIME = datetime.timedelta(days=7),
+	SESSION_COOKIE_HTTPONLY=True,
+	SESSION_COOKIE_SECURE=False  # Set to True in production with HTTPS
+)
 
 #
 # Helper functions
 #
+
+# Checks if a string is in 'YYYY-MM' format.
+def is_ym_format(date_string):
+	pattern = r"^\d{4}-\d{2}$"
+	match = re.match(pattern, date_string)
+	if match:
+		year, month = map(int, date_string.split('-'))
+		if 1 <= month <= 12:
+			return True
+	return False
+
 def allowed_file(filename: str) -> bool:
 	return '.' in filename and \
 		filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -178,8 +197,44 @@ def create_gemini_context(context_request, files, preamble):
 	except Exception as e:
 		print(f"❌ Error generating response: {e}")  # ✅ Log the error!
 		return f"❌ Error generating response: {e}"
+
+# Log events
+def log_event(session_id, app_version, log_message):
+	try:
+		conn = get_db_connection()
+		cursor = conn.cursor()
 	
-# Log entry - really for testing at the moment
+		query = """
+		INSERT INTO interaction_log (
+			session_id,
+			app_version,							
+			app_response
+		) VALUES (%s, %s, %s)
+		"""
+	
+		values = (
+			session_id,			
+			app_version,		
+			log_message
+		)
+	
+		cursor.execute(query, values)
+		conn.commit()
+		
+		log_message_id = cursor.lastrowid
+		
+		return cursor.lastrowid
+	
+	except mysql.connector.Error as err:
+		print(f"Database error: {str(err)}")
+		return False
+	
+	finally:
+		if 'conn' in locals():
+			cursor.close()
+			conn.close()
+
+# Log chat 
 def log_chat(session_id, app_version, data_selected, data_attributes, prompt_preamble, client_query, app_response, client_response_rating):
 	try:
 		conn = get_db_connection()
@@ -251,14 +306,402 @@ def log_chat_response_rating(log_id, client_response_rating):
 		if 'conn' in locals():
 			cursor.close()
 			conn.close()	
+
+# DB Query
+def db_query(query):
+	try:
+		conn = get_db_connection()
+		cursor = conn.cursor(dictionary=True)
+	
+		cursor.execute(query)
+		result = cursor.fetchall()
+		print(result)
+		if result:			
+			return result
+		else:
+			return None  						
+	
+	except mysql.connector.Error as err:
+		print(f"Database error: {str(err)}")
+		return False
+	
+	finally:
+		if 'conn' in locals():
+			cursor.close()
+			conn.close()
+
+# Middleware to check session and create if needed
+@api.before_request
+def check_session():
+	if 'session_id' not in session:
+		session.permanent = True  # Make the session persistent
+		session['session_id'] = str(uuid.uuid4())
+		log_event(session_id=session['session_id'], app_version='0', log_message="New session created")
+
+	# Log the request
+	log_event(session_id=session['session_id'], app_version='0', log_message=f"Request: {request.url}")
+
 #
 #Endpoint Definitions
 #
-@api.route('/data', methods=['GET', 'POST'])
-def route_data():
+
+@api.route('/data/query', methods=['GET'])
+def route_data_query():
+	session_id = session.get('session_id')
+	app_version = request.cookies.get('app_version','0')
+	
+	try:
+		data_request = request.args.get('request', '')			
+		if not data_request:
+			return jsonify({
+				'error': 'Missing data_request parameter'
+			}), 400
+		
+		request_options = request.args.get('category','')
+		if data_request.startswith('311_by') and not request_options:
+			return jsonify({
+				'error': 'Missing required options parameter for 311 request'
+			}), 400
+			
+		request_date = request.args.get('date','')
+		if data_request.startswith('311_on_date') and not request_date:
+			return jsonify({
+				'error': 'Missing required options parameter for 311 request'
+			}), 400
+		request_zipcode = request.args.get('zipcode','')
+		
+		# Switch for 311_by queries using the 311 types listed below	
+		if data_request.startswith('311_by'):
+			if request_options == 'living_conditions':
+				category_types = "'Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential'"
+			elif request_options == 'trash':
+				category_types = "'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping'"
+			elif request_options == 'streets':
+				category_types = "'Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair'"
+			elif request_options == 'parking':	
+				category_types = "'Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints'"
+
+		if data_request == '311_on_date_geo':
+			if not is_ym_format(request_date):
+				return jsonify({
+					'error': 'Incorrect date format. Expects "YYYY-MM"'
+				}), 400
+			query = f"""
+			SELECT latitude, longitude
+			FROM bos311_data
+			WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
+				AND type IN ('Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential', 'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping','Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair','Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints')				
+				AND police_district IN ('B3', 'B2', 'C11')
+				AND neighborhood = 'Dorchester';
+			"""
+		elif data_request == '311_on_date_count':
+			if not is_ym_format(request_date):
+				return jsonify({
+					'error': 'Incorrect date format. Expects "YYYY-MM"'
+				}), 400
+			query = f"""
+			SELECT
+				CASE
+					WHEN type IN ('Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential') THEN 'Living Conditions'
+					WHEN type IN ('Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping') THEN 'Trash, Recycling, And Waste'
+					WHEN type IN ('Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair') THEN 'Streets, Sidewalks, And Parks'
+					WHEN type IN ('Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints')
+					THEN 'Parking'
+				END AS request_category,
+				COUNT(*) AS request_count,
+				DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
+			FROM bos311_data
+			WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
+			  AND police_district IN ('B3', 'B2', 'C11')
+			"""			
+			if request_zipcode:				
+				query += f"""
+				AND location_zipcode = {request_zipcode}
+				"""
+			query +=  """
+			AND neighborhood = 'Dorchester'
+			GROUP BY request_category, monthyear
+			HAVING request_category IS NOT NULL;
+			"""
+		elif data_request == '311_year_month':
+			query= f"""
+			SELECT DISTINCT DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
+			FROM bos311_data
+			WHERE police_district IN ('B3', 'B2', 'C11')
+			AND neighborhood = 'Dorchester';
+			ORDER BY monthyear;
+			"""
+		elif data_request == '311_by_type':		
+			query = f"""
+			SELECT
+				police_district,
+				type,
+				YEAR(open_dt) AS year,
+				COUNT(*) AS total_by_year,
+				SUM(CASE WHEN QUARTER(open_dt) = 1 THEN 1 ELSE 0 END) AS q1_total,
+				SUM(CASE WHEN QUARTER(open_dt) = 2 THEN 1 ELSE 0 END) AS q2_total,
+				SUM(CASE WHEN QUARTER(open_dt) = 3 THEN 1 ELSE 0 END) AS q3_total,
+				SUM(CASE WHEN QUARTER(open_dt) = 4 THEN 1 ELSE 0 END) AS q4_total,
+				SUM(CASE WHEN MONTH(open_dt) = 1 THEN 1 ELSE 0 END) AS jan_total,
+				SUM(CASE WHEN MONTH(open_dt) = 2 THEN 1 ELSE 0 END) AS feb_total,
+				SUM(CASE WHEN MONTH(open_dt) = 3 THEN 1 ELSE 0 END) AS mar_total,
+				SUM(CASE WHEN MONTH(open_dt) = 4 THEN 1 ELSE 0 END) AS apr_total,
+				SUM(CASE WHEN MONTH(open_dt) = 5 THEN 1 ELSE 0 END) AS may_total,
+				SUM(CASE WHEN MONTH(open_dt) = 6 THEN 1 ELSE 0 END) AS jun_total,
+				SUM(CASE WHEN MONTH(open_dt) = 7 THEN 1 ELSE 0 END) AS jul_total,
+				SUM(CASE WHEN MONTH(open_dt) = 8 THEN 1 ELSE 0 END) AS aug_total,
+				SUM(CASE WHEN MONTH(open_dt) = 9 THEN 1 ELSE 0 END) AS sep_total,
+				SUM(CASE WHEN MONTH(open_dt) = 10 THEN 1 ELSE 0 END) AS oct_total,
+				SUM(CASE WHEN MONTH(open_dt) = 11 THEN 1 ELSE 0 END) AS nov_total,
+				SUM(CASE WHEN MONTH(open_dt) = 12 THEN 1 ELSE 0 END) AS dec_total
+			FROM
+				bos311_data
+			WHERE
+				type IN ({category_types})
+				AND police_district IN ('B2','B3','C11') 
+				AND neighborhood = 'Dorchester'				
+			GROUP BY
+				police_district, type, year 
+			ORDER BY
+				police_district, type, year;
+			"""				
+		elif data_request == '311_by_total':
+			query = f"""
+			SELECT
+				YEAR(open_dt) AS year,
+				'parking' AS incident_type,  -- Fixed category name
+				COUNT(*) AS total_year,
+				SUM(CASE WHEN QUARTER(open_dt) = 1 THEN 1 ELSE 0 END) AS q1_total,
+				SUM(CASE WHEN QUARTER(open_dt) = 2 THEN 1 ELSE 0 END) AS q2_total,
+				SUM(CASE WHEN QUARTER(open_dt) = 3 THEN 1 ELSE 0 END) AS q3_total,
+				SUM(CASE WHEN QUARTER(open_dt) = 4 THEN 1 ELSE 0 END) AS q4_total,
+				SUM(CASE WHEN MONTH(open_dt) = 1 THEN 1 ELSE 0 END) AS jan_total,
+				SUM(CASE WHEN MONTH(open_dt) = 2 THEN 1 ELSE 0 END) AS feb_total,
+				SUM(CASE WHEN MONTH(open_dt) = 3 THEN 1 ELSE 0 END) AS mar_total,
+				SUM(CASE WHEN MONTH(open_dt) = 4 THEN 1 ELSE 0 END) AS apr_total,
+				SUM(CASE WHEN MONTH(open_dt) = 5 THEN 1 ELSE 0 END) AS may_total,
+				SUM(CASE WHEN MONTH(open_dt) = 6 THEN 1 ELSE 0 END) AS jun_total,
+				SUM(CASE WHEN MONTH(open_dt) = 7 THEN 1 ELSE 0 END) AS jul_total,
+				SUM(CASE WHEN MONTH(open_dt) = 8 THEN 1 ELSE 0 END) AS aug_total,
+				SUM(CASE WHEN MONTH(open_dt) = 9 THEN 1 ELSE 0 END) AS sep_total,
+				SUM(CASE WHEN MONTH(open_dt) = 10 THEN 1 ELSE 0 END) AS oct_total,
+				SUM(CASE WHEN MONTH(open_dt) = 11 THEN 1 ELSE 0 END) AS nov_total,
+				SUM(CASE WHEN MONTH(open_dt) = 12 THEN 1 ELSE 0 END) AS dec_total
+			FROM
+				bos311_data
+			WHERE
+				type IN ({category_types})
+				AND police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' 
+			GROUP BY
+				year
+			ORDER BY
+				year
+			"""				
+		elif data_request == '311_by_geo':	
+			query = f"""
+			SELECT
+				type,
+				open_dt,
+				police_district,
+				location,
+				latitude,
+				longitude
+			FROM 
+				bos311_data
+			WHERE 
+				type IN ({category_types})
+				AND police_district IN ('B2', 'B3', 'C11')
+				AND neighborhood = 'Dorchester'
+			"""									
+		elif data_request == '911_homicides':	
+			query = f"""
+			SELECT
+				year,
+				COUNT(*) AS total_by_year,
+				SUM(CASE WHEN quarter = 1 THEN 1 ELSE 0 END) AS q1_total,
+				SUM(CASE WHEN quarter = 2 THEN 1 ELSE 0 END) AS q2_total,
+				SUM(CASE WHEN quarter = 3 THEN 1 ELSE 0 END) AS q3_total,
+				SUM(CASE WHEN quarter = 4 THEN 1 ELSE 0 END) AS q4_total,
+				SUM(CASE WHEN month = 1 THEN 1 ELSE 0 END) AS jan_total,
+				SUM(CASE WHEN month = 2 THEN 1 ELSE 0 END) AS feb_total,
+				SUM(CASE WHEN month = 3 THEN 1 ELSE 0 END) AS mar_total,
+				SUM(CASE WHEN month = 4 THEN 1 ELSE 0 END) AS apr_total,
+				SUM(CASE WHEN month = 5 THEN 1 ELSE 0 END) AS may_total,
+				SUM(CASE WHEN month = 6 THEN 1 ELSE 0 END) AS jun_total,
+				SUM(CASE WHEN month = 7 THEN 1 ELSE 0 END) AS jul_total,
+				SUM(CASE WHEN month = 8 THEN 1 ELSE 0 END) AS aug_total,
+				SUM(CASE WHEN month = 9 THEN 1 ELSE 0 END) AS sep_total,
+				SUM(CASE WHEN month = 10 THEN 1 ELSE 0 END) AS oct_total,
+				SUM(CASE WHEN month = 11 THEN 1 ELSE 0 END) AS nov_total,
+				SUM(CASE WHEN month = 12 THEN 1 ELSE 0 END) AS dec_total				
+			FROM homicide_data
+			WHERE district IN ('B2', 'B3', 'C11')
+			AND year >= 2018
+			AND year < 2025
+			AND neighborhood = 'Dorchester'
+			GROUP BY year;			
+			"""				
+		elif data_request == '911_shots_fired':	
+			query = f"""
+			SELECT
+				year,
+				district,
+				ballistics_evidence,
+				neighborhood,
+				hour_of_day,
+				day_of_week,
+				latitude,
+				longitude
+			FROM shots_fired_data
+			WHERE district IN ('B2', 'B3', 'C11')
+			AND neighborhood = 'Dorchester'
+			AND year >= 2018
+			AND year < 2025			
+			GROUP BY year, district, neighborhood, ballistics_evidence, hour_of_day, day_of_week, latitude, longitude;
+			"""			
+		elif data_request == '911_shots_fired_count_confirmed':	
+			query = f"""
+			SELECT
+				year,
+				COUNT(*) AS total_by_year,
+				SUM(CASE WHEN quarter = 1 THEN 1 ELSE 0 END) AS q1_total,
+				SUM(CASE WHEN quarter = 2 THEN 1 ELSE 0 END) AS q2_total,
+				SUM(CASE WHEN quarter = 3 THEN 1 ELSE 0 END) AS q3_total,
+				SUM(CASE WHEN quarter = 4 THEN 1 ELSE 0 END) AS q4_total,
+				SUM(CASE WHEN month = 1 THEN 1 ELSE 0 END) AS jan_total,
+				SUM(CASE WHEN month = 2 THEN 1 ELSE 0 END) AS feb_total,
+				SUM(CASE WHEN month = 3 THEN 1 ELSE 0 END) AS mar_total,
+				SUM(CASE WHEN month = 4 THEN 1 ELSE 0 END) AS apr_total,
+				SUM(CASE WHEN month = 5 THEN 1 ELSE 0 END) AS may_total,
+				SUM(CASE WHEN month = 6 THEN 1 ELSE 0 END) AS jun_total,
+				SUM(CASE WHEN month = 7 THEN 1 ELSE 0 END) AS jul_total,
+				SUM(CASE WHEN month = 8 THEN 1 ELSE 0 END) AS aug_total,
+				SUM(CASE WHEN month = 9 THEN 1 ELSE 0 END) AS sep_total,
+				SUM(CASE WHEN month = 10 THEN 1 ELSE 0 END) AS oct_total,
+				SUM(CASE WHEN month = 11 THEN 1 ELSE 0 END) AS nov_total,
+				SUM(CASE WHEN month = 12 THEN 1 ELSE 0 END) AS dec_total
+			FROM shots_fired_data
+			WHERE district IN ('B2', 'B3', 'C11')
+			AND ballistics_evidence = 1
+			AND neighborhood = 'Dorchester'
+			AND year >= 2018
+			AND year < 2025			
+			GROUP BY year
+			"""
+		elif data_request == '911_shots_fired_count_unconfirmed':	
+			query = f"""
+			SELECT
+				year,
+				COUNT(*) AS total_by_year,
+				SUM(CASE WHEN quarter = 1 THEN 1 ELSE 0 END) AS q1_total,
+				SUM(CASE WHEN quarter = 2 THEN 1 ELSE 0 END) AS q2_total,
+				SUM(CASE WHEN quarter = 3 THEN 1 ELSE 0 END) AS q3_total,
+				SUM(CASE WHEN quarter = 4 THEN 1 ELSE 0 END) AS q4_total,
+				SUM(CASE WHEN month = 1 THEN 1 ELSE 0 END) AS jan_total,
+				SUM(CASE WHEN month = 2 THEN 1 ELSE 0 END) AS feb_total,
+				SUM(CASE WHEN month = 3 THEN 1 ELSE 0 END) AS mar_total,
+				SUM(CASE WHEN month = 4 THEN 1 ELSE 0 END) AS apr_total,
+				SUM(CASE WHEN month = 5 THEN 1 ELSE 0 END) AS may_total,
+				SUM(CASE WHEN month = 6 THEN 1 ELSE 0 END) AS jun_total,
+				SUM(CASE WHEN month = 7 THEN 1 ELSE 0 END) AS jul_total,
+				SUM(CASE WHEN month = 8 THEN 1 ELSE 0 END) AS aug_total,
+				SUM(CASE WHEN month = 9 THEN 1 ELSE 0 END) AS sep_total,
+				SUM(CASE WHEN month = 10 THEN 1 ELSE 0 END) AS oct_total,
+				SUM(CASE WHEN month = 11 THEN 1 ELSE 0 END) AS nov_total,
+				SUM(CASE WHEN month = 12 THEN 1 ELSE 0 END) AS dec_total
+			FROM shots_fired_data
+			WHERE district IN ('B2', 'B3', 'C11')
+			AND ballistics_evidence = 0
+			AND neighborhood = 'Dorchester'
+			AND year >= 2018
+			AND year < 2025			
+			GROUP BY year
+			"""
+		elif data_request == '911_homicides_and_shots_fired':				
+			query = f"""
+			SELECT 			 
+				h.year as year,
+				h.quarter as quarter,
+				h.month as month,
+				h.day_of_week as day,
+				h.hour_of_day as hour,
+				h.district as police_district,
+				s.address as shot_address,
+				s.latitude as latitude,
+				s.longitude as longitude				
+			FROM 
+				shots_fired_data s
+			INNER JOIN 
+				homicide_data h
+			ON 
+				DATE(s.incident_date_time) = DATE(h.homicide_date)			
+				AND s.district = h.district
+			WHERE 
+				s.ballistics_evidence = 1
+				AND h.district IN ('B3', 'C11', 'B2')
+				AND h.neighborhood = 'Dorchester'
+				AND s.year >= 2018
+				AND s.year < 2025
+			"""						
+		
+		result = db_query(query=query)			
+		
+		log_event(session_id=session_id, app_version=app_version, log_message=f"Request: SUCCESS")	
+		return jsonify(result)
+		
+	
+	except Exception as e:
+		log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
+		return jsonify({
+			'error': str(e)
+		}), 500
+
+@api.route('/data/zipcode', methods=['GET'])
+def route_data_zipcode():
+	session_id = session.get('session_id')
+	app_version = request.cookies.get('app_version','0')
+	
+	try:
+		data_request = request.args.get('request', '')			
+		if not data_request:
+			return jsonify({
+				'error': 'Missing data_request parameter'
+			}), 400
+	
+		query = f"""
+		SELECT JSON_OBJECT(
+			'type', 'FeatureCollection',
+			'features', JSON_ARRAYAGG(
+				JSON_OBJECT(
+					'type', 'Feature',
+					'geometry', ST_AsGeoJSON(boundary),
+					'properties', JSON_OBJECT('zipcode', zipcode)
+				)
+			)
+		)
+		FROM zipcode_geo
+		WHERE zipcode IN ({data_request})
+		"""				
+		
+		result = db_query(query=query)
+		
+		log_event(session_id=session_id, app_version=app_version, log_message=f"Request: SUCCESS")
+		return jsonify(result)
+	
+	except Exception as e:
+		log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
+		return jsonify({
+			'error': str(e)
+		}), 500
+
+@api.route('/data/file', methods=['GET', 'POST'])
+def route_data_file():
+	session_id = session.get('session_id')
+	app_version = request.cookies.get('app_version','0')
+	
 	if request.method == 'GET':
 		try:
-			data_request = request.args.get('data_request', '')			
+			data_request = request.args.get('request', '')			
 			if not data_request:
 				return jsonify({
 					'error': 'Missing data_request parameter'
@@ -305,6 +748,7 @@ def route_data():
 			})
 		
 		except Exception as e:
+			log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
 			return jsonify({
 				'error': str(e)
 			}), 500
@@ -361,12 +805,16 @@ def route_data():
 			return jsonify(response), 200 if saved_files else 400
 		
 		except Exception as e:
+			log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
 			return jsonify({
 				'error': str(e)
 			}), 500
 
 @api.route('/chat', methods=['POST'])
 def route_chat():
+	session_id = session.get('session_id')
+	app_version = request.cookies.get('app_version','0')
+	
 	context_request = request.args.get('context_request', '')
 		
 	data = request.get_json()	
@@ -416,11 +864,15 @@ def route_chat():
 		return jsonify(response)
 	
 	except Exception as e:
+		log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
 		print(f"❌ Exception in /chat: {e}")
 		return jsonify({"error": f"Internal server error: {e}"}), 500
 
 @api.route('/chat/context', methods=['GET','POST'])
 def route_chat_context():
+	session_id = session.get('session_id')
+	app_version = request.cookies.get('app_version','0')
+	
 	if request.method == 'GET':
 		response = {}
 		for cache in client.caches.list():
@@ -448,6 +900,9 @@ def route_chat_context():
 		
 @api.route('/chat/context/clear', methods=['POST'])
 def route_chat_context_clear():
+	session_id = session.get('session_id')
+	app_version = request.cookies.get('app_version','0')
+	
 	for cache in client.caches.list():		
 		client.caches.delete(name=cache.name)
 	
@@ -456,12 +911,15 @@ def route_chat_context_clear():
 # query string log_action [insert, client_response_rating]
 @api.route('/log', methods=['POST'])
 def route_log():
+	session_id = session.get('session_id')
+	app_version = request.cookies.get('app_version','0')
+	
 	log_switch = request.args.get('log_action', '')
 	data = request.get_json()
 	if log_switch == 'insert':		
 		log_id = log_chat(
-			session_id=data.get('session_id', ''),			
-			app_version=data.get('app_version', ''),
+			session_id=session_id,			
+			app_version=app_version,
 			data_selected=data.get('data_selected', ''),
 			data_attributes=data.get('data_attributes', ''),
 			prompt_preamble=data.get('prompt_preambe',''),
