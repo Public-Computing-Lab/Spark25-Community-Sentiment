@@ -223,9 +223,9 @@ POST /chat/context?context_request={structured | unstructured | all | specific}
 
 ### /log \[ POST \]
 ---
-#### **POST chat log to logging database**
+#### **POST user action logging**
 ```
-POST /log?log_action=insert
+POST /log
 ```
 *Json Data object*
 ```
@@ -237,7 +237,8 @@ POST /log?log_action=insert
     "prompt_preamble": "{Prompt preamble}"
     "client_query": "{User chat query}",
     "client_response_rating": "{answered | unanswered}",
-    "app_response": "{LLM response}"	
+    "app_response": "{LLM response}",
+    "log_id": "{log_id}" // optional, necessary for updating log entries 	
 }
 ```
 *Response*
@@ -246,26 +247,6 @@ POST /log?log_action=insert
     "log_id":"log_id"
 }
 ```
-
-#### **POST user_rating feedback update**
-Update log entry based on user feedback.
-```
-POST /log?log_action=update_client_response_rating
-```
-*Json Data object*
-```
-{
-    "log_id": "{log_id}",			
-    "client_response_rating": "{answered | unanswered}"
-}
-```
-*Response*
-```
-{
-    "log_id":"{log_id}"
-}
-```
-
 
 ## Getting Started
 

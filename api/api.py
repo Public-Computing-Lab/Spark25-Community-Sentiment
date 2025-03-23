@@ -1,5 +1,5 @@
 
-from flask import Flask, request, jsonify, make_response, render_template_string, session
+from flask import Flask, request, jsonify, make_response, render_template_string, session, g
 import mysql.connector
 import datetime
 import os
@@ -199,104 +199,81 @@ def create_gemini_context(context_request, files, preamble):
 		return f"❌ Error generating response: {e}"
 
 # Log events
-def log_event(session_id, app_version, log_message):
+def log_event(session_id, app_version, data_selected='', data_attributes='', prompt_preamble='', client_query='', app_response='', client_response_rating='', log_id=''):
+	if not session_id or not app_version:
+		print(f"Missing session_id or app_version: {str(err)}")
+		return False 
 	try:
 		conn = get_db_connection()
 		cursor = conn.cursor()
-	
-		query = """
-		INSERT INTO interaction_log (
-			session_id,
-			app_version,							
-			app_response
-		) VALUES (%s, %s, %s)
-		"""
-	
-		values = (
-			session_id,			
-			app_version,		
-			log_message
-		)
+		#empty log_id, insert new entry	
+		if not log_id:
+			query = """
+			INSERT INTO interaction_log (
+				session_id,			
+				app_version,
+				data_selected,
+				data_attributes,
+				prompt_preamble,
+				client_query,
+				app_response,
+				client_response_rating
+			) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+			"""
+			
+			values = (
+				session_id,			
+				app_version,
+				data_selected,
+				data_attributes,
+				prompt_preamble,
+				client_query,
+				app_response,
+				client_response_rating
+			)
+		#log_id exists, update entry, only w/ non-null fields	
+		else:			
+			query = f"""
+			UPDATE interaction_log
+			"""
+			if data_selected:
+				query += f"""
+				SET data_selected = "{data_selected}"
+				"""
+			if data_attributes:
+				query += f"""
+				SET data_attributes = "{data_attributes}"
+				"""
+			if prompt_preamble:
+				query += f"""
+				SET prompt_preamble = "{prompt_preamble}"
+				"""
+			if client_query:
+				query += f"""
+				SET client_query = "{client_query}"
+				"""
+			if app_response:
+				query += f"""
+				SET app_response = "{app_response}"
+				"""
+			if client_response_rating:
+				query += f"""
+				SET client_response_rating = "{client_response_rating}"
+				"""
+			query += f"""
+			WHERE id = "{log_id}"		
+			"""					
+			values = ''
 	
 		cursor.execute(query, values)
 		conn.commit()
 		
-		log_message_id = cursor.lastrowid
-		
-		return cursor.lastrowid
-	
-	except mysql.connector.Error as err:
-		print(f"Database error: {str(err)}")
-		return False
-	
-	finally:
-		if 'conn' in locals():
-			cursor.close()
-			conn.close()
-
-# Log chat 
-def log_chat(session_id, app_version, data_selected, data_attributes, prompt_preamble, client_query, app_response, client_response_rating):
-	try:
-		conn = get_db_connection()
-		cursor = conn.cursor()
-	
-		query = """
-		INSERT INTO interaction_log (
-			session_id,			
-			app_version,
-			data_selected,
-			data_attributes,
-			prompt_preamble,
-			client_query,
-			app_response,
-			client_response_rating
-		) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-		"""
-	
-		values = (
-			session_id,			
-			app_version,
-			data_selected,
-			data_attributes,
-			prompt_preamble,
-			client_query,
-			app_response,
-			client_response_rating
-		)
-	
-		cursor.execute(query, values)
-		conn.commit()
-		
-		log_message_id = cursor.lastrowid
-		
-		return cursor.lastrowid
-	
-	except mysql.connector.Error as err:
-		print(f"Database error: {str(err)}")
-		return False
-	
-	finally:
-		if 'conn' in locals():
-			cursor.close()
-			conn.close()
-
-def log_chat_response_rating(log_id, client_response_rating):
-	try:
-		conn = get_db_connection()
-		cursor = conn.cursor()
-		
-		query = f"""
-		UPDATE interaction_log
-		SET client_response_rating = "{client_response_rating}"
-		WHERE id = "{log_id}"		
-		"""		
-		
-		cursor.execute(query)
-		conn.commit()
-		if cursor.rowcount > 0:
-			return log_id
+		if not log_id:
+			app_response_id = cursor.lastrowid
 		else:
-			return None
+			app_response_id = log_id		
+		
+		return app_response_id
 	
 	except mysql.connector.Error as err:
 		print(f"Database error: {str(err)}")
@@ -305,7 +282,7 @@ def log_chat_response_rating(log_id, client_response_rating):
 	finally:
 		if 'conn' in locals():
 			cursor.close()
-			conn.close()	
+			conn.close()
 
 # DB Query
 def db_query(query):
@@ -336,10 +313,10 @@ def check_session():
 	if 'session_id' not in session:
 		session.permanent = True  # Make the session persistent
 		session['session_id'] = str(uuid.uuid4())
-		log_event(session_id=session['session_id'], app_version='0', log_message="New session created")
+		log_event(session_id=session['session_id'], app_version='0', app_response="New session created")
 
 	# Log the request
-	log_event(session_id=session['session_id'], app_version='0', log_message=f"Request: {request.url}")
+	g.log_entry = log_event(session_id=session['session_id'], app_version='0', client_query=f"Request: {request.url}")
 
 #
 #Endpoint Definitions
@@ -647,12 +624,12 @@ def route_data_query():
 		
 		result = db_query(query=query)			
 		
-		log_event(session_id=session_id, app_version=app_version, log_message=f"Request: SUCCESS")	
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")	
 		return jsonify(result)
 		
 	
 	except Exception as e:
-		log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: ERROR: {str(e)}")
 		return jsonify({
 			'error': str(e)
 		}), 500
@@ -686,11 +663,11 @@ def route_data_zipcode():
 		
 		result = db_query(query=query)
 		
-		log_event(session_id=session_id, app_version=app_version, log_message=f"Request: SUCCESS")
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")
 		return jsonify(result)
 	
 	except Exception as e:
-		log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: ERROR: {str(e)}")
 		return jsonify({
 			'error': str(e)
 		}), 500
@@ -739,7 +716,8 @@ def route_data_file():
 				content = read_file_content(file)
 				if content is not None:
 					file_contents[file] = content
-		
+			
+			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")	
 			return jsonify({
 				'status': 'success',
 				'request_type': file_type,
@@ -749,7 +727,7 @@ def route_data_file():
 			})
 		
 		except Exception as e:
-			log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
+			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: ERROR: {str(e)}")
 			return jsonify({
 				'error': str(e)
 			}), 500
@@ -806,7 +784,7 @@ def route_data_file():
 			return jsonify(response), 200 if saved_files else 400
 		
 		except Exception as e:
-			log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
+			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: ERROR: {str(e)}")
 			return jsonify({
 				'error': str(e)
 			}), 500
@@ -862,10 +840,11 @@ def route_chat():
 			'log_id': log_id		
 		}
 		
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")	
 		return jsonify(response)
 	
 	except Exception as e:
-		log_event(session_id=session_id, app_version=app_version, log_message=f"Request: ERROR: {str(e)}")
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: ERROR: {str(e)}")
 		print(f"❌ Exception in /chat: {e}")
 		return jsonify({"error": f"Internal server error: {e}"}), 500
 
@@ -897,6 +876,7 @@ def route_chat_context():
 		
 		response = cache_name=create_gemini_context(context_request, data_selected, prompt_preamble)
 		
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")	
 		return jsonify(response)
 		
 @api.route('/chat/context/clear', methods=['POST'])
@@ -907,6 +887,7 @@ def route_chat_context_clear():
 	for cache in client.caches.list():		
 		client.caches.delete(name=cache.name)
 	
+	log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")	
 	return jsonify({'Success': 'Context cache cleared.'})
 	
 # query string log_action [insert, client_response_rating]
@@ -917,30 +898,25 @@ def route_log():
 	
 	log_switch = request.args.get('log_action', '')
 	data = request.get_json()
-	if log_switch == 'insert':		
-		log_id = log_chat(
-			session_id=session_id,			
-			app_version=app_version,
-			data_selected=data.get('data_selected', ''),
-			data_attributes=data.get('data_attributes', ''),
-			prompt_preamble=data.get('prompt_preambe',''),
-			client_query=data.get('client_query', ''),
-			app_response=data.get('app_response', ''),
-			client_response_rating=data.get('client_response_rating', '')
-		)
-		if id != 0:		
-			return jsonify({'message': 'Log entry created successfully', 'log_id': log_id}), 201
-		else:
-			return jsonify({'error': 'Failed to create log entry'}), 500
-		
-	if log_switch == 'update_client_response_rating':
-		if log_chat_response_rating(
-			log_id=data.get('log_id', ''),			
-			client_response_rating=data.get('client_response_rating', '')
-		):
-			return jsonify({'message': 'Log entry created successfully'}), 201
-		else:
-			return jsonify({'error': 'Failed to create log entry'}), 500	
+
+	log_id = log_event(
+		session_id=session_id,			
+		app_version=app_version,
+		data_selected=data.get('data_selected', ''),
+		data_attributes=data.get('data_attributes', ''),
+		prompt_preamble=data.get('prompt_preambe',''),
+		client_query=data.get('client_query', ''),
+		app_response=data.get('app_response', ''),
+		client_response_rating=data.get('client_response_rating', ''),
+		log_id=data.get('log_id', '')
+	)
+	if log_id != 0:
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")		
+		return jsonify({'message': 'Log entry created successfully', 'log_id': log_id}), 201
+	else:
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: ERROR: Log entry not created")
+		return jsonify({'error': 'Failed to create log entry'}), 500
+			
 	
 if __name__ == '__main__':	
 	api.run(host=HOST, port=PORT, debug=True)
