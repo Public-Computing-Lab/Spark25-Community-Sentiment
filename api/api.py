@@ -491,7 +491,8 @@ def route_data_query():
 				bos311_data
 			WHERE
 				type IN ({category_types})
-				AND police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' 
+				AND police_district IN ('B2', 'B3', 'C11') 
+				AND neighborhood = 'Dorchester' 
 			GROUP BY
 				year
 			ORDER BY
