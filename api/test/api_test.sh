@@ -2,7 +2,7 @@
 
 # API base URL
 API_URL="http://127.0.0.1:8888/"
-
+#API_URL="https://boston.ourcommunity.is/api"
 # Colors for output
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -11,6 +11,29 @@ NC='\033[0m' # No Color
 LOG_ID=0
 SESSION_ID="\"TEST_SESSION_ID\""
 
+# Function to test /data/context/token_count
+test_context_token_count(){
+	context_data='{
+		"data_selected": "",
+		"prompt_preamble":""
+	}'
+	echo -e "\n${GREEN}Testing POST /chat/token_count?context_request=experiment_5${NC}"
+	response=$(curl -s -X POST \
+		-b cookies.txt \
+		-c cookies.txt \
+		--cookie "app_version=0" \
+		-H "Content-Type: application/json" \
+		-d "$context_data" \
+		"${API_URL}/chat/token_count?context_request=experiment_5")
+	
+	if [ $? -eq 0 ]; then
+		echo "Response: $response"
+		echo -e "${GREEN}Chat endpoint test completed${NC}"
+	else
+		echo -e "${RED}Chat endpoint test failed${NC}"
+	fi
+	
+}
 # Function to test /data/context endpoint
 test_context_create(){
 	context_data='{
@@ -18,46 +41,62 @@ test_context_create(){
 		"prompt_preamble":""
 	}'
 	
-	echo -e "\n${GREEN}Testing POST /chat/context?context_request=structured${NC}"
+	# echo -e "\n${GREEN}Testing POST /chat/context?context_request=structured${NC}"
+	# response=$(curl -s -X POST \
+	# 	-b cookies.txt \
+	# 	-c cookies.txt \
+	# 	--cookie "app_version=0" \
+	# 	-H "Content-Type: application/json" \
+	# 	-d "$context_data" \
+	# 	"${API_URL}/chat/context?context_request=structured")
+	# 
+	# if [ $? -eq 0 ]; then
+	# 	echo "Response: $response"
+	# 	echo -e "${GREEN}Chat endpoint test completed${NC}"
+	# else
+	# 	echo -e "${RED}Chat endpoint test failed${NC}"
+	# fi
+	# 
+	# echo -e "\n${GREEN}Testing POST /chat/context?context_request=unstructured${NC}"
+	# response=$(curl -s -X POST \
+	# 	-b cookies.txt \
+	# 	-c cookies.txt \
+	# 	--cookie "app_version=0" \
+	# 	-H "Content-Type: application/json" \
+	# 	-d "$context_data" \
+	# 	"${API_URL}/chat/context?context_request=unstructured")
+	# 
+	# if [ $? -eq 0 ]; then
+	# 	echo "Response: $response"
+	# 	echo -e "${GREEN}Chat endpoint test completed${NC}"
+	# else
+	# 	echo -e "${RED}Chat endpoint test failed${NC}"
+	# fi
+	# 
+	# echo -e "\n${GREEN}Testing POST /chat/context?context_request=all${NC}"
+	# response=$(curl -s -X POST \
+	# 	-b cookies.txt \
+	# 	-c cookies.txt \
+	# 	--cookie "app_version=0" \
+	# 	-H "Content-Type: application/json" \
+	# 	-d "$context_data" \
+	# 	"${API_URL}/chat/context?context_request=all")
+	# 
+	# if [ $? -eq 0 ]; then
+	# 	echo "Response: $response"
+	# 	echo -e "${GREEN}Chat endpoint test completed${NC}"
+	# else
+	# 	echo -e "${RED}Chat endpoint test failed${NC}"
+	# fi
+	
+	echo -e "\n${GREEN}Testing POST /chat/context?context_request=experiment_5${NC}"
 	response=$(curl -s -X POST \
 		-b cookies.txt \
 		-c cookies.txt \
 		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$context_data" \
-		"${API_URL}/chat/context?context_request=structured")
-	
-	if [ $? -eq 0 ]; then
-		echo "Response: $response"
-		echo -e "${GREEN}Chat endpoint test completed${NC}"
-	else
-		echo -e "${RED}Chat endpoint test failed${NC}"
-	fi
-	
-	echo -e "\n${GREEN}Testing POST /chat/context?context_request=unstructured${NC}"
-	response=$(curl -s -X POST \
-		-b cookies.txt \
-		-c cookies.txt \
-		--cookie "app_version=0" \
-		-H "Content-Type: application/json" \
-		-d "$context_data" \
-		"${API_URL}/chat/context?context_request=unstructured")
-	
-	if [ $? -eq 0 ]; then
-		echo "Response: $response"
-		echo -e "${GREEN}Chat endpoint test completed${NC}"
-	else
-		echo -e "${RED}Chat endpoint test failed${NC}"
-	fi
-	
-	echo -e "\n${GREEN}Testing POST /chat/context?context_request=all${NC}"
-	response=$(curl -s -X POST \
-		-b cookies.txt \
-		-c cookies.txt \
-		--cookie "app_version=0" \
-		-H "Content-Type: application/json" \
-		-d "$context_data" \
-		"${API_URL}/chat/context?context_request=all")
+		"${API_URL}/chat/context?context_request=experiment_5")
 	
 	if [ $? -eq 0 ]; then
 		echo "Response: $response"
@@ -234,20 +273,20 @@ test_chat_single() {
 	echo -e "\n${GREEN}Testing POST /chat${NC}"
 	
 	chat_data='{
-		"client_query": "What are the key take aways from the data?",		
+		"client_query": "The data content describes 311 reports over time to indicate relative health and conditions of the neighborhood, and 911 reports of homicides and shots fired over time indicating incidents of violent crime in the neighborhood. The text content are community meetings and interviews about experiences of safety and voilence in the neighborhood and community meetings discussing community concerns and priorities. Some people think that violence is decreasing, other people still do not feel safe in their neighborhood. Using the data and text content, describe how the two are related and why there is disagreement on the safety of the neighborhood.",		
 		"app_version": "0",
 		"data_selected": "",
 		"data_attributes": ""
 	}'
 		
-	echo -e "\n${GREEN}Testing POST /chat?context_request=unstructured${NC}"
+	echo -e "\n${GREEN}Testing POST /chat?context_request=experiment_5${NC}"
 	response=$(curl -s -X POST \
 		-b cookies.txt \
 		-c cookies.txt \
 		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$chat_data" \
-		"${API_URL}/chat?context_request=unstructured")
+		"${API_URL}/chat?context_request=experiment_5")
 	echo "Response: $response"
 	
 	LOG_ID=$(echo "$response" | jq ".log_id")
@@ -422,6 +461,9 @@ case "$1" in
 		;;
 	"all")
 		run_all_tests
+		;;
+	"token")
+		test_context_token_count
 		;;
 	*)
 		echo "Usage: $0 [cache_create | cache_list | cache_clear | data | chat | chat_single | log | all]"
