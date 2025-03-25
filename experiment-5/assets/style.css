@@ -1,0 +1,87 @@
+#hover-chart {
+  position: absolute;
+  z-index: 99999 !important;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.3);
+  width: 350px !important;
+  height: 300px !important;
+  display: block !important;
+}
+
+.rc-slider {
+  height: 10px !important;
+  padding: 0 !important;
+  z-index: 1000 !important;
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.rc-slider-311 {
+  width: 100% !important;
+  max-width: 430px !important;
+  margin-left: 80px !important;
+  margin-right: 0 !important;
+  padding: 0 !important;
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.rc-slider-311 .rc-slider-handle {
+  height: 30px !important;
+  width: 4px !important;
+  background-color: #ff69b4 !important;
+  border-radius: 2px !important;
+  margin-top: -12px !important;
+  z-index: 1000 !important;
+  position: relative !important;
+}
+
+.rc-slider-311 .rc-slider-handle::before {
+  content: "";
+  position: absolute;
+  top: -550px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 550px;
+  width: 2px;
+  background-color: #ff69b4;
+  z-index: 9999;
+}
+
+.rc-slider-311 .rc-slider-track,
+.rc-slider-311 .rc-slider-rail {
+  background-color: transparent !important;
+}
+
+.rc-slider-311 .rc-slider-mark,
+.rc-slider-311 .rc-slider-mark-text {
+  display: none !important;
+}
+
+#temporal-chart,
+.js-plotly-plot {
+  overflow: visible !important;
+}
+
+.rc-slider-handle {
+  height: 50px !important;
+  width: 10px !important;
+  background-color: #6a5acd !important;
+  border-radius: 0 !important;
+  border: none !important;
+  margin-top: -24px !important;
+  cursor: ew-resize !important;
+  opacity: 1 !important;
+  z-index: 1000 !important;
+}
+
+.rc-slider-track,
+.rc-slider-rail {
+  background-color: transparent !important;
+}
+
+.rc-slider-mark,
+.rc-slider-mark-text {
+  display: none !important;
+}
