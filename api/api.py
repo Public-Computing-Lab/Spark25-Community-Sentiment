@@ -18,6 +18,7 @@ import io
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL")
+GEMINI_CACHE_TTL = os.getenv("GEMINI_CACHE_TTL")
 PORT = os.getenv("API_PORT")
 HOST = os.getenv("API_HOST")
 DATASTORE_PATH = Path(os.getenv("DATASTORE_PATH"))
@@ -374,7 +375,7 @@ def create_gemini_context(context_request, files, preamble, generate_cache=True)
 			expire_time = (
 				(
 					datetime.datetime.now(datetime.timezone.utc)
-					+ datetime.timedelta(days=1)
+					+ datetime.timedelta(days=GEMINI_CACHE_TTL)
 				)
 				.isoformat()
 				.replace("+00:00", "Z")
