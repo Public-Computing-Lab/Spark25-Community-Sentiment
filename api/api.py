@@ -132,10 +132,11 @@ async def get_gemini_response(prompt, cache_name):
 
 # TODO: Unsure if this should be async as well			
 def create_gemini_context(context_request, files="", preamble="", generate_cache=True):
-	# test if cache exists	
-	for cache in client.caches.list():
-		if cache.display_name == context_request + files:		
-			return cache.name
+	# test if cache exists
+	if generate_cache:	
+		for cache in client.caches.list():
+			if cache.display_name == context_request + files:		
+				return cache.name
 
 	try:
 		# dict for gemini context
@@ -312,7 +313,7 @@ def create_gemini_context(context_request, files="", preamble="", generate_cache
 				display_name = context_request
 			
 			#set cache expire time
-			expire_time = (
+			cache_ttl = (
 				(
 					datetime.datetime.now(datetime.timezone.utc)
 					+ datetime.timedelta(days=int(GEMINI_CACHE_TTL))
@@ -326,7 +327,7 @@ def create_gemini_context(context_request, files="", preamble="", generate_cache
 				config=types.CreateCachedContentConfig(
 				display_name=display_name, 
 				system_instruction=(prompt_content),
-				expire_time=expire_time,
+				expire_time=cache_ttl,
 				contents=content["parts"]			  
 			)
 			)
