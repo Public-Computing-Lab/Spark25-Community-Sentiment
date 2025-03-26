@@ -25,6 +25,8 @@ DATASTORE_PATH = Path(os.getenv("DATASTORE_PATH"))
 PROMPTS_PATH = Path(os.getenv("PROMPTS_PATH"))
 ALLOWED_EXTENSIONS = {'csv', 'txt'}  # Add more if needed
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit, totally arbitrary
+FLASK_SECRET_KEY=os.getenv("FLASK_SECRET_KEY","rethinkAI2025!")
+FLASK_SESSION_COOKIE_SECURE=os.getenv("FLASK_SESSION_COOKIE_SECURE",False)
 
 # Database configuration
 db_config = {
@@ -40,10 +42,10 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 api = Flask(__name__)
 # Set up configuration
 api.config.update(
-	SECRET_KEY='rethinkAI2025!',
+	SECRET_KEY=FLASK_SECRET_KEY,
 	PERMANENT_SESSION_LIFETIME = datetime.timedelta(days=7),
 	SESSION_COOKIE_HTTPONLY=True,
-	SESSION_COOKIE_SECURE=False  # Set to True in production with HTTPS
+	SESSION_COOKIE_SECURE=FLASK_SESSION_COOKIE_SECURE  # Set to True in production with HTTPS
 )
 
 #
@@ -313,7 +315,7 @@ def create_gemini_context(context_request, files="", preamble="", generate_cache
 			expire_time = (
 				(
 					datetime.datetime.now(datetime.timezone.utc)
-					+ datetime.timedelta(days=GEMINI_CACHE_TTL)
+					+ datetime.timedelta(days=int(GEMINI_CACHE_TTL))
 				)
 				.isoformat()
 				.replace("+00:00", "Z")
