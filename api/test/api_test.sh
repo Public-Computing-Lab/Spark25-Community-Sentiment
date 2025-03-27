@@ -265,6 +265,7 @@ test_data_query() {
 		"911_shots_fired_count_confirmed"
 		"911_shots_fired_count_unconfirmed"
 		"911_homicides_and_shots_fired"
+		"zip_geo&zipcode=02121,02115"
 	)
 	
 	for endpoint in "${ENDPOINTS_OPTIONS[@]}"; do
@@ -298,7 +299,7 @@ test_data_query() {
 
 # Function to test /data/zipcode?request=
 test_data_zip() {
-	echo -e "\n${GREEN}Testing GET /data/zipcode?request=02115${NC}"
+	echo -e "\n${GREEN}Testing GET /data/query?request=zip_geo&zipcode=02115${NC}"
 	
 	# Current timestamp in ISO format
 	#timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -313,7 +314,7 @@ test_data_zip() {
 		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$log_data" \
-		"${API_URL}/data/zipcode?request=02115,02115")
+		"${API_URL}/data/query?request=zip_geo&zipcode=02121,02115")
 
 	# Check if curl command was successful
 	if [ $? -eq 0 ]; then
