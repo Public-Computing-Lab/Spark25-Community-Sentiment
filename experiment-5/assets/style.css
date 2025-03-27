@@ -4,9 +4,13 @@
   background: white;
   border-radius: 8px;
   box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.3);
-  width: 350px !important;
-  height: 300px !important;
+  width: 250px !important;
+  height: 180px !important;
   display: block !important;
+}
+
+.rc-slider-311 {
+  padding-bottom: 60px !important;
 }
 
 .rc-slider {
@@ -17,22 +21,25 @@
   overflow: visible !important;
 }
 
+
+
 .rc-slider-311 {
-  width: 100% !important;
-  max-width: 430px !important;
-  margin-left: 80px !important;
-  margin-right: 0 !important;
+  width: calc(100vw - 80px) !important; /* Adds 40px padding on both sides */
+  margin-left: 40px !important;
+  margin-right: 40px !important;
   padding: 0 !important;
   position: relative !important;
   overflow: visible !important;
+  background-color: black;
 }
+
 
 .rc-slider-311 .rc-slider-handle {
   height: 30px !important;
   width: 4px !important;
   background-color: #ff69b4 !important;
   border-radius: 2px !important;
-  margin-top: -12px !important;
+  margin-top: -48px !important; !important;
   z-index: 1000 !important;
   position: relative !important;
 }
@@ -40,10 +47,10 @@
 .rc-slider-311 .rc-slider-handle::before {
   content: "";
   position: absolute;
-  top: -550px;
+  /* top: -550px; */
   left: 50%;
   transform: translateX(-50%);
-  height: 550px;
+  height: 10px;
   width: 2px;
   background-color: #ff69b4;
   z-index: 9999;
@@ -53,16 +60,24 @@
 .rc-slider-311 .rc-slider-rail {
   background-color: transparent !important;
 }
-
-.rc-slider-311 .rc-slider-mark,
-.rc-slider-311 .rc-slider-mark-text {
-  display: none !important;
+/* Style the slider tooltip (number bubble above handle) */
+.rc-slider-tooltip,
+.rc-slider-tooltip .rc-slider-tooltip-inner {
+  transform: translateY(-50px) !important;
+  margin-top: 0 !important;
+  background-color: #444 !important;
+  color: white !important;
+  font-size: 10px !important;
+  border-radius: 4px !important;
+  box-shadow: 1px 1px 6px rgba(0, 0, 0, 0.3) !important;
+  z-index: 99999 !important;
 }
 
 #temporal-chart,
 .js-plotly-plot {
   overflow: visible !important;
 }
+
 
 .rc-slider-handle {
   height: 50px !important;
@@ -81,7 +96,13 @@
   background-color: transparent !important;
 }
 
-.rc-slider-mark,
-.rc-slider-mark-text {
-  display: none !important;
+body {
+  background-color: black !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden;
+}
+
+html {
+  background-color: black !important;
 }
