@@ -363,7 +363,6 @@ app.layout = html.Div(style={'backgroundColor': 'black', 'padding': '10px'}, chi
        dcc.Store(id="page-load", data="loaded")
     ]),
     html.Div([
-
         html.Div([
             dcc.Graph(id='hexbin-map', style={'height': '800px', 'width': '900px'}),
             html.Div([
@@ -465,7 +464,7 @@ app.layout = html.Div(style={'backgroundColor': 'black', 'padding': '10px'}, chi
 
 
 # Clientside callback to set cookie on page load
-clientside_callback(
+app.clientside_callback(
     """
     function(data) {
         const d = new Date();
