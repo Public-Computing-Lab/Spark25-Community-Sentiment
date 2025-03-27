@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 import os
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus
+from dash import html
+from dash import ctx, dcc
 
 
 load_dotenv()
@@ -19,12 +21,14 @@ DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_5_DASH_REQUESTS_PATHNAME")
 
 def get_db_engine():
     user = os.getenv("DB_USER")
-    password = quote_plus(os.getenv("DB_PASS"))
+    password = quote_plus(os.getenv("DB_PASSWORD"))
     host = os.getenv("DB_HOST")
     db = os.getenv("DB_NAME")
 
     return create_engine(f"mysql+pymysql://{user}:{password}@{host}/{db}")
 
+PORT = os.getenv("EXPERIMENT_5_PORT")
+DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_5_DASH_REQUESTS_PATHNAME")
 
 engine = get_db_engine()
 
@@ -59,11 +63,10 @@ raw_type_to_category = {
 }
 
 districts = {
-    "B3": "#FFFF00",   
-    "B2": "#00FFFF",   
-    "C11": "#00FF00"   
+    "B3": "rgba(255, 255, 0, 0.7)",  
+    "B2": "rgba(0, 255, 255, 0.7)",   
+    "C11": "rgba(0, 255, 0, 0.7)"     
 }
-
 boston_url = "https://gisportal.boston.gov/ArcGIS/rest/services/PublicSafety/OpenData/MapServer/5/query"
 
 type_to_category = {
@@ -73,8 +76,26 @@ type_to_category = {
 allowed_types = list(type_to_category.keys())
 types_str = "', '".join(allowed_types)
 
-query_311 = "SELECT type, latitude, longitude, DATE(open_dt) AS date, police_district FROM bos311_data"
-df_311 = pd.read_sql(query_311, con=engine)
+import requests
+
+api_url = "https://boston.ourcommunity.is/api/data/query?request=311_by_geo&category=all"
+
+
+resp = requests.get(api_url)
+resp.raise_for_status()
+
+# Parse as list of dicts
+data = resp.json()
+
+# Now make DataFrame
+df_311 = pd.DataFrame(data)
+
+df_311.rename(columns={'open_dt': 'date'}, inplace=True)
+df_311['latitude'] = pd.to_numeric(df_311['latitude'], errors='coerce')
+df_311['longitude'] = pd.to_numeric(df_311['longitude'], errors='coerce')
+df_311['date'] = pd.to_datetime(df_311['date'], errors='coerce')
+df_311.dropna(subset=["latitude", "longitude", "date"], inplace=True)
+
 df_311['normalized_type'] = df_311['type'].str.strip().str.title()
 
 df_hom = pd.read_sql("SELECT homicide_date AS date FROM homicide_data", con=engine)
@@ -175,7 +196,7 @@ fig_map = create_hexbin_mapbox(
     data_frame=pivot,
     lat="latitude",
     lon="longitude",
-    nx_hexagon=45,
+    nx_hexagon=30,
     agg_func=np.sum,
     color="total_count", 
     opacity=0.7,
@@ -186,6 +207,7 @@ fig_map = create_hexbin_mapbox(
     min_count=1,
     labels={"total_count": "311 Requests"}
 )
+fig_map.update_layout(height=700, width=500)
 hexbin_geojson = fig_map.data[0].geojson
 
 fig_map.update_coloraxes(
@@ -235,21 +257,34 @@ for district_code, color in districts.items():
     except Exception as e:
         print(f"district {district_code} boundary not added", e)
 
+
+
 center_lat = map_center["lat"]
 center_lon = map_center["lon"]
 
 print(f"map center set to: lat={center_lat}, lon={center_lon}")
 
 fig_map.update_layout(
+    mapbox=dict(
+        style="carto-darkmatter",
+        center=dict(lat=42.29, lon=-71.08),  # adjust center
+        zoom=12.2,  # tighter zoom
+        bounds=dict(
+            west=-71.125,  # left edge
+            east=-71.035,  # right edge
+            south=42.25,   # bottom edge
+            north=42.34    # top edge
+        )
+    ),
     paper_bgcolor="black",
     plot_bgcolor="black",
     font_color="white",
     legend=dict(
         orientation="v",
-        x=1.02,  
+        x=1.02,
         y=0.95,
         font=dict(color='white'),
-        bgcolor="rgba(0,0,0,0)",  
+        bgcolor="rgba(0,0,0,0)",
         bordercolor="rgba(255,255,255,0.2)",
         borderwidth=1
     )
@@ -312,192 +347,138 @@ daily_merge = pd.merge(hom_daily, shots_daily, on='day', how='outer').fillna(0)
 daily_merge = daily_merge.sort_values('day')
 
 
-import plotly.graph_objects as go
-
-daily_merge_sorted = daily_merge.sort_values('day')
-
-smoothed_hom = daily_merge_sorted['homicides'].rolling(window=7).mean()
-smoothed_shots = daily_merge_sorted['shots'].rolling(window=7).mean()
-
-fig_crime_timeline = go.Figure()
-
-# homicides 
-fig_crime_timeline.add_trace(go.Scatter(
-    x=daily_merge_sorted['day'],
-    y=daily_merge_sorted['homicides'],
-    mode='lines',
-    line=dict(color='#FF0000', width=2),
-    name='Homicides',
-    hovertemplate='Homicides: %{y}<extra></extra>',
-    line_shape='spline'
-))
-
-#homicides smoothed overlay
-fig_crime_timeline.add_trace(go.Scatter(
-    x=daily_merge_sorted['day'],
-    y=smoothed_hom,
-    mode='lines',
-    line=dict(color='rgba(255,0,0,0.3)', width=2, dash='dot'),
-    name='Homicides (7d Avg)',
-    hoverinfo='skip',
-    line_shape='spline'
-))
-
-#shotsfired
-fig_crime_timeline.add_trace(go.Scatter(
-    x=daily_merge_sorted['day'],
-    y=daily_merge_sorted['shots'],
-    mode='lines',
-    line=dict(color='#FFD700', width=2),
-    name='Shots Fired',
-    hovertemplate='Shots Fired: %{y}<extra></extra>',
-    line_shape='spline'
-))
-
-#shots fired smooth
-fig_crime_timeline.add_trace(go.Scatter(
-    x=daily_merge_sorted['day'],
-    y=smoothed_shots,
-    mode='lines',
-    line=dict(color='rgba(255,215,0,0.3)', width=2, dash='dot'),
-    name='Shots Fired (7d Avg)',
-    hoverinfo='skip',
-    line_shape='spline'
-))
-
-
-fig_crime_timeline.update_xaxes(range=[pd.to_datetime("2018-01-01"), pd.to_datetime("2024-12-31")])
-
-fig_crime_timeline.update_layout(
-    title="Homicides vs. Shots Fired (Daily, with 7-Day Smoothing)",
-    title_font=dict(size=18, color='white'),
-    height=420,
-    paper_bgcolor="black",
-    plot_bgcolor="black",
-    font_color="white",
-    legend_bgcolor="rgba(0,0,0,0)",
-    xaxis=dict(title='Date', color='white'),
-    yaxis=dict(title='Incidents per Day', color='white')
-)
-
-
-#pie chart
-hom_days = set(df_hom['day'])
-shot_days = set(df_shots['day'])
-matched = sum(1 for d in hom_days if any((d + pd.Timedelta(days=off)) in shot_days for off in [-1, 0, 1]))
-no_match = len(hom_days) - matched
-pie_data = pd.DataFrame({
-    "Category": ["Homicide with Shots±1d", "Homicide without Shots"], 
-    "Count": [matched, no_match]
-})
-fig_pie = px.pie(
-    pie_data, names='Category', values='Count',
-    color='Category', color_discrete_map={
-        "Homicide with Shots±1d": "#FFD700",  
-        "Homicide without Shots": "#1f77b4"  
-    }
-)
-fig_pie.update_traces(textfont_color='white')
-fig_pie.update_layout(
-    title="Homicides With vs. Without Shots Fired (±1 Day)",
-    title_font=dict(size=16, color='white'),
-    height=300,
-    paper_bgcolor="black", font_color="white",
-    legend_bgcolor="rgba(0,0,0,0)"
-)
 
 #dash initiate
 app = Dash(__name__, suppress_callback_exceptions=True,serve_locally=False, requests_pathname_prefix=DASH_REQUESTS_PATHNAME)
-app.layout = html.Div(style={'backgroundColor': 'black', 'padding': '10px'}, children=[
+app.layout = html.Div(style={'backgroundColor': 'black', 'padding': '10px'}, children=[    
     html.H1("City Safety Dashboard", style={
         'textAlign': 'center',
         'color': 'white',
         'marginBottom': '15px'
-    }),
-
-
+    }),    
+    dcc.Store(id="chat-history-store", data=[]),
+    #set the cookie
+    html.Div([
+       html.Div(id="cookie-setter-trigger", style={"display": "none"}),
+       dcc.Store(id="page-load", data="loaded")
+    ]),
     html.Div([
 
         html.Div([
-            dcc.Graph(id='hexbin-map', style={'height': '620px'}),
+            dcc.Graph(id='hexbin-map', style={'height': '800px', 'width': '900px'}),
             html.Div([
-                dcc.Graph(id='hover-chart', style={'height': '250px', 'width': '280px'})
-            ], id='hover-container', style={'display': 'none'})
+                dcc.Graph(id='hover-chart', style={'height': '180px', 'width': '250px'})
+            ], id='hover-container', style={
+                'display': 'none',
+                'backgroundColor': 'rgba(42,42,42,0.95)',
+                'borderRadius': '8px',
+                'padding': '4px',
+                'overflow': 'hidden',
+                'position': 'absolute',
+                'zIndex': 1000,
+                'boxShadow': '2px 2px 12px rgba(0,0,0,0.5)'
+            })
         ], style={
             'width': '58%',
             'display': 'inline-block',
             'paddingLeft': '2%',
-            'position': 'relative'
+            'position': 'relative',
+            'verticalAlign': 'top'
         }),
 
 
         html.Div([
-
-            html.Div([
-                dcc.Graph(
-                    id='temporal-chart',
-                    figure=fig_timeline,
-                    style={'height': '620px', 'width': '100%'}
-                )
-            ], style={
-                'overflow': 'visible', 
-                'position': 'relative'
+            html.Div("🤖 Assistant", style={
+                'color': 'white',
+                'fontWeight': 'bold',
+                'marginBottom': '8px',
+                'fontSize': '16px'
+            }),
+            html.Div(id='chat-display', style={
+                'height': '480px',
+                'backgroundColor': '#1a1a1a',
+                'color': 'white',
+                'border': '1px solid #444',
+                'borderRadius': '8px',
+                'padding': '10px',
+                'overflowY': 'auto',
+                'marginBottom': '10px',
+                'fontSize': '13px'
+            }),
+            dcc.Textarea(
+                id='chat-input',
+                placeholder='Type your question here...',
+                style={
+                    'width': '100%',
+                    'height': '80px',
+                    'borderRadius': '8px',
+                    'backgroundColor': '#333',
+                    'color': 'white',
+                    'border': '1px solid #555',
+                    'padding': '8px',
+                    'resize': 'none',
+                    'fontSize': '13px'
+                }
+            ),
+            html.Button("SEND", id='send-button', n_clicks=0, style={
+                'marginTop': '8px',
+                'width': '100%',
+                'backgroundColor': '#ff69b4',
+                'color': 'white',
+                'border': 'none',
+                'borderRadius': '6px',
+                'padding': '10px',
+                'fontWeight': 'bold',
+                'cursor': 'pointer'
             }),
 
-            html.Div([
-                dcc.Slider(
-                    id='hexbin-slider',
-                    min=0,
-                    max=len(month_labels) - 1,
-                    step=1,
-                    value=0,
-                    marks=slider_marks,
-                    tooltip={"placement": "top", "always_visible": True},
-                    className='rc-slider-311'
-                )
-            ], style={
-                'width': '100%',
-                'paddingTop': '12px',
-                'paddingBottom': '24px',
-                'display': 'flex',
-                'justifyContent': 'flex-start'
-            })
+
         ], style={
-            'width': '40%',
+            'width': '38%',
             'display': 'inline-block',
+            'paddingLeft': '2%',
             'verticalAlign': 'top'
         })
+
     ], style={'marginBottom': '2rem'}),
 
-
+   
     html.Div([
-        html.Div([
-            dcc.Dropdown(
-                id='crime-year-dropdown',
-                options=[{'label': str(year), 'value': year} for year in range(2018, 2025)],
-                value=2018,
-                style={'width': '200px', 'marginBottom': '10px'}
-            ),
-            dcc.Graph(id='crime-timeline', style={'height': '500px'}),
-        ], style={'flex': '2'}),  
-
-        dcc.Graph(id='crime-pie', figure=fig_pie, style={'flex': '1'})
-    ], style={'display': 'flex', 'gap': '2rem'}),
-
-
-
-    html.Div([
-        html.H3("Shots Fired Map (Confirmed vs Unconfirmed)", style={'color': 'white', 'textAlign': 'center'}),
         dcc.Slider(
-            id='shots-slider',
-            min=0, max=len(month_labels) - 1, step=1, value=0,
-            marks=slider_marks,
-            tooltip={"placement": "top", "always_visible": True}
-        ),
-        dcc.Graph(id='shots-fired-map', style={'height': '600px'})
-    ], style={'marginTop': '3rem'})
-
+            id='hexbin-slider',
+            min=0,
+            max=len(month_labels) - 1,
+            step=1,
+            value=0,
+            marks={i: {'label': label, 'style': {'color': 'white'}} for i, label in slider_marks.items()},
+            tooltip={"placement": "bottom", "always_visible": True},
+            className='rc-slider-311'
+        )
+    ], style={
+        'width': '100%',
+        'margin': '0 auto',
+        'paddingTop': '30px',
+        'paddingBottom': '0px',
+        'backgroundColor': 'black'
+    })
 ])
+
+
+# Clientside callback to set cookie on page load
+clientside_callback(
+    """
+    function(data) {
+        const d = new Date();
+        d.setTime(d.getTime() + (30*24*60*60*1000));
+        const expires = "expires=" + d.toUTCString();
+        document.cookie = "app_version=5;" + expires + ";path=/";
+
+        return "Cookie 'app_version=5' has been set successfully!";
+    }
+    """,
+    Output("cookie-status", "children"),
+    Input("page-load", "data")
+)
 
 
 from dash.dependencies import Input, Output, State
@@ -510,22 +491,20 @@ from shapely.geometry import Point, Polygon
     [State('hexbin-map', 'figure')]
 )
 def update_hover_chart(hoverData, hexmap_fig):
-    print("\n hover triggered")
 
     if not hoverData or 'points' not in hoverData:
-        print("no data")
         return go.Figure(), {'display': 'none'}
 
     point = hoverData['points'][0]
-    print("hovered point:", point)
 
-    hex_id = point.get('location')
+    if 'location' not in point:
+        return go.Figure(), {'display': 'none'}
+
+    hex_id = point['location']
+
     bbox = point.get('bbox', {})
-    print("hex_id:", hex_id)
-    print("(bbox):", bbox)
 
     if not hex_id or 'x0' not in bbox or 'y0' not in bbox:
-        print("missing hexid")
         return go.Figure(), {'display': 'none'}
 
     x_pos = bbox['x0']
@@ -533,7 +512,7 @@ def update_hover_chart(hoverData, hexmap_fig):
 
     geojson = hexmap_fig['data'][0].get('geojson')
     if not geojson:
-        print("no geojson found")
+
         return go.Figure(), {'display': 'none'}
 
     coords = None
@@ -543,19 +522,24 @@ def update_hover_chart(hoverData, hexmap_fig):
             break
 
     if not coords:
-        print("no matching polygon for hexid")
+
         return go.Figure(), {'display': 'none'}
     
-    print("coordinates found")
+    
 
     polygon = Polygon(coords)
-    points_in_hex = df_311[df_311.apply(
-        lambda row: polygon.contains(Point(row['longitude'], row['latitude'])), axis=1)]
+    from shapely import vectorized
+
+    lons = df_311['longitude'].values
+    lats = df_311['latitude'].values
+    mask = vectorized.contains(polygon, lons, lats)
+    points_in_hex = df_311[mask]
+
 
     print(f"points in hoveredhex: {len(points_in_hex)}")
 
     if points_in_hex.empty:
-        print("no data points")
+        
         return go.Figure(), {'display': 'none'}
 
     cat_counts = points_in_hex['category'].value_counts().reset_index()
@@ -573,24 +557,41 @@ def update_hover_chart(hoverData, hexmap_fig):
         color_discrete_map=category_colors
     )
     fig.update_layout(
-        height=200, width=280,
-        margin=dict(t=30, b=10, l=5, r=5),
-        paper_bgcolor='white', plot_bgcolor='white',
-        font=dict(size=10), showlegend=False
+        height=180, width=250,
+        margin=dict(t=30, b=20, l=10, r=10),
+        paper_bgcolor='#2a2a2a',  # dark grey
+        plot_bgcolor='#2a2a2a',
+        font=dict(size=10, color='white'),
+        showlegend=False,
+        title=dict(font=dict(size=12, color='white'), x=0.5, xanchor='center'),
+        xaxis=dict(
+            tickangle=-35, 
+            tickfont=dict(size=8, color='white'),
+            title=None
+        ),
+        yaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            tickfont=dict(size=8, color='white'),
+            title='Count'
+        )
     )
-    fig.update_traces(marker_line_color='black', marker_line_width=1)
+   
+
 
     style = {
         'position': 'absolute',
-        'top': f'{y_pos - 60}px',
+        'top': f'{y_pos - 50}px',
         'left': f'{x_pos + 20}px',
         'display': 'block',
-        'backgroundColor': 'white',
-        'boxShadow': '2px 2px 10px rgba(0,0,0,0.3)',
-        'borderRadius': '8px',
-        'padding': '5px',
-        'zIndex': 1000
+        'backgroundColor': '#2a2a2a',  
+        'boxShadow': '3px 3px 12px rgba(0,0,0,0.6)',
+        'borderRadius': '10px',
+        'padding': '6px',
+        'zIndex': 1000,
+        'border': '1px solid #444'
     }
+
 
     print("hover chart is generated")
     return fig, style
@@ -624,143 +625,6 @@ def add_district_boundaries(fig):
         except Exception as e:
             print(f"district {district_code} boundary not added", e)
 
-@app.callback(
-    Output('shots-fired-map', 'figure'),
-    Input('shots-slider', 'value')
-)
-def update_shots_map(month_index):
-    selected_month = month_labels[month_index]
-    month_dt = pd.to_datetime(selected_month)
-
-    df_month = df_shots[df_shots["month"] == month_dt]
-    if df_month.empty:
-        print(f"no data for month: {selected_month}")
-        return go.Figure()
-
-    confirmed = df_month[df_month["ballistics_evidence"] == 1]
-    unconfirmed = df_month[df_month["ballistics_evidence"] == 0]
-
-    hom_this_month = df_hom_shot_matched[df_hom_shot_matched["month"] == month_dt].copy()
-    hom_this_month["latitude"] += 0.0020
-    hom_this_month["longitude"] += 0.0020
-    print("matched homicides:", len(hom_this_month))
-    print(hom_this_month[['latitude', 'longitude', 'date']].head())
-
-
-    fig = go.Figure()
-
-    #confirmed
-    fig.add_trace(go.Scattermapbox(
-        lat=confirmed["latitude"],
-        lon=confirmed["longitude"],
-        mode="markers",
-        name="Confirmed (Ballistic)",
-        marker=dict(color="red", size=9, opacity=1),
-        hoverinfo="text",
-        text=confirmed["date"].dt.strftime('%Y-%m-%d %H:%M')
-    ))
-
-    #not confirmed
-    fig.add_trace(go.Scattermapbox(
-        lat=unconfirmed["latitude"],
-        lon=unconfirmed["longitude"],
-        mode="markers",
-        name="Unconfirmed",
-        marker=dict(color="#1E90FF", size=7, opacity=1),
-        hoverinfo="text",
-        text=unconfirmed["date"].dt.strftime('%Y-%m-%d %H:%M')
-    ))
-
-    #homcidices
-    fig.add_trace(go.Scattermapbox(
-        lat=hom_this_month["latitude"],
-        lon=hom_this_month["longitude"],
-        mode="markers",
-        name="Matched Homicides",
-        marker=dict(color="limegreen", size=10, opacity=1),
-        hoverinfo="text",
-        text=hom_this_month["date"].dt.strftime('%Y-%m-%d %H:%M')
-    ))
-
-
-    fig.update_layout(
-        mapbox=dict(
-            style="carto-darkmatter",
-            center=dict(lat=42.304, lon=-71.07),
-            zoom=11.8
-        ),
-        paper_bgcolor="black",
-        plot_bgcolor="black",
-        font_color="white",
-        title=f"Shots Fired Map with Matched Homicides ({selected_month})",
-        margin=dict(l=0, r=0, t=40, b=0),
-        legend=dict(
-            orientation="v",
-            x=1.01, y=1,
-            bgcolor="rgba(0,0,0,0)",
-            font=dict(size=12)
-        )
-    )
-
-    add_district_boundaries(fig)
-    return fig
-
-
-@app.callback(
-    Output('crime-timeline', 'figure'),
-    Input('crime-year-dropdown', 'value')  
-)
-def update_crime_timeline(selected_year):
-    if not selected_year:
-        selected_year = 2018
-    selected_year = int(selected_year)
-    start = pd.to_datetime(f"{selected_year}-01-01")
-    end = pd.to_datetime(f"{selected_year}-12-31")
-
-    daily_merge['day'] = pd.to_datetime(daily_merge['day'])
-    daily_merge_sorted = daily_merge.sort_values('day')
-    filtered_df = daily_merge_sorted[
-        (daily_merge_sorted['day'] >= start) & (daily_merge_sorted['day'] <= end)
-    ]
-
-    smoothed_hom = filtered_df['homicides'].rolling(window=7, center=True).mean()
-    smoothed_shots = filtered_df['shots'].rolling(window=7, center=True).mean()
-
-    fig = go.Figure()
-
-    fig.add_trace(go.Scatter(
-        x=filtered_df['day'],
-        y=smoothed_hom,
-        customdata=np.stack([filtered_df['homicides']], axis=-1),
-        hovertemplate="Homicides: %{customdata[0]}<extra></extra>",
-        mode='lines',
-        name='Homicides',
-        line=dict(color='#FF0000', width=2),
-        line_shape='spline'
-    ))
-
-    fig.add_trace(go.Scatter(
-        x=filtered_df['day'],
-        y=smoothed_shots,
-        customdata=np.stack([filtered_df['shots']], axis=-1),
-        hovertemplate="Shots Fired: %{customdata[0]}<extra></extra>",
-        mode='lines',
-        name='Shots Fired',
-        line=dict(color='#FFD700', width=2),
-        line_shape='spline'
-    ))
-
-    fig.update_layout(
-        height=900,  
-        paper_bgcolor="black",
-        plot_bgcolor="black",
-        font_color="white",
-        legend_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(title='Date', color='white', showgrid=False),
-        yaxis=dict(title='Incidents per Day', color='white', showgrid=False)
-    )
-
-    return fig
 
 @app.callback(
     Output('hexbin-map', 'figure'),
@@ -768,13 +632,13 @@ def update_crime_timeline(selected_year):
 )
 def update_hexbin_map(month_index):
     selected_month = available_months[month_index]
-    month_str = selected_month.strftime('%B %Y')  
+    month_str = selected_month.strftime('%B %Y')
 
     df_month = df_311[df_311['date'].dt.to_period('M').dt.to_timestamp() == selected_month]
-
     if df_month.empty:
         return go.Figure()
 
+    # Prepare hexbin
     df_month['count'] = 1
     grouped = df_month.groupby(['latitude', 'longitude', 'category']).size().reset_index(name='count')
     pivot = grouped.pivot_table(index=['latitude', 'longitude'], columns='category', values='count', fill_value=0).reset_index()
@@ -785,31 +649,27 @@ def update_hexbin_map(month_index):
         data_frame=pivot,
         lat="latitude",
         lon="longitude",
-        nx_hexagon=45,
+        nx_hexagon=20,
         agg_func=np.sum,
-        color="total_count",  
+        color="total_count",
         opacity=0.7,
         color_continuous_scale=px.colors.sequential.Plasma[::-1],
         mapbox_style="carto-darkmatter",
         center=dict(lat=42.304, lon=-71.07),
-        zoom=11.5,
+        zoom=11.9,
         min_count=1,
         labels={"total_count": "311 Requests"}
     )
 
     fig.update_coloraxes(colorbar=dict(
         title=dict(text="311 Requests", font=dict(size=12, color="white")),
-        orientation="h", x=0.5, y=1.1, xanchor="center", len=0.5,
+        orientation="h", x=0.5, y=1.0, xanchor="center", len=0.5,
         thickness=12, tickfont=dict(size=10, color="white"), bgcolor="rgba(0,0,0,0)"
     ))
 
-    for cat, col in category_colors.items():
-        fig.add_trace(go.Scattermapbox(
-            lat=[None], lon=[None], mode='markers',
-            marker=dict(size=10, color=col),
-            legendgroup=cat, showlegend=True, name=cat, hoverinfo='skip'
-        ))
 
+
+    # Add district outlines
     for district_code, color in districts.items():
         try:
             params = {
@@ -820,7 +680,7 @@ def update_hexbin_map(month_index):
             geojson = resp.json()
             coords = geojson['features'][0]['geometry']['coordinates']
             poly_list = coords if isinstance(coords[0][0][0], float) else [p[0] for p in coords]
-            for poly in poly_list:
+            for i, poly in enumerate(poly_list):
                 lons = [pt[0] for pt in poly] + [poly[0][0]]
                 lats = [pt[1] for pt in poly] + [poly[0][1]]
                 fig.add_trace(go.Scattermapbox(
@@ -828,27 +688,241 @@ def update_hexbin_map(month_index):
                     line=dict(color=color, width=3),
                     name=f"District {district_code}",
                     legendgroup=f"District {district_code}",
-                    showlegend=(poly == poly_list[0]), hoverinfo='skip'
+                    showlegend=(i == 0), 
+                    hoverinfo='skip'
                 ))
+
         except Exception as e:
             print(f"district {district_code} boundary not added", e)
 
+
+    dorchester_url = "https://gis.bostonplans.org/hosting/rest/services/Hosted/Boston_Neighborhood_Boundaries/FeatureServer/1/query"
+    params = {
+        "where": "name='Dorchester'",
+        "outFields": "*",
+        "f": "geojson",
+        "outSR": "4326"
+    }
+
+    try:
+        
+        resp = requests.get(dorchester_url, params=params)
+
+
+        if resp.status_code != 200:
+
+            raise Exception(f"Request failed with status code {resp.status_code}")
+
+        
+        geojson = resp.json()  
+        features = geojson.get('features', [])
+
+
+        if not features:
+            print("no features found in geojson")
+        else:
+            geometry = features[0].get('geometry', {})
+            print("geometry type:", geometry.get('type'))
+
+            if geometry['type'] == "Polygon":
+                polygons = [geometry['coordinates']]
+            elif geometry['type'] == "MultiPolygon":
+                polygons = geometry['coordinates']
+            else:
+                print("unexpected geometry type:", geometry['type'])
+                polygons = []
+
+            for i, polygon in enumerate(polygons):
+                for j, ring in enumerate(polygon):
+                    show = (i == 0 and j == 0)
+                    lons = [pt[0] for pt in ring] + [ring[0][0]]
+                    lats = [pt[1] for pt in ring] + [ring[0][1]]
+                    fig.add_trace(go.Scattermapbox(
+                        lat=lats, lon=lons, mode='lines',
+                        line=dict(color='white', width=3),
+                        name="Neighborhood: Dorchester",
+                        legendgroup="Neighborhood: Dorchester",
+                        showlegend=show,
+                        hoverinfo='skip'
+                    ))
+            print("dorchester boundary successfully added.")
+
+    except Exception as e:
+        print("dorchester boundary not added:", e)
+
+
+    df_month_shots = df_shots[df_shots["month"] == selected_month]
+    confirmed = df_month_shots[df_month_shots["ballistics_evidence"] == 1]
+    unconfirmed = df_month_shots[df_month_shots["ballistics_evidence"] == 0]
+
+    hom_this_month = df_hom_shot_matched[df_hom_shot_matched["month"] == selected_month].copy()
+    hom_this_month["latitude"] += 0.0020
+    hom_this_month["longitude"] += 0.0020
+
+
+    fig.add_trace(go.Scattermapbox(
+        lat=confirmed["latitude"],
+        lon=confirmed["longitude"],
+        mode="markers",
+        name="Confirmed (Ballistic)",
+        marker=dict(color="red", size=9, opacity=1),
+        hoverinfo="text",
+        text=confirmed["date"].dt.strftime('%Y-%m-%d %H:%M')
+    ))
+
+
+    fig.add_trace(go.Scattermapbox(
+        lat=unconfirmed["latitude"],
+        lon=unconfirmed["longitude"],
+        mode="markers",
+        name="Unconfirmed",
+        marker=dict(color="#1E90FF", size=7, opacity=1),
+        hoverinfo="text",
+        text=unconfirmed["date"].dt.strftime('%Y-%m-%d %H:%M')
+    ))
+
+
+    fig.add_trace(go.Scattermapbox(
+        lat=hom_this_month["latitude"],
+        lon=hom_this_month["longitude"],
+        mode="markers",
+        name="Matched Homicides",
+        marker=dict(color="limegreen", size=10, opacity=1),
+        hoverinfo="text",
+        text=hom_this_month["date"].dt.strftime('%Y-%m-%d %H:%M')
+    ))
+
     fig.update_layout(
-        title=f"311 Request Hexbin Map ({month_str})",  
+        title=f"311 Requests + Shots Fired + Homicides ({month_str})",
         title_font=dict(size=18, color='white'),
         title_x=0.5,
         paper_bgcolor="black",
         plot_bgcolor="black",
         font_color="white",
         legend=dict(
-            orientation="v", x=1.02, y=0.95,
+            orientation="h",
+            x=0.5,
+            y=0.01,
+            xanchor="center",
             font=dict(color='white'),
             bgcolor="rgba(0,0,0,0)",
-            bordercolor="rgba(255,255,255,0.2)", borderwidth=1
+            bordercolor="rgba(255,255,255,0.2)",
+            borderwidth=1
         )
+
     )
 
     return fig
+
+from dash import ctx
+import requests
+import json
+
+app.clientside_callback_context = ctx
+
+chat_history = []
+
+def chat_display_div(history):
+    return [
+        html.Div([
+            html.Strong(who + ":", style={"color": "#ff69b4" if who == "You" else "#00ffff"}),
+            html.Span(" " + msg, style={"marginLeft": "6px", "fontStyle": "italic"} if msg == "_typing_..." else {"marginLeft": "6px"})
+        ], style={"marginBottom": "10px"})
+        for who, msg in history
+    ]
+
+
+
+import dash
+from dash import ctx
+import time
+from dash.exceptions import PreventUpdate
+import requests
+from dash import callback_context
+from dash import callback_context, no_update
+
+@app.callback(
+    [Output("chat-history-store", "data"),
+     Output("chat-display", "children"),
+     Output("chat-input", "value")],
+    [Input("send-button", "n_clicks"),
+     Input("hexbin-slider", "value")],
+    [State("chat-input", "value"),
+     State("chat-history-store", "data")]
+)
+def handle_chat_simple(n_clicks, slider_val, user_input, history):
+    from dash.exceptions import PreventUpdate
+    import requests
+
+    triggered_id = ctx.triggered_id
+
+    if history is None:
+        history = []
+
+    selected_date = available_months[slider_val].strftime('%B %Y')
+
+
+    if triggered_id == "hexbin-slider":
+
+        prompt = (
+            f"Provide a professional summary of key trends in the city's safety and service data for {selected_date}. "
+            f"Use both 311 service request data (grouped into four categories: Living Conditions, Trash/Recycling/Waste, "
+            f"Streets/Sidewalks/Parks, and Parking) and 911 incident data (homicides and shots fired). "
+            f"Highlight any significant changes, spikes, or drops in activity across these categories. "
+            f"Where applicable, connect these trends to potential implications for neighborhood safety or quality of life. "
+            f"This summary should help stakeholders understand the most relevant patterns in the data for this time period."
+        )
+    elif triggered_id == "send-button":
+
+        if not user_input or not user_input.strip():
+            raise PreventUpdate
+        history.append(("You", user_input.strip()))
+        prompt = (
+            f"The data shows 311 service requests and 911 incidents for {selected_date} in Boston neighborhoods.\n\n"
+            
+            f"311 data reflects concerns about neighborhood conditions and quality of life. The request types are grouped into four major categories:\n"
+            "- **Living Conditions**: 'Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', "
+            "'Rodent Activity', 'Heat - Excessive Insufficient', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential'\n"
+            "- **Trash, Recycling, And Waste**: 'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Schedule a Bulk Item Pickup', 'CE Collection', "
+            "'Schedule a Bulk Item Pickup SS', 'Request for Recycling Cart', 'Illegal Dumping'\n"
+            "- **Streets, Sidewalks, And Parks**: 'Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', "
+            "'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair', 'Pothole'\n"
+            "- **Parking**: 'Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', "
+            "'Valet Parking Problems', 'Private Parking Lot Complaints'\n\n"
+
+            f"911 data includes reported homicides and shots fired, indicating incidents of violent crime.\n\n"
+
+            f"Text content includes quotes from community meetings and interviews. Some residents believe violence is decreasing, while others still feel unsafe. "
+            f"Concerns range from housing quality and trash overflow to gang activity and street-level violence.\n\n"
+
+            f"Using both data and text content, explain how these two types of information reflect community safety. "
+            f"Describe why there might be disagreement between what the data shows and how people feel. "
+            f"Point out notable spikes, drops, or emerging patterns in the data for {selected_date}, and connect them to lived experiences and perceptions. "
+            f"Use the grouped 311 categories and the 911 incident data together to provide a holistic, narrative-driven analysis.\n\n"
+
+            f"User's question: {user_input.strip()}"
+        )
+
+
+    else:
+        
+        raise PreventUpdate
+
+
+    try:
+        response = requests.post(
+            "https://boston.ourcommunity.is/api/chat?context_request=experiment_5",
+            headers={"Content-Type": "application/json"},
+            json={"client_query": prompt, "app_version": "5"}
+        )
+        response.raise_for_status()
+        reply = response.json().get("response", "[No reply received]")
+    except Exception as e:
+        reply = f"[Error: {e}]"
+
+    history.append(("Assistant", reply))
+    return history, chat_display_div(history), ""
+
 
 
 if __name__ == "__main__":
