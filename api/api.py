@@ -1,51 +1,117 @@
 
-from flask import Flask, request, jsonify, make_response, render_template_string, session, g
-import mysql.connector
-import datetime
-import os
+from flask import Flask, request, jsonify, g, session
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-import uuid
-import asyncio
 from pathlib import Path
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Optional, Any
+import mysql.connector
+import datetime
+import os
 import re
 import csv
 import io
+import uuid
+import asyncio
 
 # Load environment variables
 load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL")
-GEMINI_CACHE_TTL = os.getenv("GEMINI_CACHE_TTL")
-PORT = os.getenv("API_PORT")
-HOST = os.getenv("API_HOST")
-DATASTORE_PATH = Path(os.getenv("DATASTORE_PATH"))
-PROMPTS_PATH = Path(os.getenv("PROMPTS_PATH"))
-ALLOWED_EXTENSIONS = {'csv', 'txt'}  # Add more if needed
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit, totally arbitrary
-FLASK_SECRET_KEY=os.getenv("FLASK_SECRET_KEY","rethinkAI2025!")
-FLASK_SESSION_COOKIE_SECURE=os.getenv("FLASK_SESSION_COOKIE_SECURE",False)
 
-# Database configuration
-db_config = {
-	'host': os.getenv('DB_HOST', 'localhost'),
-	'user': os.getenv('DB_USER'),
-	'password': os.getenv('DB_PASSWORD'),
-	'database': os.getenv('DB_NAME')
-}
+# Configuration constants
+class Config:
+	GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+	GEMINI_MODEL = os.getenv("GEMINI_MODEL")
+	GEMINI_CACHE_TTL = int(os.getenv("GEMINI_CACHE_TTL", "7"))
+	HOST = os.getenv("API_HOST")
+	PORT = os.getenv("API_PORT")	
+	DATASTORE_HOST = os.getenv("DATASTORE_HOST")
+	DATASTORE_PATH = Path(os.getenv("DATASTORE_PATH", "."))
+	PROMPTS_PATH = Path(os.getenv("PROMPTS_PATH", "."))
+	ALLOWED_EXTENSIONS = {'csv', 'txt'}
+	MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit
+	FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "rethinkAI2025!")
+	FLASK_SESSION_COOKIE_SECURE = os.getenv("FLASK_SESSION_COOKIE_SECURE", "False").lower() == "true"
 
-# GenAI configuration
-client = genai.Client(api_key=GEMINI_API_KEY)
+	# Database configuration
+	DB_CONFIG = {
+		'host': os.getenv('DB_HOST', 'localhost'),
+		'user': os.getenv('DB_USER'),
+		'password': os.getenv('DB_PASSWORD'),
+		'database': os.getenv('DB_NAME')
+	}
 
-api = Flask(__name__)
-# Set up configuration
-api.config.update(
-	SECRET_KEY=FLASK_SECRET_KEY,
-	PERMANENT_SESSION_LIFETIME = datetime.timedelta(days=7),
+
+#
+# SQL Query Constants
+#
+class SQLConstants:	
+	# 311 category mappings
+	CATEGORY_TYPES = {
+		'living_conditions': "'Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential'",
+		'trash': "'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping'",
+		'streets': "'Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair'",
+		'parking': "'Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints'",
+	}
+	
+	# Set the 'all' category to include all individual categories
+	CATEGORY_TYPES['all'] = ', '.join([cat for cat in ', '.join(CATEGORY_TYPES.values()).split(', ')])
+	# Common aggregation columns for monthly/quarterly breakdowns
+	BOS911_TIME_BREAKDOWN = """
+		COUNT(*) AS total_by_year,
+		SUM(CASE WHEN quarter = 1 THEN 1 ELSE 0 END) AS q1_total,
+		SUM(CASE WHEN quarter = 2 THEN 1 ELSE 0 END) AS q2_total,
+		SUM(CASE WHEN quarter = 3 THEN 1 ELSE 0 END) AS q3_total,
+		SUM(CASE WHEN quarter = 4 THEN 1 ELSE 0 END) AS q4_total,
+		SUM(CASE WHEN month = 1 THEN 1 ELSE 0 END) AS jan_total,
+		SUM(CASE WHEN month = 2 THEN 1 ELSE 0 END) AS feb_total,
+		SUM(CASE WHEN month = 3 THEN 1 ELSE 0 END) AS mar_total,
+		SUM(CASE WHEN month = 4 THEN 1 ELSE 0 END) AS apr_total,
+		SUM(CASE WHEN month = 5 THEN 1 ELSE 0 END) AS may_total,
+		SUM(CASE WHEN month = 6 THEN 1 ELSE 0 END) AS jun_total,
+		SUM(CASE WHEN month = 7 THEN 1 ELSE 0 END) AS jul_total,
+		SUM(CASE WHEN month = 8 THEN 1 ELSE 0 END) AS aug_total,
+		SUM(CASE WHEN month = 9 THEN 1 ELSE 0 END) AS sep_total,
+		SUM(CASE WHEN month = 10 THEN 1 ELSE 0 END) AS oct_total,
+		SUM(CASE WHEN month = 11 THEN 1 ELSE 0 END) AS nov_total,
+		SUM(CASE WHEN month = 12 THEN 1 ELSE 0 END) AS dec_total
+	"""
+	
+	BOS311_TIME_BREAKDOWN = """
+	COUNT(*) AS total_year,
+	SUM(CASE WHEN QUARTER(open_dt) = 1 THEN 1 ELSE 0 END) AS q1_total,
+	SUM(CASE WHEN QUARTER(open_dt) = 2 THEN 1 ELSE 0 END) AS q2_total,
+	SUM(CASE WHEN QUARTER(open_dt) = 3 THEN 1 ELSE 0 END) AS q3_total,
+	SUM(CASE WHEN QUARTER(open_dt) = 4 THEN 1 ELSE 0 END) AS q4_total,
+	SUM(CASE WHEN MONTH(open_dt) = 1 THEN 1 ELSE 0 END) AS jan_total,
+	SUM(CASE WHEN MONTH(open_dt) = 2 THEN 1 ELSE 0 END) AS feb_total,
+	SUM(CASE WHEN MONTH(open_dt) = 3 THEN 1 ELSE 0 END) AS mar_total,
+	SUM(CASE WHEN MONTH(open_dt) = 4 THEN 1 ELSE 0 END) AS apr_total,
+	SUM(CASE WHEN MONTH(open_dt) = 5 THEN 1 ELSE 0 END) AS may_total,
+	SUM(CASE WHEN MONTH(open_dt) = 6 THEN 1 ELSE 0 END) AS jun_total,
+	SUM(CASE WHEN MONTH(open_dt) = 7 THEN 1 ELSE 0 END) AS jul_total,
+	SUM(CASE WHEN MONTH(open_dt) = 8 THEN 1 ELSE 0 END) AS aug_total,
+	SUM(CASE WHEN MONTH(open_dt) = 9 THEN 1 ELSE 0 END) AS sep_total,
+	SUM(CASE WHEN MONTH(open_dt) = 10 THEN 1 ELSE 0 END) AS oct_total,
+	SUM(CASE WHEN MONTH(open_dt) = 11 THEN 1 ELSE 0 END) AS nov_total,
+	SUM(CASE WHEN MONTH(open_dt) = 12 THEN 1 ELSE 0 END) AS dec_total
+	"""
+
+	# 311 specific constants
+	BOS311_BASE_WHERE = "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
+
+	# 911 specific constants	
+	BOS911_BASE_WHERE = f"district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
+
+# Initialize GenAI client
+genai_client = genai.Client(api_key=Config.GEMINI_API_KEY)
+
+# Initialize Flask app
+app = Flask(__name__)
+app.config.update(
+	SECRET_KEY=Config.FLASK_SECRET_KEY,
+	PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=7),
 	SESSION_COOKIE_HTTPONLY=True,
-	SESSION_COOKIE_SECURE=FLASK_SESSION_COOKIE_SECURE  # Set to True in production with HTTPS
+	SESSION_COOKIE_SECURE=Config.FLASK_SESSION_COOKIE_SECURE
 )
 
 #
@@ -53,112 +119,107 @@ api.config.update(
 #
 
 # Checks if a string is in 'YYYY-MM' format.
-def is_ym_format(date_string):
+def check_date_format(date_string: str) -> bool:
 	pattern = r"^\d{4}-\d{2}$"
-	match = re.match(pattern, date_string)
-	if match:
-		year, month = map(int, date_string.split('-'))
-		if 1 <= month <= 12:
-			return True
-	return False
+	if not re.match(pattern, date_string):
+		return False
+	
+	year, month = map(int, date_string.split('-'))
+	return 1 <= month <= 12
 
-def allowed_file(filename: str) -> bool:
-	return '.' in filename and \
-		filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+def check_filetype(filename: str) -> bool:
+	return '.' in filename and filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS		
 	   
-def get_files(file_type: str = None, specific_files: List[str] = None) -> List[str]:
+def get_files(file_type: Optional[str] = None, specific_files: Optional[List[str]] = None) -> List[str]:
+	"""Get a list of files from the datastore directory."""
 	try:
-		if not DATASTORE_PATH.exists():
+		if not Config.DATASTORE_PATH.exists():
 			return []
-
+	
 		if specific_files:
 			return [
-				str(f.name) for f in DATASTORE_PATH.iterdir()
+				f.name for f in Config.DATASTORE_PATH.iterdir()
 				if f.is_file() and f.name in specific_files and not f.name.startswith('.')
 			]
-
+	
 		if file_type:
 			return [
-				str(f.name) for f in DATASTORE_PATH.iterdir()
+				f.name for f in Config.DATASTORE_PATH.iterdir()
 				if f.is_file() and f.suffix.lower() == f'.{file_type}' and not f.name.startswith('.')
 			]
-
+	
 		return [
-			str(f.name) for f in DATASTORE_PATH.iterdir()
+			f.name for f in Config.DATASTORE_PATH.iterdir()
 			if f.is_file() and not f.name.startswith('.')
 		]
-
+	
 	except Exception as e:
 		print(f"Error getting files: {e}")
 		return []
 
-def read_file_content(filename: str) -> Union[str, Dict, None]:
-	try:
-		file_path = DATASTORE_PATH / filename
-		if not file_path.exists():
+def get_file_content(filename: str) -> Optional[str]:
+		"""Read content from a file in the datastore."""
+		try:
+			file_path = Config.DATASTORE_PATH / filename
+			if not file_path.exists():
+				return None
+		
+			return file_path.read_text(encoding='utf-8')
+		
+		except Exception as e:
+			print(f"Error reading file {filename}: {e}")
 			return None
-
-		if file_path.suffix.lower() == '.csv':
-			# For CSV files, you might want to use pandas or csv module
-			with open(file_path, 'r') as f:
-				return f.read()
-
-		elif file_path.suffix.lower() == '.txt':
-			with open(file_path, 'r') as f:
-				return f.read()
-
-		return None
-
-	except Exception as e:
-		print(f"Error reading file {filename}: {e}")
-		return None
 
 # DB Connection
 def get_db_connection():
-	return mysql.connector.connect(**db_config)
+	return mysql.connector.connect(**Config.DB_CONFIG)
 	
 # Send prompt to Gemini
-async def get_gemini_response(prompt, cache_name):
+async def get_gemini_response(prompt: str, cache_name: str) -> str:
 	"""Sends the prompt to Google Gemini and returns the response."""	
 	try:	
-		model = GEMINI_MODEL		
-		loop = asyncio.get_event_loop()
-		response = await loop.run_in_executor(None, lambda: client.models.generate_content(model=model,contents=prompt,config=types.GenerateContentConfig(cached_content=cache_name)))
-		print(f"\n✅ Gemini Response: {response.text}")  # ✅ Log the response!		
-		return response.text
+		model = Config.GEMINI_MODEL
+		response = await asyncio.to_thread(
+			lambda: genai_client.models.generate_content(
+				model=model,
+				contents=prompt,
+				config=types.GenerateContentConfig(cached_content=cache_name)
+			)
+		)
+		print(f"\n✅ Gemini Response: {response.text}")
+		return response.text		
 	except Exception as e:
 		print(f"❌ Error generating response: {e}")  # ✅ Log the error!
 		return f"❌ Error generating response: {e}"
 
 # TODO: Unsure if this should be async as well			
-def create_gemini_context(context_request, files="", preamble="", generate_cache=True):
+def create_gemini_context(context_request: str, files: str = "", preamble: str = "", generate_cache: bool = True) -> Union[str, int, bool]:
 	# test if cache exists
 	if generate_cache:	
-		for cache in client.caches.list():
+		cache_name = context_request + files
+		for cache in genai_client.caches.list():
 			if cache.display_name == context_request + files:		
 				return cache.name
 
-	try:
-		# dict for gemini context
+	try:		
 		content = {"parts": []}
 		
 		if context_request == 'structured':
-			files = get_files('csv')
-			preamble = 'structured_data_prompt.txt'
+			files_list = get_files('csv')
+			preamble_file = 'structured_data_prompt.txt'
 		elif context_request == 'unstructured':
-			files = get_files('txt')
-			preamble = 'unstructured_data_prompt.txt'			
+			files_list = get_files('txt')
+			preamble_file = 'unstructured_data_prompt.txt'
 		elif context_request == 'all':
-			files = get_files()
-			preamble = 'all_data_prompt.txt'
+			files_list = get_files()
+			preamble_file = 'all_data_prompt.txt'
 		elif context_request == 'specific':
-			if files != '':
-				specific_files = [f.strip() for f in files.split(',')]
-				files = get_files(specific_files=specific_files)
-			else:
+			if not files:
 				return False
-		elif context_request == 'experiment_5':			
-			files = get_files('txt')
+			specific_files = [f.strip() for f in files.split(',')]
+			files_list = get_files(specific_files=specific_files)
+		elif context_request == 'experiment_5':
+			files_list = get_files('txt')
 			query = f"""
 			WITH incident_data AS (
 				SELECT
@@ -168,11 +229,8 @@ def create_gemini_context(context_request, files="", preamble="", generate_cache
 					month
 				FROM shots_fired_data
 				WHERE 
-					district IN ('B2', 'B3', 'C11') 
+					{SQLConstants.BOS911_BASE_WHERE}
 					AND ballistics_evidence = 1 
-					AND neighborhood = 'Dorchester' 
-					AND year >= 2018 
-					AND year < 2025
 				UNION ALL
 				SELECT
 					year,
@@ -181,11 +239,8 @@ def create_gemini_context(context_request, files="", preamble="", generate_cache
 					month
 				FROM shots_fired_data
 				WHERE 
-					district IN ('B2', 'B3', 'C11') 
+					{SQLConstants.BOS911_BASE_WHERE}
 					AND ballistics_evidence = 0 
-					AND neighborhood = 'Dorchester' 
-					AND year >= 2018 
-					AND year < 2025
 				UNION ALL
 				SELECT
 					year,
@@ -194,10 +249,7 @@ def create_gemini_context(context_request, files="", preamble="", generate_cache
 					month
 				FROM homicide_data
 				WHERE 
-					district IN ('B2', 'B3', 'C11')
-					AND neighborhood = 'Dorchester'
-					AND year >= 2018
-					AND year < 2025
+					{SQLConstants.BOS911_BASE_WHERE}
 				UNION ALL
 				SELECT
 					YEAR(open_dt) AS year,
@@ -206,9 +258,8 @@ def create_gemini_context(context_request, files="", preamble="", generate_cache
 					MONTH(open_dt) AS month
 				FROM bos311_data
 				WHERE 
-					type IN ('Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping') 
-					AND police_district IN ('B2', 'B3', 'C11') 
-					AND neighborhood = 'Dorchester'
+					type IN ({SQLConstants.CATEGORY_TYPES['trash']}) 
+					AND {SQLConstants.BOS311_BASE_WHERE}
 				UNION ALL
 				SELECT
 					YEAR(open_dt) AS year,
@@ -217,11 +268,8 @@ def create_gemini_context(context_request, files="", preamble="", generate_cache
 					MONTH(open_dt) AS month
 				FROM bos311_data
 				WHERE 
-					type IN ('Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 
-							'Rodent Activity', 'Heat - Excessive Insufficient', 'Unsafe Dangerous Conditions', 
-							'Pest Infestation - Residential') 
-					AND police_district IN ('B2', 'B3', 'C11') 
-					AND neighborhood = 'Dorchester'
+					type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) 
+					AND {SQLConstants.BOS311_BASE_WHERE}
 				UNION ALL
 				SELECT
 					YEAR(open_dt) AS year,
@@ -230,10 +278,8 @@ def create_gemini_context(context_request, files="", preamble="", generate_cache
 					MONTH(open_dt) AS month
 				FROM bos311_data
 				WHERE 
-					type IN ('Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 
-							'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair') 
-					AND police_district IN ('B2', 'B3', 'C11') 
-					AND neighborhood = 'Dorchester'
+					type IN ({SQLConstants.CATEGORY_TYPES['streets']}) 
+					AND {SQLConstants.BOS311_BASE_WHERE}
 				UNION ALL
 				SELECT
 					YEAR(open_dt) AS year,
@@ -242,185 +288,145 @@ def create_gemini_context(context_request, files="", preamble="", generate_cache
 					MONTH(open_dt) AS month
 				FROM bos311_data
 				WHERE 
-					type IN ('Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 
-							'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints') 
-					AND police_district IN ('B2', 'B3', 'C11') 
-					AND neighborhood = 'Dorchester'
+					type IN ({SQLConstants.CATEGORY_TYPES['parking']}) 
+					AND {SQLConstants.BOS311_BASE_WHERE}
 			)
 			SELECT
 				year,
 				incident_type,
-				COUNT(*) AS total_by_year,
-				SUM(CASE WHEN quarter = 1 THEN 1 ELSE 0 END) AS q1_total,
-				SUM(CASE WHEN quarter = 2 THEN 1 ELSE 0 END) AS q2_total,
-				SUM(CASE WHEN quarter = 3 THEN 1 ELSE 0 END) AS q3_total,
-				SUM(CASE WHEN quarter = 4 THEN 1 ELSE 0 END) AS q4_total,
-				SUM(CASE WHEN month = 1 THEN 1 ELSE 0 END) AS jan_total,
-				SUM(CASE WHEN month = 2 THEN 1 ELSE 0 END) AS feb_total,
-				SUM(CASE WHEN month = 3 THEN 1 ELSE 0 END) AS mar_total,
-				SUM(CASE WHEN month = 4 THEN 1 ELSE 0 END) AS apr_total,
-				SUM(CASE WHEN month = 5 THEN 1 ELSE 0 END) AS may_total,
-				SUM(CASE WHEN month = 6 THEN 1 ELSE 0 END) AS jun_total,
-				SUM(CASE WHEN month = 7 THEN 1 ELSE 0 END) AS jul_total,
-				SUM(CASE WHEN month = 8 THEN 1 ELSE 0 END) AS aug_total,
-				SUM(CASE WHEN month = 9 THEN 1 ELSE 0 END) AS sep_total,
-				SUM(CASE WHEN month = 10 THEN 1 ELSE 0 END) AS oct_total,
-				SUM(CASE WHEN month = 11 THEN 1 ELSE 0 END) AS nov_total,
-				SUM(CASE WHEN month = 12 THEN 1 ELSE 0 END) AS dec_total
+				{SQLConstants.BOS911_TIME_BREAKDOWN}
 			FROM incident_data
 			GROUP BY year, incident_type
-			ORDER BY year, incident_type		
+			ORDER BY year, incident_type
+
 			"""
 			
-			results = db_query(query=query)
-			result_string = ""
+			results = run_query(query=query)
+			if results:
+				output = io.StringIO()
+				writer = csv.DictWriter(output, fieldnames=results[0].keys())
+				writer.writeheader()
+				writer.writerows(results)
+				content["parts"].append({"text": output.getvalue()})
 			
-			output = io.StringIO()  
-			writer = csv.DictWriter(output, fieldnames=results[0].keys()) 
-			writer.writeheader()
-			writer.writerows(results)
-			result_string = output.getvalue()				
-			
-			content["parts"].append({"text":result_string})
-			
-			preamble = 'experiment_5.txt'			
+			preamble_file = 'experiment_5.txt'			
 			
 		# Read contents of found files
 		
-		for file in files:
-			file_content = read_file_content(file)
-			if file_content is not None:				
-				content["parts"].append({"text":file_content})
+		for file in files_list:
+			file_content = get_file_content(file)
+			if file_content is not None:
+				content["parts"].append({"text": file_content})
 						
-		# Read prompt preamble		
+		# Read prompt preamble
 		if context_request != 'specific':
-			path = PROMPTS_PATH / preamble		
+			path = Config.PROMPTS_PATH / preamble_file
 			if not path.is_file():
-				raise FileNotFoundError(f"File not found: {PROMPTS_PATH}")
-			try:
-				prompt_content = path.read_text(encoding='utf-8')
-			except Exception as e:
-				raise Exception(f"Error reading file HERE: {str(e)}")
+				raise FileNotFoundError(f"File not found: {path}")
+			prompt_content = path.read_text(encoding='utf-8')
 		else:
 			prompt_content = preamble
 				
-		#set the display name
+		# Generate cache or return token count
 		if generate_cache:
+			# Set the display name
 			if context_request == 'specific':
-				#this may need to be truncated if long filenames
-				display_name = context_request+','.join(files)
+				display_name = context_request + ','.join(files_list)
 			else:
 				display_name = context_request
-			
-			#set cache expire time
+		
+			# Set cache expiration time
 			cache_ttl = (
 				(
 					datetime.datetime.now(datetime.timezone.utc)
-					+ datetime.timedelta(days=int(GEMINI_CACHE_TTL))
+					+ datetime.timedelta(days=Config.GEMINI_CACHE_TTL)
 				)
 				.isoformat()
 				.replace("+00:00", "Z")
 			)
-			#create the cache
-			cache = client.caches.create(
-				model = GEMINI_MODEL,
+			
+			# Create the cache
+			cache = genai_client.caches.create(
+				model=Config.GEMINI_MODEL,
 				config=types.CreateCachedContentConfig(
-				display_name=display_name, 
-				system_instruction=(prompt_content),
-				expire_time=cache_ttl,
-				contents=content["parts"]			  
-			)
+					display_name=display_name,
+					system_instruction=prompt_content,
+					expire_time=cache_ttl,
+					contents=content["parts"]
+				)
 			)
 			
 			return cache.name
-		#just return token count for the cache as test
 		else:
-			content["parts"].append({"text":prompt_content})			
-			total_tokens = client.models.count_tokens(
-				model=GEMINI_MODEL, 
+			# Return token count for testing
+			content["parts"].append({"text": prompt_content})
+			total_tokens = genai_client.models.count_tokens(
+				model=Config.GEMINI_MODEL,
 				contents=content["parts"]
-			)			
-			return total_tokens
-			
+			)
+			return total_tokens.total_tokens
+	
 	except Exception as e:
-		print(f"❌ Error generating response: {e}") 
-		return f"❌ Error generating response: {e}"
+		print(f"❌ Error generating context: {e}")
+		return f"❌ Error generating context: {e}"
 
 # Log events
-def log_event(session_id, app_version, data_selected='', data_attributes='', prompt_preamble='', client_query='', app_response='', client_response_rating='', log_id=''):
+def log_event(session_id: str, app_version: str, data_selected: str = '', 
+		  data_attributes: str = '', prompt_preamble: str = '', 
+		  client_query: str = '', app_response: str = '', 
+		  client_response_rating: str = '', log_id: str = '') -> Union[int, bool]:
+	"""Log an event to the database."""
 	if not session_id or not app_version:
-		print(f"Missing session_id or app_version: {str(err)}")
-		return False 
+		print("Missing session_id or app_version")
+		return False
+	
 	try:
 		conn = get_db_connection()
 		cursor = conn.cursor()
-		#empty log_id, insert new entry	
+	
+		# Insert new entry if no log_id provided
 		if not log_id:
 			query = """
 			INSERT INTO interaction_log (
-				session_id,			
-				app_version,
-				data_selected,
-				data_attributes,
-				prompt_preamble,
-				client_query,
-				app_response,
-				client_response_rating
+				session_id, app_version, data_selected, data_attributes,
+				prompt_preamble, client_query, app_response, client_response_rating
 			) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 			"""
-			
-			values = (
-				session_id,			
-				app_version,
-				data_selected,
-				data_attributes,
-				prompt_preamble,
-				client_query,
-				app_response,
-				client_response_rating
-			)
-		#log_id exists, update entry, only w/ non-null fields	
-		else:			
-			query = f"""
-			UPDATE interaction_log
-			"""
-			if data_selected:
-				query += f"""
-				SET data_selected = "{data_selected}"
-				"""
-			if data_attributes:
-				query += f"""
-				SET data_attributes = "{data_attributes}"
-				"""
-			if prompt_preamble:
-				query += f"""
-				SET prompt_preamble = "{prompt_preamble}"
-				"""
-			if client_query:
-				query += f"""
-				SET client_query = "{client_query}"
-				"""
-			if app_response:
-				query += f"""
-				SET app_response = "{app_response}"
-				"""
-			if client_response_rating:
-				query += f"""
-				SET client_response_rating = "{client_response_rating}"
-				"""
-			query += f"""
-			WHERE id = "{log_id}"		
-			"""					
-			values = ''
 	
-		cursor.execute(query, values)
-		conn.commit()
-		
-		if not log_id:
+			cursor.execute(query, (
+				session_id, app_version, data_selected, data_attributes,
+				prompt_preamble, client_query, app_response, client_response_rating
+			))
+	
 			app_response_id = cursor.lastrowid
 		else:
-			app_response_id = log_id		
-		
+			# Create a dictionary of non-empty fields to update
+			update_fields = {
+				'data_selected': data_selected,
+				'data_attributes': data_attributes,
+				'prompt_preamble': prompt_preamble,
+				'client_query': client_query,
+				'app_response': app_response,
+				'client_response_rating': client_response_rating
+			}
+	
+			# Filter out empty fields
+			update_fields = {k: v for k, v in update_fields.items() if v}
+	
+			if update_fields:
+				# Build the query dynamically
+				update_parts = [f"{field} = %s" for field in update_fields]
+				query = f"UPDATE interaction_log SET {', '.join(update_parts)} WHERE id = %s"
+	
+				# Add values in the correct order
+				params = list(update_fields.values())
+				params.append(log_id)
+	
+				cursor.execute(query, params)
+	
+			app_response_id = log_id
+	
+		conn.commit()
 		return app_response_id
 	
 	except mysql.connector.Error as err:
@@ -432,8 +438,9 @@ def log_event(session_id, app_version, data_selected='', data_attributes='', pro
 			cursor.close()
 			conn.close()
 
+
 # DB Query
-def db_query(query):
+def run_query(query: str) -> Optional[List[Dict[str, Any]]]:
 	try:
 		conn = get_db_connection()
 		cursor = conn.cursor(dictionary=True)
@@ -441,22 +448,190 @@ def db_query(query):
 		cursor.execute(query)
 		result = cursor.fetchall()
 		#print(result)
-		if result:			
-			return result
-		else:
-			return None  						
+		return result if result else None  						
 	
 	except mysql.connector.Error as err:
 		print(f"Database error: {str(err)}")
-		return False
+		return None
 	
 	finally:
 		if 'conn' in locals():
 			cursor.close()
 			conn.close()
+			
+#
+# Query Builder
+#
+def build_311_query(data_request: str, request_options: str = '', request_date: str = '', request_zipcode: str = '') -> str:
+	"""Build SQL query for 311 data based on request parameters."""
+	if data_request == '311_on_date_geo':
+		return f"""
+		SELECT latitude, longitude
+		FROM bos311_data
+		WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
+			AND type IN ({SQLConstants.CATEGORY_TYPES['all']})
+			AND {SQLConstants.BOS311_BASE_WHERE};
+		"""
+	elif data_request == '311_on_date_count':
+		query = f"""
+		SELECT
+			CASE
+				WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+				WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+				WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+				WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+			END AS request_category,
+			COUNT(*) AS request_count,
+			DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
+		FROM bos311_data
+		WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
+		  AND {SQLConstants.BOS311_BASE_WHERE}
+		"""
+		if request_zipcode:
+			query += f"AND location_zipcode = {request_zipcode}\n"
 
+		query += """
+		GROUP BY request_category, monthyear
+		HAVING request_category IS NOT NULL;
+		"""		
+		return query
+	elif data_request == '311_year_month':
+		return f"""
+		SELECT DISTINCT DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
+		FROM bos311_data
+		WHERE {SQLConstants.BOS311_BASE_WHERE}
+		ORDER BY monthyear;
+		"""
+	elif data_request == '311_by_type':
+		return f"""
+		SELECT
+			police_district,
+			type,
+			YEAR(open_dt) AS year,
+			{SQLConstants.BOS311_TIME_BREAKDOWN}
+		FROM
+			bos311_data
+		WHERE
+			type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+			AND {SQLConstants.BOS311_BASE_WHERE}
+		GROUP BY
+			police_district, type, year 
+		ORDER BY
+			police_district, type, year;
+		"""
+	elif data_request == '311_by_total':
+		return f"""
+		SELECT
+			YEAR(open_dt) AS year,
+			'parking' AS incident_type,
+			{SQLConstants.BOS311_TIME_BREAKDOWN}
+		FROM
+			bos311_data
+		WHERE
+			type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+			AND {SQLConstants.BOS311_BASE_WHERE}
+		GROUP BY
+			year
+		ORDER BY
+			year
+		"""
+	elif data_request == '311_by_geo':
+		return f"""
+		SELECT
+			type,
+			open_dt,
+			police_district,
+			location,
+			latitude,
+			longitude
+		FROM 
+			bos311_data
+		WHERE 
+			type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+			AND {SQLConstants.BOS311_BASE_WHERE}
+		"""
+
+	return ""
+
+
+def build_911_query(data_request: str) -> str:
+	"""Build SQL query for 911 data based on request parameters."""
+	if data_request == '911_homicides':
+		return f"""
+		SELECT
+			year,
+			{SQLConstants.BOS911_TIME_BREAKDOWN}
+		FROM homicide_data
+		WHERE {SQLConstants.BOS911_BASE_WHERE}
+		GROUP BY year;
+		"""
+	elif data_request == '911_shots_fired':
+		return f"""
+		SELECT
+			year,
+			district,
+			ballistics_evidence,
+			neighborhood,
+			hour_of_day,
+			day_of_week,
+			latitude,
+			longitude
+		FROM shots_fired_data
+		WHERE {SQLConstants.BOS911_BASE_WHERE}
+		GROUP BY year, district, neighborhood, ballistics_evidence, hour_of_day, day_of_week, latitude, longitude;
+		"""
+	elif data_request == '911_shots_fired_count_confirmed':
+		return f"""
+		SELECT
+			year,
+			{SQLConstants.BOS911_TIME_BREAKDOWN}
+		FROM shots_fired_data
+		WHERE {SQLConstants.BOS911_BASE_WHERE}
+		AND ballistics_evidence = 1
+		GROUP BY year
+		"""
+	elif data_request == '911_shots_fired_count_unconfirmed':
+		return f"""
+		SELECT
+			year,
+			{SQLConstants.BOS911_TIME_BREAKDOWN}
+		FROM shots_fired_data
+		WHERE {SQLConstants.BOS911_BASE_WHERE}
+		AND ballistics_evidence = 0
+		GROUP BY year
+		"""
+	elif data_request == '911_homicides_and_shots_fired':
+		return f"""
+		SELECT
+			h.year as year,
+			h.quarter as quarter,
+			h.month as month,
+			h.day_of_week as day,
+			h.hour_of_day as hour,
+			h.district as police_district,
+			s.address as shot_address,
+			s.latitude as latitude,
+			s.longitude as longitude
+		FROM
+			shots_fired_data s
+		INNER JOIN
+			homicide_data h
+		ON
+			DATE(s.incident_date_time) = DATE(h.homicide_date)
+			AND s.district = h.district
+		WHERE
+			s.ballistics_evidence = 1
+			AND h.district IN ('B3', 'C11', 'B2')
+			AND h.neighborhood = 'Dorchester'
+			AND s.year >= 2018
+			AND s.year < 2025
+		"""
+	return ""
+
+#
 # Middleware to check session and create if needed
-@api.before_request
+#
+@app.before_request
 def check_session():
 	if 'session_id' not in session:
 		session.permanent = True  # Make the session persistent
@@ -464,327 +639,64 @@ def check_session():
 		log_event(session_id=session['session_id'], app_version='0', app_response="New session created")
 
 	# Log the request
-	g.log_entry = log_event(session_id=session['session_id'], app_version='0', client_query=f"Request: {request.url}")
+	g.log_entry = log_event(session_id=session['session_id'], app_version='0', client_query=f"Request: {request.method}] {request.url}")
 
 #
 #Endpoint Definitions
 #
-
-@api.route('/data/query', methods=['GET'])
+@app.route('/data/query', methods=['GET'])
 def route_data_query():
 	session_id = session.get('session_id')
-	app_version = request.cookies.get('app_version','0')
-	
+	app_version = request.cookies.get('app_version', '0')	
 	try:
-		data_request = request.args.get('request', '')			
-		if not data_request:
-			return jsonify({
-				'error': 'Missing data_request parameter'
-			}), 400
-		
-		request_options = request.args.get('category','')
+		# Get and validate request parameters
+		data_request = request.args.get('request', '')
+		if not data_request:			
+			return jsonify({'error': 'Missing data_request parameter'}), 400
+	
+		request_options = request.args.get('category', '')	
 		if data_request.startswith('311_by') and not request_options:
-			return jsonify({
-				'error': 'Missing required options parameter for 311 request'
-			}), 400
-			
-		request_date = request.args.get('date','')
+			return jsonify({'error': 'Missing required options parameter for 311 request'}), 400
+	
+		request_date = request.args.get('date', '')
 		if data_request.startswith('311_on_date') and not request_date:
-			return jsonify({
-				'error': 'Missing required options parameter for 311 request'
-			}), 400
-		request_zipcode = request.args.get('zipcode','')
+			return jsonify({'error': 'Missing required options parameter for 311 request'}), 400
+	
+		# Validate date format for date-specific queries
+		if data_request.startswith('311_on_date') and not check_date_format(request_date):
+			return jsonify({'error': 'Incorrect date format. Expects "YYYY-MM"'}), 400
+	
+		request_zipcode = request.args.get('zipcode', '')
+	
+		# Build query using the appropriate query builder
 		
-		# Switch for 311_by queries using the 311 types listed below	
-		if data_request.startswith('311_by'):
-			if request_options == 'living_conditions':
-				category_types = "'Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential'"
-			elif request_options == 'trash':
-				category_types = "'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping'"
-			elif request_options == 'streets':
-				category_types = "'Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair'"
-			elif request_options == 'parking':	
-				category_types = "'Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints'"
-			elif request_options == 'all':
-				category_types = "'Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential', 'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping','Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair','Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints'"
-
-		if data_request == '311_on_date_geo':
-			if not is_ym_format(request_date):
-				return jsonify({
-					'error': 'Incorrect date format. Expects "YYYY-MM"'
-				}), 400
-			query = f"""
-			SELECT latitude, longitude
-			FROM bos311_data
-			WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
-				AND type IN ('Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential', 'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping','Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair','Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints')				
-				AND police_district IN ('B3', 'B2', 'C11')
-				AND neighborhood = 'Dorchester';
-			"""
-		elif data_request == '311_on_date_count':
-			if not is_ym_format(request_date):
-				return jsonify({
-					'error': 'Incorrect date format. Expects "YYYY-MM"'
-				}), 400
-			query = f"""
-			SELECT
-				CASE
-					WHEN type IN ('Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential') THEN 'Living Conditions'
-					WHEN type IN ('Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping') THEN 'Trash, Recycling, And Waste'
-					WHEN type IN ('Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair') THEN 'Streets, Sidewalks, And Parks'
-					WHEN type IN ('Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints')
-					THEN 'Parking'
-				END AS request_category,
-				COUNT(*) AS request_count,
-				DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
-			FROM bos311_data
-			WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
-			  AND police_district IN ('B3', 'B2', 'C11')
-			"""			
-			if request_zipcode:				
-				query += f"""
-				AND location_zipcode = {request_zipcode}
-				"""
-			query +=  """
-			AND neighborhood = 'Dorchester'
-			GROUP BY request_category, monthyear
-			HAVING request_category IS NOT NULL;
-			"""
-		elif data_request == '311_year_month':
-			query= f"""
-			SELECT DISTINCT DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
-			FROM bos311_data
-			WHERE police_district IN ('B3', 'B2', 'C11')
-			AND neighborhood = 'Dorchester';
-			ORDER BY monthyear;
-			"""
-		elif data_request == '311_by_type':		
-			query = f"""
-			SELECT
-				police_district,
-				type,
-				YEAR(open_dt) AS year,
-				COUNT(*) AS total_by_year,
-				SUM(CASE WHEN QUARTER(open_dt) = 1 THEN 1 ELSE 0 END) AS q1_total,
-				SUM(CASE WHEN QUARTER(open_dt) = 2 THEN 1 ELSE 0 END) AS q2_total,
-				SUM(CASE WHEN QUARTER(open_dt) = 3 THEN 1 ELSE 0 END) AS q3_total,
-				SUM(CASE WHEN QUARTER(open_dt) = 4 THEN 1 ELSE 0 END) AS q4_total,
-				SUM(CASE WHEN MONTH(open_dt) = 1 THEN 1 ELSE 0 END) AS jan_total,
-				SUM(CASE WHEN MONTH(open_dt) = 2 THEN 1 ELSE 0 END) AS feb_total,
-				SUM(CASE WHEN MONTH(open_dt) = 3 THEN 1 ELSE 0 END) AS mar_total,
-				SUM(CASE WHEN MONTH(open_dt) = 4 THEN 1 ELSE 0 END) AS apr_total,
-				SUM(CASE WHEN MONTH(open_dt) = 5 THEN 1 ELSE 0 END) AS may_total,
-				SUM(CASE WHEN MONTH(open_dt) = 6 THEN 1 ELSE 0 END) AS jun_total,
-				SUM(CASE WHEN MONTH(open_dt) = 7 THEN 1 ELSE 0 END) AS jul_total,
-				SUM(CASE WHEN MONTH(open_dt) = 8 THEN 1 ELSE 0 END) AS aug_total,
-				SUM(CASE WHEN MONTH(open_dt) = 9 THEN 1 ELSE 0 END) AS sep_total,
-				SUM(CASE WHEN MONTH(open_dt) = 10 THEN 1 ELSE 0 END) AS oct_total,
-				SUM(CASE WHEN MONTH(open_dt) = 11 THEN 1 ELSE 0 END) AS nov_total,
-				SUM(CASE WHEN MONTH(open_dt) = 12 THEN 1 ELSE 0 END) AS dec_total
-			FROM
-				bos311_data
-			WHERE
-				type IN ({category_types})
-				AND police_district IN ('B2','B3','C11') 
-				AND neighborhood = 'Dorchester'				
-			GROUP BY
-				police_district, type, year 
-			ORDER BY
-				police_district, type, year;
-			"""				
-		elif data_request == '311_by_total':
-			query = f"""
-			SELECT
-				YEAR(open_dt) AS year,
-				'parking' AS incident_type,  -- Fixed category name
-				COUNT(*) AS total_year,
-				SUM(CASE WHEN QUARTER(open_dt) = 1 THEN 1 ELSE 0 END) AS q1_total,
-				SUM(CASE WHEN QUARTER(open_dt) = 2 THEN 1 ELSE 0 END) AS q2_total,
-				SUM(CASE WHEN QUARTER(open_dt) = 3 THEN 1 ELSE 0 END) AS q3_total,
-				SUM(CASE WHEN QUARTER(open_dt) = 4 THEN 1 ELSE 0 END) AS q4_total,
-				SUM(CASE WHEN MONTH(open_dt) = 1 THEN 1 ELSE 0 END) AS jan_total,
-				SUM(CASE WHEN MONTH(open_dt) = 2 THEN 1 ELSE 0 END) AS feb_total,
-				SUM(CASE WHEN MONTH(open_dt) = 3 THEN 1 ELSE 0 END) AS mar_total,
-				SUM(CASE WHEN MONTH(open_dt) = 4 THEN 1 ELSE 0 END) AS apr_total,
-				SUM(CASE WHEN MONTH(open_dt) = 5 THEN 1 ELSE 0 END) AS may_total,
-				SUM(CASE WHEN MONTH(open_dt) = 6 THEN 1 ELSE 0 END) AS jun_total,
-				SUM(CASE WHEN MONTH(open_dt) = 7 THEN 1 ELSE 0 END) AS jul_total,
-				SUM(CASE WHEN MONTH(open_dt) = 8 THEN 1 ELSE 0 END) AS aug_total,
-				SUM(CASE WHEN MONTH(open_dt) = 9 THEN 1 ELSE 0 END) AS sep_total,
-				SUM(CASE WHEN MONTH(open_dt) = 10 THEN 1 ELSE 0 END) AS oct_total,
-				SUM(CASE WHEN MONTH(open_dt) = 11 THEN 1 ELSE 0 END) AS nov_total,
-				SUM(CASE WHEN MONTH(open_dt) = 12 THEN 1 ELSE 0 END) AS dec_total
-			FROM
-				bos311_data
-			WHERE
-				type IN ({category_types})
-				AND police_district IN ('B2', 'B3', 'C11') 
-				AND neighborhood = 'Dorchester' 
-			GROUP BY
-				year
-			ORDER BY
-				year
-			"""				
-		elif data_request == '311_by_geo':	
-			query = f"""
-			SELECT
-				type,
-				open_dt,
-				police_district,
-				location,
-				latitude,
-				longitude
-			FROM 
-				bos311_data
-			WHERE 
-				type IN ({category_types})
-				AND police_district IN ('B2', 'B3', 'C11')
-				AND neighborhood = 'Dorchester'
-			"""									
-		elif data_request == '911_homicides':	
-			query = f"""
-			SELECT
-				year,
-				COUNT(*) AS total_by_year,
-				SUM(CASE WHEN quarter = 1 THEN 1 ELSE 0 END) AS q1_total,
-				SUM(CASE WHEN quarter = 2 THEN 1 ELSE 0 END) AS q2_total,
-				SUM(CASE WHEN quarter = 3 THEN 1 ELSE 0 END) AS q3_total,
-				SUM(CASE WHEN quarter = 4 THEN 1 ELSE 0 END) AS q4_total,
-				SUM(CASE WHEN month = 1 THEN 1 ELSE 0 END) AS jan_total,
-				SUM(CASE WHEN month = 2 THEN 1 ELSE 0 END) AS feb_total,
-				SUM(CASE WHEN month = 3 THEN 1 ELSE 0 END) AS mar_total,
-				SUM(CASE WHEN month = 4 THEN 1 ELSE 0 END) AS apr_total,
-				SUM(CASE WHEN month = 5 THEN 1 ELSE 0 END) AS may_total,
-				SUM(CASE WHEN month = 6 THEN 1 ELSE 0 END) AS jun_total,
-				SUM(CASE WHEN month = 7 THEN 1 ELSE 0 END) AS jul_total,
-				SUM(CASE WHEN month = 8 THEN 1 ELSE 0 END) AS aug_total,
-				SUM(CASE WHEN month = 9 THEN 1 ELSE 0 END) AS sep_total,
-				SUM(CASE WHEN month = 10 THEN 1 ELSE 0 END) AS oct_total,
-				SUM(CASE WHEN month = 11 THEN 1 ELSE 0 END) AS nov_total,
-				SUM(CASE WHEN month = 12 THEN 1 ELSE 0 END) AS dec_total				
-			FROM homicide_data
-			WHERE district IN ('B2', 'B3', 'C11')
-			AND year >= 2018
-			AND year < 2025
-			AND neighborhood = 'Dorchester'
-			GROUP BY year;			
-			"""				
-		elif data_request == '911_shots_fired':	
-			query = f"""
-			SELECT
-				year,
-				district,
-				ballistics_evidence,
-				neighborhood,
-				hour_of_day,
-				day_of_week,
-				latitude,
-				longitude
-			FROM shots_fired_data
-			WHERE district IN ('B2', 'B3', 'C11')
-			AND neighborhood = 'Dorchester'
-			AND year >= 2018
-			AND year < 2025			
-			GROUP BY year, district, neighborhood, ballistics_evidence, hour_of_day, day_of_week, latitude, longitude;
-			"""			
-		elif data_request == '911_shots_fired_count_confirmed':	
-			query = f"""
-			SELECT
-				year,
-				COUNT(*) AS total_by_year,
-				SUM(CASE WHEN quarter = 1 THEN 1 ELSE 0 END) AS q1_total,
-				SUM(CASE WHEN quarter = 2 THEN 1 ELSE 0 END) AS q2_total,
-				SUM(CASE WHEN quarter = 3 THEN 1 ELSE 0 END) AS q3_total,
-				SUM(CASE WHEN quarter = 4 THEN 1 ELSE 0 END) AS q4_total,
-				SUM(CASE WHEN month = 1 THEN 1 ELSE 0 END) AS jan_total,
-				SUM(CASE WHEN month = 2 THEN 1 ELSE 0 END) AS feb_total,
-				SUM(CASE WHEN month = 3 THEN 1 ELSE 0 END) AS mar_total,
-				SUM(CASE WHEN month = 4 THEN 1 ELSE 0 END) AS apr_total,
-				SUM(CASE WHEN month = 5 THEN 1 ELSE 0 END) AS may_total,
-				SUM(CASE WHEN month = 6 THEN 1 ELSE 0 END) AS jun_total,
-				SUM(CASE WHEN month = 7 THEN 1 ELSE 0 END) AS jul_total,
-				SUM(CASE WHEN month = 8 THEN 1 ELSE 0 END) AS aug_total,
-				SUM(CASE WHEN month = 9 THEN 1 ELSE 0 END) AS sep_total,
-				SUM(CASE WHEN month = 10 THEN 1 ELSE 0 END) AS oct_total,
-				SUM(CASE WHEN month = 11 THEN 1 ELSE 0 END) AS nov_total,
-				SUM(CASE WHEN month = 12 THEN 1 ELSE 0 END) AS dec_total
-			FROM shots_fired_data
-			WHERE district IN ('B2', 'B3', 'C11')
-			AND ballistics_evidence = 1
-			AND neighborhood = 'Dorchester'
-			AND year >= 2018
-			AND year < 2025			
-			GROUP BY year
-			"""
-		elif data_request == '911_shots_fired_count_unconfirmed':	
-			query = f"""
-			SELECT
-				year,
-				COUNT(*) AS total_by_year,
-				SUM(CASE WHEN quarter = 1 THEN 1 ELSE 0 END) AS q1_total,
-				SUM(CASE WHEN quarter = 2 THEN 1 ELSE 0 END) AS q2_total,
-				SUM(CASE WHEN quarter = 3 THEN 1 ELSE 0 END) AS q3_total,
-				SUM(CASE WHEN quarter = 4 THEN 1 ELSE 0 END) AS q4_total,
-				SUM(CASE WHEN month = 1 THEN 1 ELSE 0 END) AS jan_total,
-				SUM(CASE WHEN month = 2 THEN 1 ELSE 0 END) AS feb_total,
-				SUM(CASE WHEN month = 3 THEN 1 ELSE 0 END) AS mar_total,
-				SUM(CASE WHEN month = 4 THEN 1 ELSE 0 END) AS apr_total,
-				SUM(CASE WHEN month = 5 THEN 1 ELSE 0 END) AS may_total,
-				SUM(CASE WHEN month = 6 THEN 1 ELSE 0 END) AS jun_total,
-				SUM(CASE WHEN month = 7 THEN 1 ELSE 0 END) AS jul_total,
-				SUM(CASE WHEN month = 8 THEN 1 ELSE 0 END) AS aug_total,
-				SUM(CASE WHEN month = 9 THEN 1 ELSE 0 END) AS sep_total,
-				SUM(CASE WHEN month = 10 THEN 1 ELSE 0 END) AS oct_total,
-				SUM(CASE WHEN month = 11 THEN 1 ELSE 0 END) AS nov_total,
-				SUM(CASE WHEN month = 12 THEN 1 ELSE 0 END) AS dec_total
-			FROM shots_fired_data
-			WHERE district IN ('B2', 'B3', 'C11')
-			AND ballistics_evidence = 0
-			AND neighborhood = 'Dorchester'
-			AND year >= 2018
-			AND year < 2025			
-			GROUP BY year
-			"""
-		elif data_request == '911_homicides_and_shots_fired':				
-			query = f"""
-			SELECT 			 
-				h.year as year,
-				h.quarter as quarter,
-				h.month as month,
-				h.day_of_week as day,
-				h.hour_of_day as hour,
-				h.district as police_district,
-				s.address as shot_address,
-				s.latitude as latitude,
-				s.longitude as longitude				
-			FROM 
-				shots_fired_data s
-			INNER JOIN 
-				homicide_data h
-			ON 
-				DATE(s.incident_date_time) = DATE(h.homicide_date)			
-				AND s.district = h.district
-			WHERE 
-				s.ballistics_evidence = 1
-				AND h.district IN ('B3', 'C11', 'B2')
-				AND h.neighborhood = 'Dorchester'
-				AND s.year >= 2018
-				AND s.year < 2025
-			"""						
-		
-		result = db_query(query=query)			
-		
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")	
+		if data_request.startswith('311'):
+			query = build_311_query(
+				data_request=data_request,
+				request_options=request_options,
+				request_date=request_date,
+				request_zipcode=request_zipcode
+			)			
+		elif data_request.startswith('911'):
+			query = build_911_query(data_request=data_request)
+		else:
+			return jsonify({'error': 'Invalid data_request parameter'}), 400
+	
+		if not query:
+			return jsonify({'error': 'Failed to build query'}), 500
+	
+		# Execute the query and return results
+		result = run_query(query=query)
+	
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response="SUCCESS")
 		return jsonify(result)
-		
 	
 	except Exception as e:
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: ERROR: {str(e)}")
-		return jsonify({
-			'error': str(e)
-		}), 500
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"ERROR: {str(e)}")
+		return jsonify({'error': str(e)}), 500
 
-@api.route('/data/zipcode', methods=['GET'])
+
+@app.route('/data/zipcode', methods=['GET'])
 def route_data_zipcode():
 	session_id = session.get('session_id')
 	app_version = request.cookies.get('app_version','0')
@@ -811,18 +723,18 @@ def route_data_zipcode():
 		WHERE zipcode IN ({data_request})
 		"""				
 		
-		result = db_query(query=query)
+		result = run_query(query=query)
 		
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"SUCCESS")
 		return jsonify(result)
 	
 	except Exception as e:
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: ERROR: {str(e)}")
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"ERROR: {str(e)}")
 		return jsonify({
 			'error': str(e)
 		}), 500
 
-@api.route('/data/file', methods=['GET', 'POST'])
+@app.route('/data/file', methods=['GET', 'POST'])
 def route_data_file():
 	session_id = session.get('session_id')
 	app_version = request.cookies.get('app_version','0')
@@ -863,11 +775,11 @@ def route_data_file():
 			# Read contents of found files
 			file_contents = {}
 			for file in files:
-				content = read_file_content(file)
+				content = get_file_content(file)
 				if content is not None:
 					file_contents[file] = content
 			
-			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")	
+			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"SUCCESS")	
 			return jsonify({
 				'status': 'success',
 				'request_type': file_type,
@@ -877,7 +789,7 @@ def route_data_file():
 			})
 		
 		except Exception as e:
-			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: ERROR: {str(e)}")
+			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"ERROR: {str(e)}")
 			return jsonify({
 				'error': str(e)
 			}), 500
@@ -901,7 +813,7 @@ def route_data_file():
 			errors = []
 		
 			for file in files:
-				if file and allowed_file(file.filename):
+				if file and check_filetype(file.filename):
 					filename = secure_filename(file.filename)
 					file_path = DATASTORE_PATH / filename
 		
@@ -934,43 +846,12 @@ def route_data_file():
 			return jsonify(response), 200 if saved_files else 400
 		
 		except Exception as e:
-			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: ERROR: {str(e)}")
+			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"ERROR: {str(e)}")
 			return jsonify({
 				'error': str(e)
 			}), 500
 
-@api.route('/chat/token_count', methods=['POST'])
-def route_token_count():
-	session_id = session.get('session_id')
-	app_version = request.cookies.get('app_version','0')
-	
-	context_request = request.args.get('context_request', '')
-	
-	data = request.get_json()	
-	# Extract chat data parameters
-	app_version = data.get('app_version', '')
-	data_selected = data.get('data_selected', '')
-	data_attributes = data.get('data_attributes', '')
-	client_query = data.get('client_query', '')
-	prompt_preamble = data.get('prompt_preamble','')
-	
-	token_count=create_gemini_context(context_request=context_request, files=data_selected, preamble=prompt_preamble, generate_cache=False)
-	
-	# Return as JSON response
-	# return jsonify({"total_tokens": "token_count.total_tokens"})
-	
-	if isinstance(token_count, str): 
-		return jsonify({"cache_name": token_count})
-	elif isinstance(token_count, int):
-		return jsonify({"token_count": token_count})
-	elif isinstance(token_count.total_tokens, int):
-		return jsonify({"token_count": token_count.total_tokens})
-	else:
-		# Handle the error appropriately, e.g., log the error and return an error response
-		print(f"Error getting token count: {token_count}")  # Log the error
-		return jsonify({"error": "Failed to get token count"}), 500 # Return an error response
-
-@api.route('/chat', methods=['POST'])
+@app.route('/chat', methods=['POST'])
 def route_chat():
 	session_id = session.get('session_id')
 	app_version = request.cookies.get('app_version','0')
@@ -1009,58 +890,69 @@ def route_chat():
 			'log_id': log_id		
 		}
 		
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")	
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"SUCCESS")	
 		return jsonify(response)
 	
 	except Exception as e:
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: ERROR: {str(e)}")
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"ERROR: {str(e)}")
 		print(f"❌ Exception in /chat: {e}")
 		return jsonify({"error": f"Internal server error: {e}"}), 500
 
-@api.route('/chat/context', methods=['GET','POST'])
+@app.route('/chat/context', methods=['GET','POST'])
 def route_chat_context():
 	session_id = session.get('session_id')
 	app_version = request.cookies.get('app_version','0')
 	
-	if request.method == 'GET':
-		response = {}
-		for cache in client.caches.list():
-			response[cache.name]=str(cache)			
-				
-		return jsonify(response)
+	context_request = request.args.get('context_request', '')
+
+	if request.method == 'GET':		
+		#w/ specific context, return list of context caches		
+		if not context_request:
+			response = {cache.name: str(cache) for cache in genai_client.caches.list()}
+			return jsonify(response)
 		
+		else:
+			#test token count for context cache of <request>	
+			token_count=create_gemini_context(context_request=context_request, files='', preamble='', generate_cache=False)
+						
+			if isinstance(token_count, int):
+				return jsonify({"token_count": token_count})
+			elif hasattr(token_count, 'total_tokens') and isinstance(token_count.total_tokens, int):
+				return jsonify({"token_count": token_count.total_tokens})
+			else:
+				# Handle the error appropriately, e.g., log the error and return an error response
+				print(f"Error getting token count: {token_count}")  # Log the error
+				return jsonify({"error": "Failed to get token count"}), 500 # Return an error response						
 	if request.method == 'POST':
 		#TODO: implement 'specific' context_request with list of files from datastore
-		#FOR NOW: assumes 'structured', 'unstructured', and 'all' for context_request
-		context_request = request.args.get('context_request', '')
+		#FOR NOW: assumes 'structured', 'unstructured', and 'all' for context_request				
 		if not context_request:
 			return jsonify({
 				'error': 'Missing context_request parameter'
 			}), 400
 		
-		data = request.get_json()
-		# Extract chat data parameters
-		data_selected = data.get('data_selected', '')		
-		prompt_preamble = data.get('prompt_preamble','')
-		
-		response = cache_name=create_gemini_context(context_request, data_selected, prompt_preamble)
-		
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")	
-		return jsonify(response)
-		
-@api.route('/chat/context/clear', methods=['POST'])
-def route_chat_context_clear():
-	session_id = session.get('session_id')
-	app_version = request.cookies.get('app_version','0')
-	
-	for cache in client.caches.list():		
-		client.caches.delete(name=cache.name)
-	
-	log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")	
-	return jsonify({'Success': 'Context cache cleared.'})
+		context_option = request.args.get('option','')		
+		if context_option == 'clear':			
+						
+			for cache in genai_client.caches.list():
+				if cache.display_name == context_request or context_request == 'all':					
+					genai_client.caches.delete(name=cache.name)
+			
+			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"SUCCESS")	
+			return jsonify({'Success': 'Context cache cleared.'})
+		else:	
+			data = request.get_json()
+			# Extract chat data parameters
+			data_selected = data.get('data_selected', '')		
+			prompt_preamble = data.get('prompt_preamble','')
+			
+			response = create_gemini_context(context_request, data_selected, prompt_preamble)
+			
+			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"SUCCESS")	
+			return jsonify(response)
 	
 # query string log_action [insert, client_response_rating]
-@api.route('/log', methods=['POST'])
+@app.route('/log', methods=['POST'])
 def route_log():
 	session_id = session.get('session_id')
 	app_version = request.cookies.get('app_version','0')
@@ -1080,12 +972,12 @@ def route_log():
 		log_id=data.get('log_id', '')
 	)
 	if log_id != 0:
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: SUCCESS")		
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"SUCCESS")		
 		return jsonify({'message': 'Log entry created successfully', 'log_id': log_id}), 201
 	else:
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"Request: ERROR: Log entry not created")
+		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"ERROR: Log entry not created")
 		return jsonify({'error': 'Failed to create log entry'}), 500
 			
 	
 if __name__ == '__main__':	
-	api.run(host=HOST, port=PORT, debug=True)
+	app.run(host=Config.HOST, port=Config.PORT, debug=True)
