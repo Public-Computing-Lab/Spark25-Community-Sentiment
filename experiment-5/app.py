@@ -922,7 +922,7 @@ def handle_chat_simple(n_clicks, slider_val, user_input, history):
     history.append(("Assistant", reply))
     return history, chat_display_div(history), ""
 
-
+server = app.server
 
 if __name__ == "__main__":
     app.run_server(debug=True)
