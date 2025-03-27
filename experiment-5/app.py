@@ -16,6 +16,9 @@ from dash import ctx, dcc
 
 load_dotenv()
 
+PORT = os.getenv("EXPERIMENT_5_PORT")
+DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_5_DASH_REQUESTS_PATHNAME")
+
 def get_db_engine():
     user = os.getenv("DB_USER")
     password = quote_plus(os.getenv("DB_PASSWORD"))
@@ -347,7 +350,6 @@ daily_merge = daily_merge.sort_values('day')
 
 #dash initiate
 app = Dash(__name__, suppress_callback_exceptions=True,serve_locally=False, requests_pathname_prefix=DASH_REQUESTS_PATHNAME)
-
 app.layout = html.Div(style={'backgroundColor': 'black', 'padding': '10px'}, children=[
     html.H1("City Safety Dashboard", style={
         'textAlign': 'center',
