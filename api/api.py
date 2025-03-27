@@ -679,6 +679,21 @@ def route_data_query():
 			)			
 		elif data_request.startswith('911'):
 			query = build_911_query(data_request=data_request)
+		elif data_request == 'zip_geo':
+			query = f"""
+			SELECT JSON_OBJECT(
+				'type', 'FeatureCollection',
+				'features', JSON_ARRAYAGG(
+					JSON_OBJECT(
+						'type', 'Feature',
+						'geometry', ST_AsGeoJSON(boundary),
+						'properties', JSON_OBJECT('zipcode', zipcode)
+					)
+				)
+			)
+			FROM zipcode_geo
+			WHERE zipcode IN ({request_zipcode})
+			"""									
 		else:
 			return jsonify({'error': 'Invalid data_request parameter'}), 400
 	
@@ -694,162 +709,6 @@ def route_data_query():
 	except Exception as e:
 		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"ERROR: {str(e)}")
 		return jsonify({'error': str(e)}), 500
-
-
-@app.route('/data/zipcode', methods=['GET'])
-def route_data_zipcode():
-	session_id = session.get('session_id')
-	app_version = request.cookies.get('app_version','0')
-	
-	try:
-		data_request = request.args.get('request', '')			
-		if not data_request:
-			return jsonify({
-				'error': 'Missing data_request parameter'
-			}), 400
-	
-		query = f"""
-		SELECT JSON_OBJECT(
-			'type', 'FeatureCollection',
-			'features', JSON_ARRAYAGG(
-				JSON_OBJECT(
-					'type', 'Feature',
-					'geometry', ST_AsGeoJSON(boundary),
-					'properties', JSON_OBJECT('zipcode', zipcode)
-				)
-			)
-		)
-		FROM zipcode_geo
-		WHERE zipcode IN ({data_request})
-		"""				
-		
-		result = run_query(query=query)
-		
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"SUCCESS")
-		return jsonify(result)
-	
-	except Exception as e:
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"ERROR: {str(e)}")
-		return jsonify({
-			'error': str(e)
-		}), 500
-
-@app.route('/data/file', methods=['GET', 'POST'])
-def route_data_file():
-	session_id = session.get('session_id')
-	app_version = request.cookies.get('app_version','0')
-	
-	if request.method == 'GET':
-		try:
-			data_request = request.args.get('request', '')			
-			if not data_request:
-				return jsonify({
-					'error': 'Missing data_request parameter'
-				}), 400
-		
-			# Just list filenames
-			if data_request == 'list':
-				files = get_files()
-				return jsonify({
-					'status': 'success',
-					'request_type': 'LIST',
-					'files': sorted(files),
-					'count': len(files)
-				})
-		
-			# Get file contents based on request type
-			if data_request == 'structured':
-				files = get_files('csv')
-				file_type = 'CSV'
-			elif data_request == 'unstructured':
-				files = get_files('txt')
-				file_type = 'TEXT'
-			elif data_request == 'all':
-				files = get_files()
-				file_type = 'ALL'
-			else:
-				specific_files = [f.strip() for f in data_request.split(',')]
-				files = get_files(specific_files=specific_files)
-				file_type = 'SPECIFIC'
-		
-			# Read contents of found files
-			file_contents = {}
-			for file in files:
-				content = get_file_content(file)
-				if content is not None:
-					file_contents[file] = content
-			
-			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"SUCCESS")	
-			return jsonify({
-				'status': 'success',
-				'request_type': file_type,
-				'files': sorted(files),
-				'contents': file_contents,
-				'count': len(files)
-			})
-		
-		except Exception as e:
-			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"ERROR: {str(e)}")
-			return jsonify({
-				'error': str(e)
-			}), 500
-	#POST is totally untested
-	elif request.method == 'POST':
-		try:
-			# Check if files were uploaded
-			if 'files' not in request.files:
-				return jsonify({
-					'error': 'No files provided'
-				}), 400
-		
-			files = request.files.getlist('files')
-		
-			if not files or files[0].filename == '':
-				return jsonify({
-					'error': 'No files selected'
-				}), 400
-		
-			saved_files = []
-			errors = []
-		
-			for file in files:
-				if file and check_filetype(file.filename):
-					filename = secure_filename(file.filename)
-					file_path = DATASTORE_PATH / filename
-		
-					# Check file size
-					file.seek(0, os.SEEK_END)
-					size = file.tell()
-					file.seek(0)
-		
-					if size > MAX_FILE_SIZE:
-						errors.append(f"{filename}: File too large")
-						continue
-		
-					try:
-						file.save(file_path)
-						saved_files.append(filename)
-					except Exception as e:
-						errors.append(f"{filename}: {str(e)}")
-				else:
-					errors.append(f"{file.filename}: Invalid file type")
-		
-			response = {
-				'status': 'success' if saved_files else 'error',
-				'saved_files': saved_files,
-				'count': len(saved_files)
-			}
-		
-			if errors:
-				response['errors'] = errors
-		
-			return jsonify(response), 200 if saved_files else 400
-		
-		except Exception as e:
-			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"ERROR: {str(e)}")
-			return jsonify({
-				'error': str(e)
-			}), 500
 
 @app.route('/chat', methods=['POST'])
 def route_chat():
