@@ -4,19 +4,6 @@ This project is a **Flask-based REST-ish API** supporting the RethinkAI experime
 
 ##  Endpoints
 
-### /data/zipzode \[ GET \]
----
-#### **GET zipcode geoJson objects***
-```
-GET /data/zipcode?request=<zipcode>,<zipcode>,<zipcode>...
-```
-*Response*
-
-geoJson object with zipcode boundaries
-
-### /data/query \[ GET \]
-
----
 #### **GET crime and 311 data as geoJson objects***
 ```
 GET /data/query?request=<request_type>&date=%Y-%m&zipcode=<zipcode>
@@ -38,120 +25,15 @@ GET /data/query?request=<request_type>&date=%Y-%m&zipcode=<zipcode>
 - **311_by_type** - return counts for each type in type option below
 - **311_year_month** - return all 311 dates in %Y-%m format
 - **311_on_date_count** - return category counts by date, 
-- **311_on_date_geo** - returns all lat/longs for 311 categories by date, requires '?date=%Y-%m'
+- **311_on_date_geo** - returns all lat/longs for 311 categories by date, requires '&date=%Y-%m'
+
+##### Other
+- **zip_geo** - returns geojson object for requested zipcodes, requires &zipcode=\<zipcode,zipcode,...\>
 
 *Response*
 
 {json object}
 
-### /data/file \[ GET | POST \]
----
-#### **GET a LIST of available files**
-```
-GET /data/file?request=list
-```
-*Response*
-```
-{
-    "status": "success",
-    "request_type": "LIST",
-    "files": ["{data1.csv}", "{note1.txt}", "{data2.csv}"],
-    "count": "{file_count}"
-}
-```
-
-#### **GET CSV files**
-```
-GET /data/file?request=structured
-```
-*Response*
-```
-{
-    "status": "success",
-    "request_type": "CSV",
-    "files": ["{data1.csv}", "{data2.csv}"],
-    "contents": {
-        "data1.csv": "content of data1...",
-        "data2.csv": "content of data2..."
-    },
-    "count": "{file_count}"
-}
-```
-
-#### **GET TXT files**
-```
-GET /data/file?request=unstructured
-```
-*Response*
-```
-{
-    "status": "success",
-    "request_type": "TXT",
-    "files": ["{file1.txt}", "{file2.txt}"],
-    "contents": {
-        "file1.txt": "content of file1...",
-        "file2.txt": "content of file2..."
-    },
-    "count": "{file_count}"
-}
-```
-#### **GET all (CSV & TXT) files**
-```
-GET /data/file?request=all
-```
-*Response*
-```
-{
-    "status": "success",
-    "request_type": "ALL",
-    "files": ["{file1.txt}", "{file2.csv}"],
-    "contents": {
-        "file1.txt": "content of file1...",
-        "file2.csv": "content of file2..."
-    },
-    "count": "{file_count}"
-}
-```
-
-#### **GET specific files**
-Untested – works in theory.
-```
-GET /data/file?request=file1.csv,file2.txt
-```
-*Response*
-```
-{
-    "status": "success",
-    "request_type": "SPECIFIC",
-    "files": ["{file1.csv}", "{file2.txt}"],
-    "contents": {
-        "file1.csv": "content of file1...",
-        "file2.txt": "content of file2..."
-    },
-    "count": "{file_count}"
-}
-```
-
-#### **POST files to datastore**
-Incomplete
-```
-POST /data/file
-```
-*Json Data object*
-```
-{
- TBD
-}
-```
-
-*Response*
-```
-{
-    "status": "success",
-    "saved_files": ["{file1.csv}", "{file2.txt}"],
-    "count": "{file_count}"
-}
-```
 
 ### /chat \[ POST \]
 ---
@@ -178,20 +60,19 @@ POST /chat?context_request={structured | unstructured | all | specific}
 }
 ```
 
-
 ### /chat/context \[ POST \] 
-
-#### **POST new context cache to LLM with files in datastore**
+---
+#### **POST create new context cache**
 ```
-POST /chat/context?context_request={structured | unstructured | all | specific}
+POST /chat/context?request=<context_request>
 ```
 *Json Data object*
 ```
 {
     app_version = "{app_version}"
-    data_selected = "'{file1.csv}', '{file2.txt}'", # required for context_request=specific
+    data_selected = "'{file1.csv}', '{file2.txt}'", # optional
     data_attributes = ["{attrib1}", "{attrib2}", "{attrib3}"], # optional
-    prompt_preamble = "{Prompt preable} # required for context_request=specific"
+    prompt_preamble = "{Prompt preable} # optional
 }
 ```
 *Response*
@@ -200,26 +81,51 @@ POST /chat/context?context_request={structured | unstructured | all | specific}
     "{cache_name}"
 }
 ```
-
+#### **POST clear context cache**
+```
+POST /chat/context?request=<context_request>&option=clear
+```
+Clears the requested context cache. When context_request == all, will clear all context caches
+*Json Data object*
+```
+{
+    app_version = "{app_version}"
+    data_selected = "'{file1.csv}', '{file2.txt}'", # optional
+    data_attributes = ["{attrib1}", "{attrib2}", "{attrib3}"], # optional
+    prompt_preamble = "{Prompt preable} # optional
+}
+```
+*Response*
+```
+{
+"Success":"Context cache cleared."
+}
+```
 ### /chat/context \[ GET \] 
 
-#### **GET current context cache***
+#### **GET current context cache**
+```
+GET /chat/context
+```
+Returns object with a list of context caches  
 *Response*
 ```
 {
     "{context_cache}"
 }
 ```
-
-### /chat/context \[ POST \] 
-
-#### **POST clear all context cache***
+#### **GET token count without creating the cache**
+```
+GET /chat/context?request=<context_request>
+```
+Returns token count for requested context – does not create the context
 *Response*
 ```
 {
-    "{'Success': 'Context cache cleared.'}"
+"token_count":<total_tokens>
 }
 ```
+
 
 ### /log \[ POST \]
 ---
