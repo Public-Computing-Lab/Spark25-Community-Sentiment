@@ -639,7 +639,7 @@ def check_session():
 		log_event(session_id=session['session_id'], app_version='0', app_response="New session created")
 
 	# Log the request
-	g.log_entry = log_event(session_id=session['session_id'], app_version='0', client_query=f"Request: {request.method}] {request.url}")
+	g.log_entry = log_event(session_id=session['session_id'], app_version='0', client_query=f"Request: [{request.method}] {request.url}")
 
 #
 #Endpoint Definitions
