@@ -350,13 +350,18 @@ daily_merge = daily_merge.sort_values('day')
 
 #dash initiate
 app = Dash(__name__, suppress_callback_exceptions=True,serve_locally=False, requests_pathname_prefix=DASH_REQUESTS_PATHNAME)
-app.layout = html.Div(style={'backgroundColor': 'black', 'padding': '10px'}, children=[
+app.layout = html.Div(style={'backgroundColor': 'black', 'padding': '10px'}, children=[    
     html.H1("City Safety Dashboard", style={
         'textAlign': 'center',
         'color': 'white',
         'marginBottom': '15px'
-    }),
+    }),    
     dcc.Store(id="chat-history-store", data=[]),
+    #set the cookie
+    html.Div([
+       html.Div(id="cookie-setter-trigger", style={"display": "none"}),
+       dcc.Store(id="page-load", data="loaded")
+    ]),
     html.Div([
 
         html.Div([
@@ -459,7 +464,21 @@ app.layout = html.Div(style={'backgroundColor': 'black', 'padding': '10px'}, chi
 ])
 
 
+# Clientside callback to set cookie on page load
+clientside_callback(
+    """
+    function(data) {
+        const d = new Date();
+        d.setTime(d.getTime() + (30*24*60*60*1000));
+        const expires = "expires=" + d.toUTCString();
+        document.cookie = "app_version=5;" + expires + ";path=/";
 
+        return "Cookie 'app_version=5' has been set successfully!";
+    }
+    """,
+    Output("cookie-status", "children"),
+    Input("page-load", "data")
+)
 
 
 from dash.dependencies import Input, Output, State
