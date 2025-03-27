@@ -11,17 +11,22 @@ import asyncio
 from pathlib import Path
 from typing import List, Dict, Union
 import re
+import csv
+import io
 
 # Load environment variables
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL")
+GEMINI_CACHE_TTL = os.getenv("GEMINI_CACHE_TTL")
 PORT = os.getenv("API_PORT")
 HOST = os.getenv("API_HOST")
 DATASTORE_PATH = Path(os.getenv("DATASTORE_PATH"))
 PROMPTS_PATH = Path(os.getenv("PROMPTS_PATH"))
 ALLOWED_EXTENSIONS = {'csv', 'txt'}  # Add more if needed
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit, totally arbitrary
+FLASK_SECRET_KEY=os.getenv("FLASK_SECRET_KEY","rethinkAI2025!")
+FLASK_SESSION_COOKIE_SECURE=os.getenv("FLASK_SESSION_COOKIE_SECURE",False)
 
 # Database configuration
 db_config = {
@@ -37,10 +42,10 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 api = Flask(__name__)
 # Set up configuration
 api.config.update(
-	SECRET_KEY='rethinkAI2025!',
+	SECRET_KEY=FLASK_SECRET_KEY,
 	PERMANENT_SESSION_LIFETIME = datetime.timedelta(days=7),
 	SESSION_COOKIE_HTTPONLY=True,
-	SESSION_COOKIE_SECURE=False  # Set to True in production with HTTPS
+	SESSION_COOKIE_SECURE=FLASK_SESSION_COOKIE_SECURE  # Set to True in production with HTTPS
 )
 
 #
@@ -126,14 +131,17 @@ async def get_gemini_response(prompt, cache_name):
 		return f"❌ Error generating response: {e}"
 
 # TODO: Unsure if this should be async as well			
-def create_gemini_context(context_request, files, preamble):
-	cache_exists = False
-	for cache in client.caches.list():
-		if cache.display_name == context_request + files:
-			cache_exists = True
-			return cache.name
+def create_gemini_context(context_request, files="", preamble="", generate_cache=True):
+	# test if cache exists
+	if generate_cache:	
+		for cache in client.caches.list():
+			if cache.display_name == context_request + files:		
+				return cache.name
 
 	try:
+		# dict for gemini context
+		content = {"parts": []}
+		
 		if context_request == 'structured':
 			files = get_files('csv')
 			preamble = 'structured_data_prompt.txt'
@@ -149,9 +157,136 @@ def create_gemini_context(context_request, files, preamble):
 				files = get_files(specific_files=specific_files)
 			else:
 				return False
-					
+		elif context_request == 'experiment_5':			
+			files = get_files('txt')
+			query = f"""
+			WITH incident_data AS (
+				SELECT
+					year,
+					'911 Shot Fired Confirmed' AS incident_type,
+					quarter,
+					month
+				FROM shots_fired_data
+				WHERE 
+					district IN ('B2', 'B3', 'C11') 
+					AND ballistics_evidence = 1 
+					AND neighborhood = 'Dorchester' 
+					AND year >= 2018 
+					AND year < 2025
+				UNION ALL
+				SELECT
+					year,
+					'911 Shot Fired Unconfirmed' AS incident_type,
+					quarter,
+					month
+				FROM shots_fired_data
+				WHERE 
+					district IN ('B2', 'B3', 'C11') 
+					AND ballistics_evidence = 0 
+					AND neighborhood = 'Dorchester' 
+					AND year >= 2018 
+					AND year < 2025
+				UNION ALL
+				SELECT
+					year,
+					'911 Homicides' AS incident_type,
+					quarter,
+					month
+				FROM homicide_data
+				WHERE 
+					district IN ('B2', 'B3', 'C11')
+					AND neighborhood = 'Dorchester'
+					AND year >= 2018
+					AND year < 2025
+				UNION ALL
+				SELECT
+					YEAR(open_dt) AS year,
+					'311 Trash/Dumping Issues' AS incident_type,
+					QUARTER(open_dt) AS quarter,
+					MONTH(open_dt) AS month
+				FROM bos311_data
+				WHERE 
+					type IN ('Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping') 
+					AND police_district IN ('B2', 'B3', 'C11') 
+					AND neighborhood = 'Dorchester'
+				UNION ALL
+				SELECT
+					YEAR(open_dt) AS year,
+					'311 Living Condition Issues' AS incident_type,
+					QUARTER(open_dt) AS quarter,
+					MONTH(open_dt) AS month
+				FROM bos311_data
+				WHERE 
+					type IN ('Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 
+							'Rodent Activity', 'Heat - Excessive Insufficient', 'Unsafe Dangerous Conditions', 
+							'Pest Infestation - Residential') 
+					AND police_district IN ('B2', 'B3', 'C11') 
+					AND neighborhood = 'Dorchester'
+				UNION ALL
+				SELECT
+					YEAR(open_dt) AS year,
+					'311 Streets Issues' AS incident_type,
+					QUARTER(open_dt) AS quarter,
+					MONTH(open_dt) AS month
+				FROM bos311_data
+				WHERE 
+					type IN ('Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 
+							'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair') 
+					AND police_district IN ('B2', 'B3', 'C11') 
+					AND neighborhood = 'Dorchester'
+				UNION ALL
+				SELECT
+					YEAR(open_dt) AS year,
+					'311 Parking Issues' AS incident_type,
+					QUARTER(open_dt) AS quarter,
+					MONTH(open_dt) AS month
+				FROM bos311_data
+				WHERE 
+					type IN ('Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 
+							'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints') 
+					AND police_district IN ('B2', 'B3', 'C11') 
+					AND neighborhood = 'Dorchester'
+			)
+			SELECT
+				year,
+				incident_type,
+				COUNT(*) AS total_by_year,
+				SUM(CASE WHEN quarter = 1 THEN 1 ELSE 0 END) AS q1_total,
+				SUM(CASE WHEN quarter = 2 THEN 1 ELSE 0 END) AS q2_total,
+				SUM(CASE WHEN quarter = 3 THEN 1 ELSE 0 END) AS q3_total,
+				SUM(CASE WHEN quarter = 4 THEN 1 ELSE 0 END) AS q4_total,
+				SUM(CASE WHEN month = 1 THEN 1 ELSE 0 END) AS jan_total,
+				SUM(CASE WHEN month = 2 THEN 1 ELSE 0 END) AS feb_total,
+				SUM(CASE WHEN month = 3 THEN 1 ELSE 0 END) AS mar_total,
+				SUM(CASE WHEN month = 4 THEN 1 ELSE 0 END) AS apr_total,
+				SUM(CASE WHEN month = 5 THEN 1 ELSE 0 END) AS may_total,
+				SUM(CASE WHEN month = 6 THEN 1 ELSE 0 END) AS jun_total,
+				SUM(CASE WHEN month = 7 THEN 1 ELSE 0 END) AS jul_total,
+				SUM(CASE WHEN month = 8 THEN 1 ELSE 0 END) AS aug_total,
+				SUM(CASE WHEN month = 9 THEN 1 ELSE 0 END) AS sep_total,
+				SUM(CASE WHEN month = 10 THEN 1 ELSE 0 END) AS oct_total,
+				SUM(CASE WHEN month = 11 THEN 1 ELSE 0 END) AS nov_total,
+				SUM(CASE WHEN month = 12 THEN 1 ELSE 0 END) AS dec_total
+			FROM incident_data
+			GROUP BY year, incident_type
+			ORDER BY year, incident_type		
+			"""
+			
+			results = db_query(query=query)
+			result_string = ""
+			
+			output = io.StringIO()  
+			writer = csv.DictWriter(output, fieldnames=results[0].keys()) 
+			writer.writeheader()
+			writer.writerows(results)
+			result_string = output.getvalue()				
+			
+			content["parts"].append({"text":result_string})
+			
+			preamble = 'experiment_5.txt'			
+			
 		# Read contents of found files
-		content = {"parts": []}
+		
 		for file in files:
 			file_content = read_file_content(file)
 			if file_content is not None:				
@@ -170,32 +305,45 @@ def create_gemini_context(context_request, files, preamble):
 			prompt_content = preamble
 				
 		#set the display name
-		if context_request == 'specific':
-			#this may need to be truncated if long filenames
-			display_name = context_request+','.join(files)
-		display_name = context_request
-		
-		#create the cache
-		cache = client.caches.create(
-			model = GEMINI_MODEL,
-			config=types.CreateCachedContentConfig(
-			  display_name=display_name, 
-			  system_instruction=(prompt_content),
-			  contents=content["parts"]			  
-		  )
-		)
-		context_meta = {
-			'status': 'success',
-			'context_request': context_request,
-			'files': sorted(files),
-			'count': len(files),
-			'cache_name': cache.name
-		}
-		
-		return cache.name
+		if generate_cache:
+			if context_request == 'specific':
+				#this may need to be truncated if long filenames
+				display_name = context_request+','.join(files)
+			else:
+				display_name = context_request
+			
+			#set cache expire time
+			cache_ttl = (
+				(
+					datetime.datetime.now(datetime.timezone.utc)
+					+ datetime.timedelta(days=int(GEMINI_CACHE_TTL))
+				)
+				.isoformat()
+				.replace("+00:00", "Z")
+			)
+			#create the cache
+			cache = client.caches.create(
+				model = GEMINI_MODEL,
+				config=types.CreateCachedContentConfig(
+				display_name=display_name, 
+				system_instruction=(prompt_content),
+				expire_time=cache_ttl,
+				contents=content["parts"]			  
+			)
+			)
+			
+			return cache.name
+		#just return token count for the cache as test
+		else:
+			content["parts"].append({"text":prompt_content})			
+			total_tokens = client.models.count_tokens(
+				model=GEMINI_MODEL, 
+				contents=content["parts"]
+			)			
+			return total_tokens
 			
 	except Exception as e:
-		print(f"❌ Error generating response: {e}")  # ✅ Log the error!
+		print(f"❌ Error generating response: {e}") 
 		return f"❌ Error generating response: {e}"
 
 # Log events
@@ -292,7 +440,7 @@ def db_query(query):
 	
 		cursor.execute(query)
 		result = cursor.fetchall()
-		print(result)
+		#print(result)
 		if result:			
 			return result
 		else:
@@ -357,6 +505,8 @@ def route_data_query():
 				category_types = "'Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair'"
 			elif request_options == 'parking':	
 				category_types = "'Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints'"
+			elif request_options == 'all':
+				category_types = "'Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential', 'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping','Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair','Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints'"
 
 		if data_request == '311_on_date_geo':
 			if not is_ym_format(request_date):
@@ -789,6 +939,37 @@ def route_data_file():
 				'error': str(e)
 			}), 500
 
+@api.route('/chat/token_count', methods=['POST'])
+def route_token_count():
+	session_id = session.get('session_id')
+	app_version = request.cookies.get('app_version','0')
+	
+	context_request = request.args.get('context_request', '')
+	
+	data = request.get_json()	
+	# Extract chat data parameters
+	app_version = data.get('app_version', '')
+	data_selected = data.get('data_selected', '')
+	data_attributes = data.get('data_attributes', '')
+	client_query = data.get('client_query', '')
+	prompt_preamble = data.get('prompt_preamble','')
+	
+	token_count=create_gemini_context(context_request=context_request, files=data_selected, preamble=prompt_preamble, generate_cache=False)
+	
+	# Return as JSON response
+	# return jsonify({"total_tokens": "token_count.total_tokens"})
+	
+	if isinstance(token_count, str): 
+		return jsonify({"cache_name": token_count})
+	elif isinstance(token_count, int):
+		return jsonify({"token_count": token_count})
+	elif isinstance(token_count.total_tokens, int):
+		return jsonify({"token_count": token_count.total_tokens})
+	else:
+		# Handle the error appropriately, e.g., log the error and return an error response
+		print(f"Error getting token count: {token_count}")  # Log the error
+		return jsonify({"error": "Failed to get token count"}), 500 # Return an error response
+
 @api.route('/chat', methods=['POST'])
 def route_chat():
 	session_id = session.get('session_id')
@@ -797,9 +978,6 @@ def route_chat():
 	context_request = request.args.get('context_request', '')
 		
 	data = request.get_json()	
-	
-	# Generate a session ID if not provided
-	session_id = data.get('session_id', str(uuid.uuid4()))
 	
 	# Extract chat data parameters
 	app_version = data.get('app_version', '')
@@ -824,16 +1002,7 @@ def route_chat():
 	
 		log_status=False
 		# Log the interaction
-		log_id = log_chat(session_id, 			
-			app_version,
-			context_request + ' ' + data_selected,
-			data_attributes,
-			prompt_preamble,
-			client_query,			
-			app_response,
-			None
-		)		
-		
+		log_id = log_event(session_id=session_id, app_version=app_version, data_selected=context_request + ' ' + data_selected,data_attributes=data_attributes,prompt_preamble=prompt_preamble,client_query=full_prompt,app_response=app_response)				
 		response = {
 			'session_id': session_id,		
 			'response': app_response,
