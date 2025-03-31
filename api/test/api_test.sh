@@ -267,9 +267,9 @@ test_data_query() {
 		"911_homicides_and_shots_fired"
 		"zip_geo&zipcode=02121,02115"
 	)
-	
+	start_time_big=$(perl -MTime::HiRes=time -e 'printf "%.9f", time')
 	for endpoint in "${ENDPOINTS_OPTIONS[@]}"; do
-	
+		
 		echo -e "\n${GREEN}Testing GET /data/query?request=${endpoint}${NC}"
 		# Current timestamp in ISO format
 		#timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -278,7 +278,9 @@ test_data_query() {
 		# 	"client_response_rating": "UPDATED"
 		# }'
 		#read -p "Press Enter to execute this query (or type 'skip' to skip, 'quit' to exit): " user_input
-
+		start_time=$(perl -MTime::HiRes=time -e 'printf "%.9f", time')		
+		
+		echo "Timing GET request to: $URL"
 		response=$(curl -X GET \
 			-b cookies.txt \
 			-c cookies.txt \
@@ -286,15 +288,24 @@ test_data_query() {
 			-H "Content-Type: application/json" \
 			-d "$log_data" \
 			"${API_URL}/data/query?request=${endpoint}")
-	
+		#End timing
+		end_time=$(perl -MTime::HiRes=time -e 'printf "%.9f", time')
+		
+		# Calculate elapsed time
+		elapsed=$(echo "$end_time - $start_time" | bc)
+		
 		# Check if curl command was successful
 		if [ $? -eq 0 ]; then
 			#echo "Response Length: ${#response}"
+			echo "Request completed in ${elapsed} seconds"
 			echo -e "${GREEN}Log endpoint test completed${NC}"
 		else
 			echo -e "${RED}Log endpoint test failed${NC}"
 		fi
 	done
+	end_time_big=$(perl -MTime::HiRes=time -e 'printf "%.9f", time')
+	elapsed=$(echo "$end_time_big - $start_time_big" | bc)
+	echo "Request completed in ${elapsed} seconds"
 }
 
 # Function to test /data/zipcode?request=
