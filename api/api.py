@@ -5,6 +5,7 @@ from google.genai import types
 from pathlib import Path
 from typing import List, Dict, Union, Optional, Any
 import mysql.connector
+from mysql.connector.pooling import MySQLConnectionPool
 import datetime
 import os
 import re
@@ -112,6 +113,9 @@ class SQLConstants:
 # Initialize GenAI client
 genai_client = genai.Client(api_key=Config.GEMINI_API_KEY)
 
+# Create connection pool
+db_pool = MySQLConnectionPool(**Config.DB_CONFIG)
+
 # Initialize Flask app
 app = Flask(__name__)
 app.config.update(
@@ -196,7 +200,8 @@ def get_file_content(filename: str) -> Optional[str]:
 
 # DB Connection
 def get_db_connection():
-    return mysql.connector.connect(**Config.DB_CONFIG)
+    # return mysql.connector.connect(**Config.DB_CONFIG)
+    return db_pool.get_connection()
 
 
 # Send prompt to Gemini
@@ -620,17 +625,15 @@ def build_911_query(data_request: str) -> str:
     elif data_request == "911_shots_fired":
         return f"""
 		SELECT
-			year,
-			district,
-			ballistics_evidence,
-			neighborhood,
-			hour_of_day,
-			day_of_week,
-			latitude,
-			longitude
+            incident_date_time,
+            ballistics_evidence,
+            latitude,
+            longitude
 		FROM shots_fired_data
 		WHERE {SQLConstants.BOS911_BASE_WHERE}
-		GROUP BY year, district, neighborhood, ballistics_evidence, hour_of_day, day_of_week, latitude, longitude;
+        AND latitude IS NOT NULL 
+        AND longitude IS NOT NULL
+		GROUP BY incident_date_time, ballistics_evidence, latitude, longitude;
 		"""
     elif data_request == "911_shots_fired_count_confirmed":
         return f"""
@@ -655,13 +658,13 @@ def build_911_query(data_request: str) -> str:
     elif data_request == "911_homicides_and_shots_fired":
         return """
 		SELECT
-			h.year as year,
-			h.quarter as quarter,
-			h.month as month,
-			h.day_of_week as day,
-			h.hour_of_day as hour,
-			h.district as police_district,
-			s.address as shot_address,
+		#	h.year as year,
+		#	h.quarter as quarter,
+		#	h.month as month,
+		#	h.day_of_week as day,
+		#	h.hour_of_day as hour,
+		#	h.district as police_district,
+		#	s.address as shot_address,
 			s.latitude as latitude,
 			s.longitude as longitude
 		FROM
