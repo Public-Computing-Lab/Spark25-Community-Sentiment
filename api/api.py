@@ -106,7 +106,7 @@ class SQLConstants:
     )
 
     # 911 specific constants
-    BOS911_BASE_WHERE = f"district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
+    BOS911_BASE_WHERE = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
 
 
 # Initialize GenAI client
@@ -227,7 +227,6 @@ def create_gemini_context(
 ) -> Union[str, int, bool]:
     # test if cache exists
     if generate_cache:
-        cache_name = context_request + files
         for cache in genai_client.caches.list():
             if cache.display_name == context_request + files:
                 return cache.name
@@ -594,7 +593,7 @@ def build_311_query(
 			type,
 			open_dt,
 			police_district,
-			location,
+			#location,
 			latitude,
 			longitude
 		FROM 
@@ -654,7 +653,7 @@ def build_911_query(data_request: str) -> str:
 		GROUP BY year
 		"""
     elif data_request == "911_homicides_and_shots_fired":
-        return f"""
+        return """
 		SELECT
 			h.year as year,
 			h.quarter as quarter,
@@ -828,7 +827,6 @@ def route_chat():
             print(f"❌ ERROR from Gemini API: {app_response}")
             return jsonify({"error": app_response}), 500
 
-        log_status = False
         # Log the interaction
         log_id = log_event(
             session_id=session_id,
@@ -849,7 +847,7 @@ def route_chat():
             session_id=session_id,
             app_version=app_version,
             log_id=g.log_entry,
-            app_response=f"SUCCESS",
+            app_response="SUCCESS",
         )
         return jsonify(response)
 
@@ -916,7 +914,7 @@ def route_chat_context():
                 session_id=session_id,
                 app_version=app_version,
                 log_id=g.log_entry,
-                app_response=f"SUCCESS",
+                app_response="SUCCESS",
             )
             return jsonify({"Success": "Context cache cleared."})
         else:
@@ -933,50 +931,89 @@ def route_chat_context():
                 session_id=session_id,
                 app_version=app_version,
                 log_id=g.log_entry,
-                app_response=f"SUCCESS",
+                app_response="SUCCESS",
             )
             return jsonify(response)
 
 
 # query string log_action [insert, client_response_rating]
-@app.route("/log", methods=["POST"])
+@app.route("/log", methods=["POST", "PUT"])
 def route_log():
     session_id = session.get("session_id")
     app_version = request.cookies.get("app_version", "0")
 
-    log_switch = request.args.get("log_action", "")
+    # log_switch = request.args.get("log_action", "")
     data = request.get_json()
 
-    log_id = log_event(
-        session_id=session_id,
-        app_version=app_version,
-        data_selected=data.get("data_selected", ""),
-        data_attributes=data.get("data_attributes", ""),
-        prompt_preamble=data.get("prompt_preambe", ""),
-        client_query=data.get("client_query", ""),
-        app_response=data.get("app_response", ""),
-        client_response_rating=data.get("client_response_rating", ""),
-        log_id=data.get("log_id", ""),
-    )
-    if log_id != 0:
-        log_event(
+    if request.method == "POST":
+        log_id = log_event(
             session_id=session_id,
             app_version=app_version,
-            log_id=g.log_entry,
-            app_response=f"SUCCESS",
+            data_selected=data.get("data_selected", ""),
+            data_attributes=data.get("data_attributes", ""),
+            prompt_preamble=data.get("prompt_preambe", ""),
+            client_query=data.get("client_query", ""),
+            app_response=data.get("app_response", ""),
+            client_response_rating=data.get("client_response_rating", ""),
+            log_id=data.get("log_id", ""),
         )
-        return (
-            jsonify({"message": "Log entry created successfully", "log_id": log_id}),
-            201,
-        )
-    else:
-        log_event(
+        if log_id != 0:
+            log_event(
+                session_id=session_id,
+                app_version=app_version,
+                log_id=g.log_entry,
+                app_response="SUCCESS",
+            )
+            return (
+                jsonify(
+                    {"message": "Log entry created successfully", "log_id": log_id}
+                ),
+                201,
+            )
+        else:
+            log_event(
+                session_id=session_id,
+                app_version=app_version,
+                log_id=g.log_entry,
+                app_response="ERROR: Log entry not created",
+            )
+            return jsonify({"error": "Failed to create log entry"}), 500
+    if request.method == "PUT":
+        if not data.get("log_id", ""):
+            return jsonify({"error": "Missing log_id to update"}), 500
+
+        log_id = log_event(
             session_id=session_id,
             app_version=app_version,
-            log_id=g.log_entry,
-            app_response=f"ERROR: Log entry not created",
+            data_selected=data.get("data_selected", ""),
+            data_attributes=data.get("data_attributes", ""),
+            prompt_preamble=data.get("prompt_preambe", ""),
+            client_query=data.get("client_query", ""),
+            app_response=data.get("app_response", ""),
+            client_response_rating=data.get("client_response_rating", ""),
+            log_id=data.get("log_id", ""),
         )
-        return jsonify({"error": "Failed to create log entry"}), 500
+        if log_id != 0:
+            log_event(
+                session_id=session_id,
+                app_version=app_version,
+                log_id=g.log_entry,
+                app_response="SUCCESS",
+            )
+            return (
+                jsonify(
+                    {"message": "Log entry updated successfully", "log_id": log_id}
+                ),
+                201,
+            )
+        else:
+            log_event(
+                session_id=session_id,
+                app_version=app_version,
+                log_id=g.log_entry,
+                app_response="ERROR: Log entry not updated",
+            )
+            return jsonify({"error": "Failed to update log entry"}), 500
 
 
 if __name__ == "__main__":
