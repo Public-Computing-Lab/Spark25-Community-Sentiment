@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify, g, session
 from dotenv import load_dotenv
 from google import genai
@@ -17,46 +16,51 @@ import asyncio
 # Load environment variables
 load_dotenv()
 
+
 # Configuration constants
 class Config:
-	GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-	GEMINI_MODEL = os.getenv("GEMINI_MODEL")
-	GEMINI_CACHE_TTL = int(os.getenv("GEMINI_CACHE_TTL", "7"))
-	HOST = os.getenv("API_HOST")
-	PORT = os.getenv("API_PORT")	
-	DATASTORE_HOST = os.getenv("DATASTORE_HOST")
-	DATASTORE_PATH = Path(os.getenv("DATASTORE_PATH", "."))
-	PROMPTS_PATH = Path(os.getenv("PROMPTS_PATH", "."))
-	ALLOWED_EXTENSIONS = {'csv', 'txt'}
-	MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit
-	FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "rethinkAI2025!")
-	FLASK_SESSION_COOKIE_SECURE = os.getenv("FLASK_SESSION_COOKIE_SECURE", "False").lower() == "true"
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL")
+    GEMINI_CACHE_TTL = int(os.getenv("GEMINI_CACHE_TTL", "7"))
+    HOST = os.getenv("API_HOST")
+    PORT = os.getenv("API_PORT")
+    DATASTORE_HOST = os.getenv("DATASTORE_HOST")
+    DATASTORE_PATH = Path(os.getenv("DATASTORE_PATH", "."))
+    PROMPTS_PATH = Path(os.getenv("PROMPTS_PATH", "."))
+    ALLOWED_EXTENSIONS = {"csv", "txt"}
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit
+    FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "rethinkAI2025!")
+    FLASK_SESSION_COOKIE_SECURE = (
+        os.getenv("FLASK_SESSION_COOKIE_SECURE", "False").lower() == "true"
+    )
 
-	# Database configuration
-	DB_CONFIG = {
-		'host': os.getenv('DB_HOST', 'localhost'),
-		'user': os.getenv('DB_USER'),
-		'password': os.getenv('DB_PASSWORD'),
-		'database': os.getenv('DB_NAME')
-	}
+    # Database configuration
+    DB_CONFIG = {
+        "host": os.getenv("DB_HOST", "localhost"),
+        "user": os.getenv("DB_USER"),
+        "password": os.getenv("DB_PASSWORD"),
+        "database": os.getenv("DB_NAME"),
+    }
 
 
 #
 # SQL Query Constants
 #
-class SQLConstants:	
-	# 311 category mappings
-	CATEGORY_TYPES = {
-		'living_conditions': "'Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential'",
-		'trash': "'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping'",
-		'streets': "'Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair'",
-		'parking': "'Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints'",
-	}
-	
-	# Set the 'all' category to include all individual categories
-	CATEGORY_TYPES['all'] = ', '.join([cat for cat in ', '.join(CATEGORY_TYPES.values()).split(', ')])
-	# Common aggregation columns for monthly/quarterly breakdowns
-	BOS911_TIME_BREAKDOWN = """
+class SQLConstants:
+    # 311 category mappings
+    CATEGORY_TYPES = {
+        "living_conditions": "'Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', 'Rodent Activity', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential'",
+        "trash": "'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Illegal Dumping'",
+        "streets": "'Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', 'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair'",
+        "parking": "'Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', 'Private Parking Lot Complaints'",
+    }
+
+    # Set the 'all' category to include all individual categories
+    CATEGORY_TYPES["all"] = ", ".join(
+        [cat for cat in ", ".join(CATEGORY_TYPES.values()).split(", ")]
+    )
+    # Common aggregation columns for monthly/quarterly breakdowns
+    BOS911_TIME_BREAKDOWN = """
 		COUNT(*) AS total_by_year,
 		SUM(CASE WHEN quarter = 1 THEN 1 ELSE 0 END) AS q1_total,
 		SUM(CASE WHEN quarter = 2 THEN 1 ELSE 0 END) AS q2_total,
@@ -75,8 +79,8 @@ class SQLConstants:
 		SUM(CASE WHEN month = 11 THEN 1 ELSE 0 END) AS nov_total,
 		SUM(CASE WHEN month = 12 THEN 1 ELSE 0 END) AS dec_total
 	"""
-	
-	BOS311_TIME_BREAKDOWN = """
+
+    BOS311_TIME_BREAKDOWN = """
 	COUNT(*) AS total_year,
 	SUM(CASE WHEN QUARTER(open_dt) = 1 THEN 1 ELSE 0 END) AS q1_total,
 	SUM(CASE WHEN QUARTER(open_dt) = 2 THEN 1 ELSE 0 END) AS q2_total,
@@ -96,11 +100,14 @@ class SQLConstants:
 	SUM(CASE WHEN MONTH(open_dt) = 12 THEN 1 ELSE 0 END) AS dec_total
 	"""
 
-	# 311 specific constants
-	BOS311_BASE_WHERE = "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
+    # 311 specific constants
+    BOS311_BASE_WHERE = (
+        "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
+    )
 
-	# 911 specific constants	
-	BOS911_BASE_WHERE = f"district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
+    # 911 specific constants
+    BOS911_BASE_WHERE = f"district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
+
 
 # Initialize GenAI client
 genai_client = genai.Client(api_key=Config.GEMINI_API_KEY)
@@ -108,119 +115,143 @@ genai_client = genai.Client(api_key=Config.GEMINI_API_KEY)
 # Initialize Flask app
 app = Flask(__name__)
 app.config.update(
-	SECRET_KEY=Config.FLASK_SECRET_KEY,
-	PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=7),
-	SESSION_COOKIE_HTTPONLY=True,
-	SESSION_COOKIE_SECURE=Config.FLASK_SESSION_COOKIE_SECURE
+    SECRET_KEY=Config.FLASK_SECRET_KEY,
+    PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=7),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=Config.FLASK_SESSION_COOKIE_SECURE,
 )
 
 #
 # Helper functions
 #
 
+
 # Checks if a string is in 'YYYY-MM' format.
 def check_date_format(date_string: str) -> bool:
-	pattern = r"^\d{4}-\d{2}$"
-	if not re.match(pattern, date_string):
-		return False
-	
-	year, month = map(int, date_string.split('-'))
-	return 1 <= month <= 12
+    pattern = r"^\d{4}-\d{2}$"
+    if not re.match(pattern, date_string):
+        return False
+
+    year, month = map(int, date_string.split("-"))
+    return 1 <= month <= 12
+
 
 def check_filetype(filename: str) -> bool:
-	return '.' in filename and filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS		
-	   
-def get_files(file_type: Optional[str] = None, specific_files: Optional[List[str]] = None) -> List[str]:
-	"""Get a list of files from the datastore directory."""
-	try:
-		if not Config.DATASTORE_PATH.exists():
-			return []
-	
-		if specific_files:
-			return [
-				f.name for f in Config.DATASTORE_PATH.iterdir()
-				if f.is_file() and f.name in specific_files and not f.name.startswith('.')
-			]
-	
-		if file_type:
-			return [
-				f.name for f in Config.DATASTORE_PATH.iterdir()
-				if f.is_file() and f.suffix.lower() == f'.{file_type}' and not f.name.startswith('.')
-			]
-	
-		return [
-			f.name for f in Config.DATASTORE_PATH.iterdir()
-			if f.is_file() and not f.name.startswith('.')
-		]
-	
-	except Exception as e:
-		print(f"Error getting files: {e}")
-		return []
+    return (
+        "." in filename
+        and filename.rsplit(".", 1)[1].lower() in Config.ALLOWED_EXTENSIONS
+    )
+
+
+def get_files(
+    file_type: Optional[str] = None, specific_files: Optional[List[str]] = None
+) -> List[str]:
+    """Get a list of files from the datastore directory."""
+    try:
+        if not Config.DATASTORE_PATH.exists():
+            return []
+
+        if specific_files:
+            return [
+                f.name
+                for f in Config.DATASTORE_PATH.iterdir()
+                if f.is_file()
+                and f.name in specific_files
+                and not f.name.startswith(".")
+            ]
+
+        if file_type:
+            return [
+                f.name
+                for f in Config.DATASTORE_PATH.iterdir()
+                if f.is_file()
+                and f.suffix.lower() == f".{file_type}"
+                and not f.name.startswith(".")
+            ]
+
+        return [
+            f.name
+            for f in Config.DATASTORE_PATH.iterdir()
+            if f.is_file() and not f.name.startswith(".")
+        ]
+
+    except Exception as e:
+        print(f"Error getting files: {e}")
+        return []
+
 
 def get_file_content(filename: str) -> Optional[str]:
-		"""Read content from a file in the datastore."""
-		try:
-			file_path = Config.DATASTORE_PATH / filename
-			if not file_path.exists():
-				return None
-		
-			return file_path.read_text(encoding='utf-8')
-		
-		except Exception as e:
-			print(f"Error reading file {filename}: {e}")
-			return None
+    """Read content from a file in the datastore."""
+    try:
+        file_path = Config.DATASTORE_PATH / filename
+        if not file_path.exists():
+            return None
+
+        return file_path.read_text(encoding="utf-8")
+
+    except Exception as e:
+        print(f"Error reading file {filename}: {e}")
+        return None
+
 
 # DB Connection
 def get_db_connection():
-	return mysql.connector.connect(**Config.DB_CONFIG)
-	
+    return mysql.connector.connect(**Config.DB_CONFIG)
+
+
 # Send prompt to Gemini
 async def get_gemini_response(prompt: str, cache_name: str) -> str:
-	"""Sends the prompt to Google Gemini and returns the response."""	
-	try:	
-		model = Config.GEMINI_MODEL
-		response = await asyncio.to_thread(
-			lambda: genai_client.models.generate_content(
-				model=model,
-				contents=prompt,
-				config=types.GenerateContentConfig(cached_content=cache_name)
-			)
-		)
-		print(f"\n✅ Gemini Response: {response.text}")
-		return response.text		
-	except Exception as e:
-		print(f"❌ Error generating response: {e}")  # ✅ Log the error!
-		return f"❌ Error generating response: {e}"
+    """Sends the prompt to Google Gemini and returns the response."""
+    try:
+        model = Config.GEMINI_MODEL
+        response = await asyncio.to_thread(
+            lambda: genai_client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(cached_content=cache_name),
+            )
+        )
+        print(f"\n✅ Gemini Response: {response.text}")
+        return response.text
+    except Exception as e:
+        print(f"❌ Error generating response: {e}")  # ✅ Log the error!
+        return f"❌ Error generating response: {e}"
 
-# TODO: Unsure if this should be async as well			
-def create_gemini_context(context_request: str, files: str = "", preamble: str = "", generate_cache: bool = True) -> Union[str, int, bool]:
-	# test if cache exists
-	if generate_cache:	
-		cache_name = context_request + files
-		for cache in genai_client.caches.list():
-			if cache.display_name == context_request + files:		
-				return cache.name
 
-	try:		
-		content = {"parts": []}
-		
-		if context_request == 'structured':
-			files_list = get_files('csv')
-			preamble_file = 'structured_data_prompt.txt'
-		elif context_request == 'unstructured':
-			files_list = get_files('txt')
-			preamble_file = 'unstructured_data_prompt.txt'
-		elif context_request == 'all':
-			files_list = get_files()
-			preamble_file = 'all_data_prompt.txt'
-		elif context_request == 'specific':
-			if not files:
-				return False
-			specific_files = [f.strip() for f in files.split(',')]
-			files_list = get_files(specific_files=specific_files)
-		elif context_request == 'experiment_5':
-			files_list = get_files('txt')
-			query = f"""
+# TODO: Unsure if this should be async as well
+def create_gemini_context(
+    context_request: str,
+    files: str = "",
+    preamble: str = "",
+    generate_cache: bool = True,
+) -> Union[str, int, bool]:
+    # test if cache exists
+    if generate_cache:
+        cache_name = context_request + files
+        for cache in genai_client.caches.list():
+            if cache.display_name == context_request + files:
+                return cache.name
+
+    try:
+        content = {"parts": []}
+
+        if context_request == "structured":
+            files_list = get_files("csv")
+            preamble_file = "structured_data_prompt.txt"
+        elif context_request == "unstructured":
+            files_list = get_files("txt")
+            preamble_file = "unstructured_data_prompt.txt"
+        elif context_request == "all":
+            files_list = get_files()
+            preamble_file = "all_data_prompt.txt"
+        elif context_request == "specific":
+            if not files:
+                return False
+            specific_files = [f.strip() for f in files.split(",")]
+            files_list = get_files(specific_files=specific_files)
+        elif context_request == "experiment_5":
+            files_list = get_files("txt")
+            query = f"""
 			WITH incident_data AS (
 				SELECT
 					year,
@@ -300,180 +331,202 @@ def create_gemini_context(context_request: str, files: str = "", preamble: str =
 			ORDER BY year, incident_type
 
 			"""
-			
-			results = run_query(query=query)
-			if results:
-				output = io.StringIO()
-				writer = csv.DictWriter(output, fieldnames=results[0].keys())
-				writer.writeheader()
-				writer.writerows(results)
-				content["parts"].append({"text": output.getvalue()})
-			
-			preamble_file = 'experiment_5.txt'			
-			
-		# Read contents of found files
-		
-		for file in files_list:
-			file_content = get_file_content(file)
-			if file_content is not None:
-				content["parts"].append({"text": file_content})
-						
-		# Read prompt preamble
-		if context_request != 'specific':
-			path = Config.PROMPTS_PATH / preamble_file
-			if not path.is_file():
-				raise FileNotFoundError(f"File not found: {path}")
-			prompt_content = path.read_text(encoding='utf-8')
-		else:
-			prompt_content = preamble
-				
-		# Generate cache or return token count
-		if generate_cache:
-			# Set the display name
-			if context_request == 'specific':
-				display_name = context_request + ','.join(files_list)
-			else:
-				display_name = context_request
-		
-			# Set cache expiration time
-			cache_ttl = (
-				(
-					datetime.datetime.now(datetime.timezone.utc)
-					+ datetime.timedelta(days=Config.GEMINI_CACHE_TTL)
-				)
-				.isoformat()
-				.replace("+00:00", "Z")
-			)
-			
-			# Create the cache
-			cache = genai_client.caches.create(
-				model=Config.GEMINI_MODEL,
-				config=types.CreateCachedContentConfig(
-					display_name=display_name,
-					system_instruction=prompt_content,
-					expire_time=cache_ttl,
-					contents=content["parts"]
-				)
-			)
-			
-			return cache.name
-		else:
-			# Return token count for testing
-			content["parts"].append({"text": prompt_content})
-			total_tokens = genai_client.models.count_tokens(
-				model=Config.GEMINI_MODEL,
-				contents=content["parts"]
-			)
-			return total_tokens.total_tokens
-	
-	except Exception as e:
-		print(f"❌ Error generating context: {e}")
-		return f"❌ Error generating context: {e}"
+
+            results = run_query(query=query)
+            if results:
+                output = io.StringIO()
+                writer = csv.DictWriter(output, fieldnames=results[0].keys())
+                writer.writeheader()
+                writer.writerows(results)
+                content["parts"].append({"text": output.getvalue()})
+
+            preamble_file = "experiment_5.txt"
+
+        # Read contents of found files
+
+        for file in files_list:
+            file_content = get_file_content(file)
+            if file_content is not None:
+                content["parts"].append({"text": file_content})
+
+        # Read prompt preamble
+        if context_request != "specific":
+            path = Config.PROMPTS_PATH / preamble_file
+            if not path.is_file():
+                raise FileNotFoundError(f"File not found: {path}")
+            prompt_content = path.read_text(encoding="utf-8")
+        else:
+            prompt_content = preamble
+
+        # Generate cache or return token count
+        if generate_cache:
+            # Set the display name
+            if context_request == "specific":
+                display_name = context_request + ",".join(files_list)
+            else:
+                display_name = context_request
+
+            # Set cache expiration time
+            cache_ttl = (
+                (
+                    datetime.datetime.now(datetime.timezone.utc)
+                    + datetime.timedelta(days=Config.GEMINI_CACHE_TTL)
+                )
+                .isoformat()
+                .replace("+00:00", "Z")
+            )
+
+            # Create the cache
+            cache = genai_client.caches.create(
+                model=Config.GEMINI_MODEL,
+                config=types.CreateCachedContentConfig(
+                    display_name=display_name,
+                    system_instruction=prompt_content,
+                    expire_time=cache_ttl,
+                    contents=content["parts"],
+                ),
+            )
+
+            return cache.name
+        else:
+            # Return token count for testing
+            content["parts"].append({"text": prompt_content})
+            total_tokens = genai_client.models.count_tokens(
+                model=Config.GEMINI_MODEL, contents=content["parts"]
+            )
+            return total_tokens.total_tokens
+
+    except Exception as e:
+        print(f"❌ Error generating context: {e}")
+        return f"❌ Error generating context: {e}"
+
 
 # Log events
-def log_event(session_id: str, app_version: str, data_selected: str = '', 
-		  data_attributes: str = '', prompt_preamble: str = '', 
-		  client_query: str = '', app_response: str = '', 
-		  client_response_rating: str = '', log_id: str = '') -> Union[int, bool]:
-	"""Log an event to the database."""
-	if not session_id or not app_version:
-		print("Missing session_id or app_version")
-		return False
-	
-	try:
-		conn = get_db_connection()
-		cursor = conn.cursor()
-	
-		# Insert new entry if no log_id provided
-		if not log_id:
-			query = """
+def log_event(
+    session_id: str,
+    app_version: str,
+    data_selected: str = "",
+    data_attributes: str = "",
+    prompt_preamble: str = "",
+    client_query: str = "",
+    app_response: str = "",
+    client_response_rating: str = "",
+    log_id: str = "",
+) -> Union[int, bool]:
+    """Log an event to the database."""
+    if not session_id or not app_version:
+        print("Missing session_id or app_version")
+        return False
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Insert new entry if no log_id provided
+        if not log_id:
+            query = """
 			INSERT INTO interaction_log (
 				session_id, app_version, data_selected, data_attributes,
 				prompt_preamble, client_query, app_response, client_response_rating
 			) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 			"""
-	
-			cursor.execute(query, (
-				session_id, app_version, data_selected, data_attributes,
-				prompt_preamble, client_query, app_response, client_response_rating
-			))
-	
-			app_response_id = cursor.lastrowid
-		else:
-			# Create a dictionary of non-empty fields to update
-			update_fields = {
-				'data_selected': data_selected,
-				'data_attributes': data_attributes,
-				'prompt_preamble': prompt_preamble,
-				'client_query': client_query,
-				'app_response': app_response,
-				'client_response_rating': client_response_rating
-			}
-	
-			# Filter out empty fields
-			update_fields = {k: v for k, v in update_fields.items() if v}
-	
-			if update_fields:
-				# Build the query dynamically
-				update_parts = [f"{field} = %s" for field in update_fields]
-				query = f"UPDATE interaction_log SET {', '.join(update_parts)} WHERE id = %s"
-	
-				# Add values in the correct order
-				params = list(update_fields.values())
-				params.append(log_id)
-	
-				cursor.execute(query, params)
-	
-			app_response_id = log_id
-	
-		conn.commit()
-		return app_response_id
-	
-	except mysql.connector.Error as err:
-		print(f"Database error: {str(err)}")
-		return False
-	
-	finally:
-		if 'conn' in locals():
-			cursor.close()
-			conn.close()
+
+            cursor.execute(
+                query,
+                (
+                    session_id,
+                    app_version,
+                    data_selected,
+                    data_attributes,
+                    prompt_preamble,
+                    client_query,
+                    app_response,
+                    client_response_rating,
+                ),
+            )
+
+            app_response_id = cursor.lastrowid
+        else:
+            # Create a dictionary of non-empty fields to update
+            update_fields = {
+                "data_selected": data_selected,
+                "data_attributes": data_attributes,
+                "prompt_preamble": prompt_preamble,
+                "client_query": client_query,
+                "app_response": app_response,
+                "client_response_rating": client_response_rating,
+            }
+
+            # Filter out empty fields
+            update_fields = {k: v for k, v in update_fields.items() if v}
+
+            if update_fields:
+                # Build the query dynamically
+                update_parts = [f"{field} = %s" for field in update_fields]
+                query = f"UPDATE interaction_log SET {', '.join(update_parts)} WHERE id = %s"
+
+                # Add values in the correct order
+                params = list(update_fields.values())
+                params.append(log_id)
+
+                cursor.execute(query, params)
+
+            app_response_id = log_id
+
+        conn.commit()
+        return app_response_id
+
+    except mysql.connector.Error as err:
+        print(f"Database error: {str(err)}")
+        return False
+
+    finally:
+        if "conn" in locals():
+            cursor.close()
+            conn.close()
 
 
 # DB Query
 def run_query(query: str) -> Optional[List[Dict[str, Any]]]:
-	try:
-		conn = get_db_connection()
-		cursor = conn.cursor(dictionary=True)
-	
-		cursor.execute(query)
-		result = cursor.fetchall()
-		#print(result)
-		return result if result else None  						
-	
-	except mysql.connector.Error as err:
-		print(f"Database error: {str(err)}")
-		return None
-	
-	finally:
-		if 'conn' in locals():
-			cursor.close()
-			conn.close()
-			
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute(query)
+        result = cursor.fetchall()
+        # print(result)
+        return result if result else None
+
+    except mysql.connector.Error as err:
+        print(f"Database error: {str(err)}")
+        return None
+
+    finally:
+        if "conn" in locals():
+            cursor.close()
+            conn.close()
+
+
 #
 # Query Builder
 #
-def build_311_query(data_request: str, request_options: str = '', request_date: str = '', request_zipcode: str = '') -> str:
-	"""Build SQL query for 311 data based on request parameters."""
-	if data_request == '311_on_date_geo':
-		return f"""
+def build_311_query(
+    data_request: str,
+    request_options: str = "",
+    request_date: str = "",
+    request_zipcode: str = "",
+) -> str:
+    """Build SQL query for 311 data based on request parameters."""
+    if data_request == "311_on_date_geo":
+        return f"""
 		SELECT latitude, longitude
 		FROM bos311_data
 		WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
 			AND type IN ({SQLConstants.CATEGORY_TYPES['all']})
 			AND {SQLConstants.BOS311_BASE_WHERE};
 		"""
-	elif data_request == '311_on_date_count':
-		query = f"""
+    elif data_request == "311_on_date_count":
+        query = f"""
 		SELECT
 			CASE
 				WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
@@ -487,23 +540,23 @@ def build_311_query(data_request: str, request_options: str = '', request_date: 
 		WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
 		  AND {SQLConstants.BOS311_BASE_WHERE}
 		"""
-		if request_zipcode:
-			query += f"AND location_zipcode = {request_zipcode}\n"
+        if request_zipcode:
+            query += f"AND location_zipcode = {request_zipcode}\n"
 
-		query += """
+        query += """
 		GROUP BY request_category, monthyear
 		HAVING request_category IS NOT NULL;
-		"""		
-		return query
-	elif data_request == '311_year_month':
-		return f"""
+		"""
+        return query
+    elif data_request == "311_year_month":
+        return f"""
 		SELECT DISTINCT DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
 		FROM bos311_data
 		WHERE {SQLConstants.BOS311_BASE_WHERE}
 		ORDER BY monthyear;
 		"""
-	elif data_request == '311_by_type':
-		return f"""
+    elif data_request == "311_by_type":
+        return f"""
 		SELECT
 			police_district,
 			type,
@@ -519,8 +572,8 @@ def build_311_query(data_request: str, request_options: str = '', request_date: 
 		ORDER BY
 			police_district, type, year;
 		"""
-	elif data_request == '311_by_total':
-		return f"""
+    elif data_request == "311_by_total":
+        return f"""
 		SELECT
 			YEAR(open_dt) AS year,
 			'parking' AS incident_type,
@@ -535,8 +588,8 @@ def build_311_query(data_request: str, request_options: str = '', request_date: 
 		ORDER BY
 			year
 		"""
-	elif data_request == '311_by_geo':
-		return f"""
+    elif data_request == "311_by_geo":
+        return f"""
 		SELECT
 			type,
 			open_dt,
@@ -551,13 +604,13 @@ def build_311_query(data_request: str, request_options: str = '', request_date: 
 			AND {SQLConstants.BOS311_BASE_WHERE}
 		"""
 
-	return ""
+    return ""
 
 
 def build_911_query(data_request: str) -> str:
-	"""Build SQL query for 911 data based on request parameters."""
-	if data_request == '911_homicides':
-		return f"""
+    """Build SQL query for 911 data based on request parameters."""
+    if data_request == "911_homicides":
+        return f"""
 		SELECT
 			year,
 			{SQLConstants.BOS911_TIME_BREAKDOWN}
@@ -565,8 +618,8 @@ def build_911_query(data_request: str) -> str:
 		WHERE {SQLConstants.BOS911_BASE_WHERE}
 		GROUP BY year;
 		"""
-	elif data_request == '911_shots_fired':
-		return f"""
+    elif data_request == "911_shots_fired":
+        return f"""
 		SELECT
 			year,
 			district,
@@ -580,8 +633,8 @@ def build_911_query(data_request: str) -> str:
 		WHERE {SQLConstants.BOS911_BASE_WHERE}
 		GROUP BY year, district, neighborhood, ballistics_evidence, hour_of_day, day_of_week, latitude, longitude;
 		"""
-	elif data_request == '911_shots_fired_count_confirmed':
-		return f"""
+    elif data_request == "911_shots_fired_count_confirmed":
+        return f"""
 		SELECT
 			year,
 			{SQLConstants.BOS911_TIME_BREAKDOWN}
@@ -590,8 +643,8 @@ def build_911_query(data_request: str) -> str:
 		AND ballistics_evidence = 1
 		GROUP BY year
 		"""
-	elif data_request == '911_shots_fired_count_unconfirmed':
-		return f"""
+    elif data_request == "911_shots_fired_count_unconfirmed":
+        return f"""
 		SELECT
 			year,
 			{SQLConstants.BOS911_TIME_BREAKDOWN}
@@ -600,8 +653,8 @@ def build_911_query(data_request: str) -> str:
 		AND ballistics_evidence = 0
 		GROUP BY year
 		"""
-	elif data_request == '911_homicides_and_shots_fired':
-		return f"""
+    elif data_request == "911_homicides_and_shots_fired":
+        return f"""
 		SELECT
 			h.year as year,
 			h.quarter as quarter,
@@ -626,61 +679,83 @@ def build_911_query(data_request: str) -> str:
 			AND s.year >= 2018
 			AND s.year < 2025
 		"""
-	return ""
+    return ""
+
 
 #
 # Middleware to check session and create if needed
 #
 @app.before_request
 def check_session():
-	if 'session_id' not in session:
-		session.permanent = True  # Make the session persistent
-		session['session_id'] = str(uuid.uuid4())
-		log_event(session_id=session['session_id'], app_version='0', app_response="New session created")
+    if "session_id" not in session:
+        session.permanent = True  # Make the session persistent
+        session["session_id"] = str(uuid.uuid4())
+        log_event(
+            session_id=session["session_id"],
+            app_version="0",
+            app_response="New session created",
+        )
 
-	# Log the request
-	g.log_entry = log_event(session_id=session['session_id'], app_version='0', client_query=f"Request: [{request.method}] {request.url}")
+    # Log the request
+    g.log_entry = log_event(
+        session_id=session["session_id"],
+        app_version="0",
+        client_query=f"Request: [{request.method}] {request.url}",
+    )
+
 
 #
-#Endpoint Definitions
+# Endpoint Definitions
 #
-@app.route('/data/query', methods=['GET'])
+@app.route("/data/query", methods=["GET"])
 def route_data_query():
-	session_id = session.get('session_id')
-	app_version = request.cookies.get('app_version', '0')	
-	try:
-		# Get and validate request parameters
-		data_request = request.args.get('request', '')
-		if not data_request:			
-			return jsonify({'error': 'Missing data_request parameter'}), 400
-	
-		request_options = request.args.get('category', '')	
-		if data_request.startswith('311_by') and not request_options:
-			return jsonify({'error': 'Missing required options parameter for 311 request'}), 400
-	
-		request_date = request.args.get('date', '')
-		if data_request.startswith('311_on_date') and not request_date:
-			return jsonify({'error': 'Missing required options parameter for 311 request'}), 400
-	
-		# Validate date format for date-specific queries
-		if data_request.startswith('311_on_date') and not check_date_format(request_date):
-			return jsonify({'error': 'Incorrect date format. Expects "YYYY-MM"'}), 400
-	
-		request_zipcode = request.args.get('zipcode', '')
-	
-		# Build query using the appropriate query builder
-		
-		if data_request.startswith('311'):
-			query = build_311_query(
-				data_request=data_request,
-				request_options=request_options,
-				request_date=request_date,
-				request_zipcode=request_zipcode
-			)			
-		elif data_request.startswith('911'):
-			query = build_911_query(data_request=data_request)
-		elif data_request == 'zip_geo':
-			query = f"""
+    session_id = session.get("session_id")
+    app_version = request.cookies.get("app_version", "0")
+    try:
+        # Get and validate request parameters
+        data_request = request.args.get("request", "")
+        if not data_request:
+            return jsonify({"error": "Missing data_request parameter"}), 400
+
+        request_options = request.args.get("category", "")
+        if data_request.startswith("311_by") and not request_options:
+            return (
+                jsonify(
+                    {"error": "Missing required options parameter for 311 request"}
+                ),
+                400,
+            )
+
+        request_date = request.args.get("date", "")
+        if data_request.startswith("311_on_date") and not request_date:
+            return (
+                jsonify(
+                    {"error": "Missing required options parameter for 311 request"}
+                ),
+                400,
+            )
+
+        # Validate date format for date-specific queries
+        if data_request.startswith("311_on_date") and not check_date_format(
+            request_date
+        ):
+            return jsonify({"error": 'Incorrect date format. Expects "YYYY-MM"'}), 400
+
+        request_zipcode = request.args.get("zipcode", "")
+
+        # Build query using the appropriate query builder
+
+        if data_request.startswith("311"):
+            query = build_311_query(
+                data_request=data_request,
+                request_options=request_options,
+                request_date=request_date,
+                request_zipcode=request_zipcode,
+            )
+        elif data_request.startswith("911"):
+            query = build_911_query(data_request=data_request)
+        elif data_request == "zip_geo":
+            query = f"""
 			SELECT JSON_OBJECT(
 				'type', 'FeatureCollection',
 				'features', JSON_ARRAYAGG(
@@ -693,150 +768,216 @@ def route_data_query():
 			)
 			FROM zipcode_geo
 			WHERE zipcode IN ({request_zipcode})
-			"""									
-		else:
-			return jsonify({'error': 'Invalid data_request parameter'}), 400
-	
-		if not query:
-			return jsonify({'error': 'Failed to build query'}), 500
-	
-		# Execute the query and return results
-		result = run_query(query=query)
-	
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response="SUCCESS")
-		return jsonify(result)
-	
-	except Exception as e:
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"ERROR: {str(e)}")
-		return jsonify({'error': str(e)}), 500
+			"""
+        else:
+            return jsonify({"error": "Invalid data_request parameter"}), 400
 
-@app.route('/chat', methods=['POST'])
+        if not query:
+            return jsonify({"error": "Failed to build query"}), 500
+
+        # Execute the query and return results
+        result = run_query(query=query)
+
+        log_event(
+            session_id=session_id,
+            app_version=app_version,
+            log_id=g.log_entry,
+            app_response="SUCCESS",
+        )
+        return jsonify(result)
+
+    except Exception as e:
+        log_event(
+            session_id=session_id,
+            app_version=app_version,
+            log_id=g.log_entry,
+            app_response=f"ERROR: {str(e)}",
+        )
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/chat", methods=["POST"])
 def route_chat():
-	session_id = session.get('session_id')
-	app_version = request.cookies.get('app_version','0')
-	
-	context_request = request.args.get('context_request', '')
-		
-	data = request.get_json()	
-	
-	# Extract chat data parameters
-	app_version = data.get('app_version', '')
-	data_selected = data.get('data_selected', '')
-	data_attributes = data.get('data_attributes', '')
-	client_query = data.get('client_query', '')
-	prompt_preamble = data.get('prompt_preamble','')
-	
-	# data_selected, optional, list of files used when context_request==s
-	cache_name=create_gemini_context(context_request, data_selected, prompt_preamble)	
-	
-	full_prompt = f"User question: {client_query}"
+    session_id = session.get("session_id")
+    app_version = request.cookies.get("app_version", "0")
 
-	# Process chat 
-	try:
-		loop = asyncio.new_event_loop()
-		asyncio.set_event_loop(loop)
-		app_response = loop.run_until_complete(get_gemini_response(full_prompt, cache_name))				
-		if "❌ Error" in app_response:
-			print(f"❌ ERROR from Gemini API: {app_response}")
-			return jsonify({"error": app_response}), 500	
-	
-		log_status=False
-		# Log the interaction
-		log_id = log_event(session_id=session_id, app_version=app_version, data_selected=context_request + ' ' + data_selected,data_attributes=data_attributes,prompt_preamble=prompt_preamble,client_query=full_prompt,app_response=app_response)				
-		response = {
-			'session_id': session_id,		
-			'response': app_response,
-			'log_id': log_id		
-		}
-		
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"SUCCESS")	
-		return jsonify(response)
-	
-	except Exception as e:
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"ERROR: {str(e)}")
-		print(f"❌ Exception in /chat: {e}")
-		return jsonify({"error": f"Internal server error: {e}"}), 500
+    context_request = request.args.get("context_request", "")
 
-@app.route('/chat/context', methods=['GET','POST'])
+    data = request.get_json()
+
+    # Extract chat data parameters
+    app_version = data.get("app_version", "")
+    data_selected = data.get("data_selected", "")
+    data_attributes = data.get("data_attributes", "")
+    client_query = data.get("client_query", "")
+    prompt_preamble = data.get("prompt_preamble", "")
+
+    # data_selected, optional, list of files used when context_request==s
+    cache_name = create_gemini_context(context_request, data_selected, prompt_preamble)
+
+    full_prompt = f"User question: {client_query}"
+
+    # Process chat
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        app_response = loop.run_until_complete(
+            get_gemini_response(full_prompt, cache_name)
+        )
+        if "❌ Error" in app_response:
+            print(f"❌ ERROR from Gemini API: {app_response}")
+            return jsonify({"error": app_response}), 500
+
+        log_status = False
+        # Log the interaction
+        log_id = log_event(
+            session_id=session_id,
+            app_version=app_version,
+            data_selected=context_request + " " + data_selected,
+            data_attributes=data_attributes,
+            prompt_preamble=prompt_preamble,
+            client_query=full_prompt,
+            app_response=app_response,
+        )
+        response = {
+            "session_id": session_id,
+            "response": app_response,
+            "log_id": log_id,
+        }
+
+        log_event(
+            session_id=session_id,
+            app_version=app_version,
+            log_id=g.log_entry,
+            app_response=f"SUCCESS",
+        )
+        return jsonify(response)
+
+    except Exception as e:
+        log_event(
+            session_id=session_id,
+            app_version=app_version,
+            log_id=g.log_entry,
+            app_response=f"ERROR: {str(e)}",
+        )
+        print(f"❌ Exception in /chat: {e}")
+        return jsonify({"error": f"Internal server error: {e}"}), 500
+
+
+@app.route("/chat/context", methods=["GET", "POST"])
 def route_chat_context():
-	session_id = session.get('session_id')
-	app_version = request.cookies.get('app_version','0')
-	
-	context_request = request.args.get('context_request', '')
+    session_id = session.get("session_id")
+    app_version = request.cookies.get("app_version", "0")
 
-	if request.method == 'GET':		
-		#w/ specific context, return list of context caches		
-		if not context_request:
-			response = {cache.name: str(cache) for cache in genai_client.caches.list()}
-			return jsonify(response)
-		
-		else:
-			#test token count for context cache of <request>	
-			token_count=create_gemini_context(context_request=context_request, files='', preamble='', generate_cache=False)
-						
-			if isinstance(token_count, int):
-				return jsonify({"token_count": token_count})
-			elif hasattr(token_count, 'total_tokens') and isinstance(token_count.total_tokens, int):
-				return jsonify({"token_count": token_count.total_tokens})
-			else:
-				# Handle the error appropriately, e.g., log the error and return an error response
-				print(f"Error getting token count: {token_count}")  # Log the error
-				return jsonify({"error": "Failed to get token count"}), 500 # Return an error response						
-	if request.method == 'POST':
-		#TODO: implement 'specific' context_request with list of files from datastore
-		#FOR NOW: assumes 'structured', 'unstructured', and 'all' for context_request				
-		if not context_request:
-			return jsonify({
-				'error': 'Missing context_request parameter'
-			}), 400
-		
-		context_option = request.args.get('option','')		
-		if context_option == 'clear':			
-						
-			for cache in genai_client.caches.list():
-				if cache.display_name == context_request or context_request == 'all':					
-					genai_client.caches.delete(name=cache.name)
-			
-			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"SUCCESS")	
-			return jsonify({'Success': 'Context cache cleared.'})
-		else:	
-			data = request.get_json()
-			# Extract chat data parameters
-			data_selected = data.get('data_selected', '')		
-			prompt_preamble = data.get('prompt_preamble','')
-			
-			response = create_gemini_context(context_request, data_selected, prompt_preamble)
-			
-			log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"SUCCESS")	
-			return jsonify(response)
-	
+    context_request = request.args.get("context_request", "")
+
+    if request.method == "GET":
+        # w/ specific context, return list of context caches
+        if not context_request:
+            response = {cache.name: str(cache) for cache in genai_client.caches.list()}
+            return jsonify(response)
+
+        else:
+            # test token count for context cache of <request>
+            token_count = create_gemini_context(
+                context_request=context_request,
+                files="",
+                preamble="",
+                generate_cache=False,
+            )
+
+            if isinstance(token_count, int):
+                return jsonify({"token_count": token_count})
+            elif hasattr(token_count, "total_tokens") and isinstance(
+                token_count.total_tokens, int
+            ):
+                return jsonify({"token_count": token_count.total_tokens})
+            else:
+                # Handle the error appropriately, e.g., log the error and return an error response
+                print(f"Error getting token count: {token_count}")  # Log the error
+                return (
+                    jsonify({"error": "Failed to get token count"}),
+                    500,
+                )  # Return an error response
+    if request.method == "POST":
+        # TODO: implement 'specific' context_request with list of files from datastore
+        # FOR NOW: assumes 'structured', 'unstructured', and 'all' for context_request
+        if not context_request:
+            return jsonify({"error": "Missing context_request parameter"}), 400
+
+        context_option = request.args.get("option", "")
+        if context_option == "clear":
+
+            for cache in genai_client.caches.list():
+                if cache.display_name == context_request or context_request == "all":
+                    genai_client.caches.delete(name=cache.name)
+
+            log_event(
+                session_id=session_id,
+                app_version=app_version,
+                log_id=g.log_entry,
+                app_response=f"SUCCESS",
+            )
+            return jsonify({"Success": "Context cache cleared."})
+        else:
+            data = request.get_json()
+            # Extract chat data parameters
+            data_selected = data.get("data_selected", "")
+            prompt_preamble = data.get("prompt_preamble", "")
+
+            response = create_gemini_context(
+                context_request, data_selected, prompt_preamble
+            )
+
+            log_event(
+                session_id=session_id,
+                app_version=app_version,
+                log_id=g.log_entry,
+                app_response=f"SUCCESS",
+            )
+            return jsonify(response)
+
+
 # query string log_action [insert, client_response_rating]
-@app.route('/log', methods=['POST'])
+@app.route("/log", methods=["POST"])
 def route_log():
-	session_id = session.get('session_id')
-	app_version = request.cookies.get('app_version','0')
-	
-	log_switch = request.args.get('log_action', '')
-	data = request.get_json()
+    session_id = session.get("session_id")
+    app_version = request.cookies.get("app_version", "0")
 
-	log_id = log_event(
-		session_id=session_id,			
-		app_version=app_version,
-		data_selected=data.get('data_selected', ''),
-		data_attributes=data.get('data_attributes', ''),
-		prompt_preamble=data.get('prompt_preambe',''),
-		client_query=data.get('client_query', ''),
-		app_response=data.get('app_response', ''),
-		client_response_rating=data.get('client_response_rating', ''),
-		log_id=data.get('log_id', '')
-	)
-	if log_id != 0:
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"SUCCESS")		
-		return jsonify({'message': 'Log entry created successfully', 'log_id': log_id}), 201
-	else:
-		log_event(session_id=session_id, app_version=app_version, log_id=g.log_entry, app_response=f"ERROR: Log entry not created")
-		return jsonify({'error': 'Failed to create log entry'}), 500
-			
-	
-if __name__ == '__main__':	
-	app.run(host=Config.HOST, port=Config.PORT, debug=True)
+    log_switch = request.args.get("log_action", "")
+    data = request.get_json()
+
+    log_id = log_event(
+        session_id=session_id,
+        app_version=app_version,
+        data_selected=data.get("data_selected", ""),
+        data_attributes=data.get("data_attributes", ""),
+        prompt_preamble=data.get("prompt_preambe", ""),
+        client_query=data.get("client_query", ""),
+        app_response=data.get("app_response", ""),
+        client_response_rating=data.get("client_response_rating", ""),
+        log_id=data.get("log_id", ""),
+    )
+    if log_id != 0:
+        log_event(
+            session_id=session_id,
+            app_version=app_version,
+            log_id=g.log_entry,
+            app_response=f"SUCCESS",
+        )
+        return (
+            jsonify({"message": "Log entry created successfully", "log_id": log_id}),
+            201,
+        )
+    else:
+        log_event(
+            session_id=session_id,
+            app_version=app_version,
+            log_id=g.log_entry,
+            app_response=f"ERROR: Log entry not created",
+        )
+        return jsonify({"error": "Failed to create log entry"}), 500
+
+
+if __name__ == "__main__":
+    app.run(host=Config.HOST, port=Config.PORT, debug=True)
