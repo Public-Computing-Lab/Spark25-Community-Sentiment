@@ -453,6 +453,7 @@ def log_event(
         else:
             # Create a dictionary of non-empty fields to update
             update_fields = {
+                "app_version": app_version,
                 "data_selected": data_selected,
                 "data_attributes": data_attributes,
                 "prompt_preamble": prompt_preamble,
@@ -694,14 +695,16 @@ def check_session():
         session["session_id"] = str(uuid.uuid4())
         log_event(
             session_id=session["session_id"],
-            app_version="0",
+            app_version="0.2",
+            data_attributes="API v 0.2",
             app_response="New session created",
         )
 
     # Log the request
     g.log_entry = log_event(
         session_id=session["session_id"],
-        app_version="0",
+        app_version="0.2",
+        data_attributes="API v 0.2",
         client_query=f"Request: [{request.method}] {request.url}",
     )
 
@@ -712,7 +715,7 @@ def check_session():
 @app.route("/data/query", methods=["GET"])
 def route_data_query():
     session_id = session.get("session_id")
-    app_version = request.cookies.get("app_version", "0")
+    app_version = request.args.get("app_version", "0")
     try:
         # Get and validate request parameters
         data_request = request.args.get("request", "")
@@ -801,7 +804,7 @@ def route_data_query():
 @app.route("/chat", methods=["POST"])
 def route_chat():
     session_id = session.get("session_id")
-    app_version = request.cookies.get("app_version", "0")
+    app_version = request.args.get("app_version", "0")
 
     context_request = request.args.get("context_request", "")
 
@@ -868,7 +871,7 @@ def route_chat():
 @app.route("/chat/context", methods=["GET", "POST"])
 def route_chat_context():
     session_id = session.get("session_id")
-    app_version = request.cookies.get("app_version", "0")
+    app_version = request.args.get("app_version", "0")
 
     context_request = request.args.get("context_request", "")
 
@@ -943,7 +946,7 @@ def route_chat_context():
 @app.route("/log", methods=["POST", "PUT"])
 def route_log():
     session_id = session.get("session_id")
-    app_version = request.cookies.get("app_version", "0")
+    app_version = request.args.get("app_version", "0")
 
     # log_switch = request.args.get("log_action", "")
     data = request.get_json()
