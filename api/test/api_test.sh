@@ -220,7 +220,7 @@ test_log_update() {
 		"client_response_rating": "UPDATED"
 	}'
 	
-	response=$(curl -s -X POST \
+	response=$(curl -s -X PUT \
 		-b cookies.txt \
 		-c cookies.txt \
 		--cookie "app_version=0" \
@@ -241,31 +241,31 @@ test_log_update() {
 test_data_query() {
 	
 	ENDPOINTS_OPTIONS=(
-		"311_on_date_geo&date=2019-02"
-		"311_on_date_count&date=2020-04"
-		"311_on_date_count&date=2021-06&zipcode=02121"
-		"311_year_month"
-		"311_by_type&category=living_conditions"
-		"311_by_type&category=trash"
-		"311_by_type&category=streets"
-		"311_by_type&category=parking"
-		"311_by_type&category=all"
-		"311_by_total&category=living_conditions"
-		"311_by_total&category=trash"
-		"311_by_total&category=streets"
-		"311_by_total&category=parking"
-		"311_by_total&category=all"
-		"311_by_geo&category=living_conditions"
-		"311_by_geo&category=trash"
-		"311_by_geo&category=streets"
-		"311_by_geo&category=parking"
-		"311_by_geo&category=all"
-		"911_homicides"
-		"911_shots_fired"
-		"911_shots_fired_count_confirmed"
-		"911_shots_fired_count_unconfirmed"
-		"911_homicides_and_shots_fired"
-		"zip_geo&zipcode=02121,02115"
+		"311_on_date_geo&app_version=5.5&date=2019-02"
+		"311_on_date_count&app_version=5.5&date=2020-04"
+		"311_on_date_count&app_version=5.5&date=2021-06&zipcode=02121"
+		"311_year_month&app_version=5.5"
+		"311_by_type&app_version=5.5&category=living_conditions"
+		"311_by_type&app_version=5.5&category=trash"
+		"311_by_type&app_version=5.5&category=streets"
+		"311_by_type&app_version=5.5&category=parking"
+		"311_by_type&app_version=5.5&category=all"
+		"311_by_total&app_version=5.5&category=living_conditions"
+		"311_by_total&app_version=5.5&category=trash"
+		"311_by_total&app_version=5.5&category=streets"
+		"311_by_total&app_version=5.5&category=parking"
+		"311_by_total&app_version=5.5&category=all"
+		"311_by_geo&app_version=5.5&category=living_conditions"
+		"311_by_geo&app_version=5.5&category=trash"
+		"311_by_geo&app_version=5.5&category=streets"
+		"311_by_geo&app_version=5.5&category=parking"
+		"311_by_geo&app_version=5.5&category=all"
+		"911_homicides&app_version=5.5"
+		"911_shots_fired&app_version=5.5"
+		"911_shots_fired_count_confirmed&app_version=5.5"
+		"911_shots_fired_count_unconfirmed&app_version=5.5"
+		"911_homicides_and_shots_fired&app_version=5.5"
+		"zip_geo&app_version=5.5&zipcode=02121,02115"
 	)
 	start_time_big=$(perl -MTime::HiRes=time -e 'printf "%.9f", time')
 	for endpoint in "${ENDPOINTS_OPTIONS[@]}"; do
