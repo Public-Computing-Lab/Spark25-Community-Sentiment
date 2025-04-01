@@ -6,7 +6,7 @@ This project is a **Flask-based REST-ish API** supporting the RethinkAI experime
 
 #### **GET crime and 311 data as geoJson objects***
 ```
-GET /data/query?request=<request_type>&date=%Y-%m&zipcode=<zipcode>
+GET /data/query?app_version=<0.0>&request=<request_type>&date=%Y-%m&zipcode=<zipcode>
 ```
 ```<request_type>``` is one of: 
 ##### Crime Data
