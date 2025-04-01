@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, g, session
+import csv
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -9,7 +10,6 @@ from mysql.connector.pooling import MySQLConnectionPool
 import datetime
 import os
 import re
-import csv
 import io
 import uuid
 import asyncio
@@ -31,9 +31,7 @@ class Config:
     ALLOWED_EXTENSIONS = {"csv", "txt"}
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit
     FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "rethinkAI2025!")
-    FLASK_SESSION_COOKIE_SECURE = (
-        os.getenv("FLASK_SESSION_COOKIE_SECURE", "False").lower() == "true"
-    )
+    FLASK_SESSION_COOKIE_SECURE = os.getenv("FLASK_SESSION_COOKIE_SECURE", "False").lower() == "true"
 
     # Database configuration
     DB_CONFIG = {
@@ -57,54 +55,50 @@ class SQLConstants:
     }
 
     # Set the 'all' category to include all individual categories
-    CATEGORY_TYPES["all"] = ", ".join(
-        [cat for cat in ", ".join(CATEGORY_TYPES.values()).split(", ")]
-    )
+    CATEGORY_TYPES["all"] = ", ".join([cat for cat in ", ".join(CATEGORY_TYPES.values()).split(", ")])
     # Common aggregation columns for monthly/quarterly breakdowns
     BOS911_TIME_BREAKDOWN = """
-		COUNT(*) AS total_by_year,
-		SUM(CASE WHEN quarter = 1 THEN 1 ELSE 0 END) AS q1_total,
-		SUM(CASE WHEN quarter = 2 THEN 1 ELSE 0 END) AS q2_total,
-		SUM(CASE WHEN quarter = 3 THEN 1 ELSE 0 END) AS q3_total,
-		SUM(CASE WHEN quarter = 4 THEN 1 ELSE 0 END) AS q4_total,
-		SUM(CASE WHEN month = 1 THEN 1 ELSE 0 END) AS jan_total,
-		SUM(CASE WHEN month = 2 THEN 1 ELSE 0 END) AS feb_total,
-		SUM(CASE WHEN month = 3 THEN 1 ELSE 0 END) AS mar_total,
-		SUM(CASE WHEN month = 4 THEN 1 ELSE 0 END) AS apr_total,
-		SUM(CASE WHEN month = 5 THEN 1 ELSE 0 END) AS may_total,
-		SUM(CASE WHEN month = 6 THEN 1 ELSE 0 END) AS jun_total,
-		SUM(CASE WHEN month = 7 THEN 1 ELSE 0 END) AS jul_total,
-		SUM(CASE WHEN month = 8 THEN 1 ELSE 0 END) AS aug_total,
-		SUM(CASE WHEN month = 9 THEN 1 ELSE 0 END) AS sep_total,
-		SUM(CASE WHEN month = 10 THEN 1 ELSE 0 END) AS oct_total,
-		SUM(CASE WHEN month = 11 THEN 1 ELSE 0 END) AS nov_total,
-		SUM(CASE WHEN month = 12 THEN 1 ELSE 0 END) AS dec_total
-	"""
+    COUNT(*) AS total_by_year,
+    SUM(CASE WHEN quarter = 1 THEN 1 ELSE 0 END) AS q1_total,
+    SUM(CASE WHEN quarter = 2 THEN 1 ELSE 0 END) AS q2_total,
+    SUM(CASE WHEN quarter = 3 THEN 1 ELSE 0 END) AS q3_total,
+    SUM(CASE WHEN quarter = 4 THEN 1 ELSE 0 END) AS q4_total,
+    SUM(CASE WHEN month = 1 THEN 1 ELSE 0 END) AS jan_total,
+    SUM(CASE WHEN month = 2 THEN 1 ELSE 0 END) AS feb_total,
+    SUM(CASE WHEN month = 3 THEN 1 ELSE 0 END) AS mar_total,
+    SUM(CASE WHEN month = 4 THEN 1 ELSE 0 END) AS apr_total,
+    SUM(CASE WHEN month = 5 THEN 1 ELSE 0 END) AS may_total,
+    SUM(CASE WHEN month = 6 THEN 1 ELSE 0 END) AS jun_total,
+    SUM(CASE WHEN month = 7 THEN 1 ELSE 0 END) AS jul_total,
+    SUM(CASE WHEN month = 8 THEN 1 ELSE 0 END) AS aug_total,
+    SUM(CASE WHEN month = 9 THEN 1 ELSE 0 END) AS sep_total,
+    SUM(CASE WHEN month = 10 THEN 1 ELSE 0 END) AS oct_total,
+    SUM(CASE WHEN month = 11 THEN 1 ELSE 0 END) AS nov_total,
+    SUM(CASE WHEN month = 12 THEN 1 ELSE 0 END) AS dec_total
+    """
 
     BOS311_TIME_BREAKDOWN = """
-	COUNT(*) AS total_year,
-	SUM(CASE WHEN QUARTER(open_dt) = 1 THEN 1 ELSE 0 END) AS q1_total,
-	SUM(CASE WHEN QUARTER(open_dt) = 2 THEN 1 ELSE 0 END) AS q2_total,
-	SUM(CASE WHEN QUARTER(open_dt) = 3 THEN 1 ELSE 0 END) AS q3_total,
-	SUM(CASE WHEN QUARTER(open_dt) = 4 THEN 1 ELSE 0 END) AS q4_total,
-	SUM(CASE WHEN MONTH(open_dt) = 1 THEN 1 ELSE 0 END) AS jan_total,
-	SUM(CASE WHEN MONTH(open_dt) = 2 THEN 1 ELSE 0 END) AS feb_total,
-	SUM(CASE WHEN MONTH(open_dt) = 3 THEN 1 ELSE 0 END) AS mar_total,
-	SUM(CASE WHEN MONTH(open_dt) = 4 THEN 1 ELSE 0 END) AS apr_total,
-	SUM(CASE WHEN MONTH(open_dt) = 5 THEN 1 ELSE 0 END) AS may_total,
-	SUM(CASE WHEN MONTH(open_dt) = 6 THEN 1 ELSE 0 END) AS jun_total,
-	SUM(CASE WHEN MONTH(open_dt) = 7 THEN 1 ELSE 0 END) AS jul_total,
-	SUM(CASE WHEN MONTH(open_dt) = 8 THEN 1 ELSE 0 END) AS aug_total,
-	SUM(CASE WHEN MONTH(open_dt) = 9 THEN 1 ELSE 0 END) AS sep_total,
-	SUM(CASE WHEN MONTH(open_dt) = 10 THEN 1 ELSE 0 END) AS oct_total,
-	SUM(CASE WHEN MONTH(open_dt) = 11 THEN 1 ELSE 0 END) AS nov_total,
-	SUM(CASE WHEN MONTH(open_dt) = 12 THEN 1 ELSE 0 END) AS dec_total
-	"""
+    COUNT(*) AS total_year,
+    SUM(CASE WHEN QUARTER(open_dt) = 1 THEN 1 ELSE 0 END) AS q1_total,
+    SUM(CASE WHEN QUARTER(open_dt) = 2 THEN 1 ELSE 0 END) AS q2_total,
+    SUM(CASE WHEN QUARTER(open_dt) = 3 THEN 1 ELSE 0 END) AS q3_total,
+    SUM(CASE WHEN QUARTER(open_dt) = 4 THEN 1 ELSE 0 END) AS q4_total,
+    SUM(CASE WHEN MONTH(open_dt) = 1 THEN 1 ELSE 0 END) AS jan_total,
+    SUM(CASE WHEN MONTH(open_dt) = 2 THEN 1 ELSE 0 END) AS feb_total,
+    SUM(CASE WHEN MONTH(open_dt) = 3 THEN 1 ELSE 0 END) AS mar_total,
+    SUM(CASE WHEN MONTH(open_dt) = 4 THEN 1 ELSE 0 END) AS apr_total,
+    SUM(CASE WHEN MONTH(open_dt) = 5 THEN 1 ELSE 0 END) AS may_total,
+    SUM(CASE WHEN MONTH(open_dt) = 6 THEN 1 ELSE 0 END) AS jun_total,
+    SUM(CASE WHEN MONTH(open_dt) = 7 THEN 1 ELSE 0 END) AS jul_total,
+    SUM(CASE WHEN MONTH(open_dt) = 8 THEN 1 ELSE 0 END) AS aug_total,
+    SUM(CASE WHEN MONTH(open_dt) = 9 THEN 1 ELSE 0 END) AS sep_total,
+    SUM(CASE WHEN MONTH(open_dt) = 10 THEN 1 ELSE 0 END) AS oct_total,
+    SUM(CASE WHEN MONTH(open_dt) = 11 THEN 1 ELSE 0 END) AS nov_total,
+    SUM(CASE WHEN MONTH(open_dt) = 12 THEN 1 ELSE 0 END) AS dec_total
+    """
 
     # 311 specific constants
-    BOS311_BASE_WHERE = (
-        "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
-    )
+    BOS311_BASE_WHERE = "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
 
     # 911 specific constants
     BOS911_BASE_WHERE = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
@@ -141,43 +135,22 @@ def check_date_format(date_string: str) -> bool:
 
 
 def check_filetype(filename: str) -> bool:
-    return (
-        "." in filename
-        and filename.rsplit(".", 1)[1].lower() in Config.ALLOWED_EXTENSIONS
-    )
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in Config.ALLOWED_EXTENSIONS
 
 
-def get_files(
-    file_type: Optional[str] = None, specific_files: Optional[List[str]] = None
-) -> List[str]:
+def get_files(file_type: Optional[str] = None, specific_files: Optional[List[str]] = None) -> List[str]:
     """Get a list of files from the datastore directory."""
     try:
         if not Config.DATASTORE_PATH.exists():
             return []
 
         if specific_files:
-            return [
-                f.name
-                for f in Config.DATASTORE_PATH.iterdir()
-                if f.is_file()
-                and f.name in specific_files
-                and not f.name.startswith(".")
-            ]
+            return [f.name for f in Config.DATASTORE_PATH.iterdir() if f.is_file() and f.name in specific_files and not f.name.startswith(".")]
 
         if file_type:
-            return [
-                f.name
-                for f in Config.DATASTORE_PATH.iterdir()
-                if f.is_file()
-                and f.suffix.lower() == f".{file_type}"
-                and not f.name.startswith(".")
-            ]
+            return [f.name for f in Config.DATASTORE_PATH.iterdir() if f.is_file() and f.suffix.lower() == f".{file_type}" and not f.name.startswith(".")]
 
-        return [
-            f.name
-            for f in Config.DATASTORE_PATH.iterdir()
-            if f.is_file() and not f.name.startswith(".")
-        ]
+        return [f.name for f in Config.DATASTORE_PATH.iterdir() if f.is_file() and not f.name.startswith(".")]
 
     except Exception as e:
         print(f"Error getting files: {e}")
@@ -256,85 +229,84 @@ def create_gemini_context(
         elif context_request == "experiment_5":
             files_list = get_files("txt")
             query = f"""
-			WITH incident_data AS (
-				SELECT
-					year,
-					'911 Shot Fired Confirmed' AS incident_type,
-					quarter,
-					month
-				FROM shots_fired_data
-				WHERE 
-					{SQLConstants.BOS911_BASE_WHERE}
-					AND ballistics_evidence = 1 
-				UNION ALL
-				SELECT
-					year,
-					'911 Shot Fired Unconfirmed' AS incident_type,
-					quarter,
-					month
-				FROM shots_fired_data
-				WHERE 
-					{SQLConstants.BOS911_BASE_WHERE}
-					AND ballistics_evidence = 0 
-				UNION ALL
-				SELECT
-					year,
-					'911 Homicides' AS incident_type,
-					quarter,
-					month
-				FROM homicide_data
-				WHERE 
-					{SQLConstants.BOS911_BASE_WHERE}
-				UNION ALL
-				SELECT
-					YEAR(open_dt) AS year,
-					'311 Trash/Dumping Issues' AS incident_type,
-					QUARTER(open_dt) AS quarter,
-					MONTH(open_dt) AS month
-				FROM bos311_data
-				WHERE 
-					type IN ({SQLConstants.CATEGORY_TYPES['trash']}) 
-					AND {SQLConstants.BOS311_BASE_WHERE}
-				UNION ALL
-				SELECT
-					YEAR(open_dt) AS year,
-					'311 Living Condition Issues' AS incident_type,
-					QUARTER(open_dt) AS quarter,
-					MONTH(open_dt) AS month
-				FROM bos311_data
-				WHERE 
-					type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) 
-					AND {SQLConstants.BOS311_BASE_WHERE}
-				UNION ALL
-				SELECT
-					YEAR(open_dt) AS year,
-					'311 Streets Issues' AS incident_type,
-					QUARTER(open_dt) AS quarter,
-					MONTH(open_dt) AS month
-				FROM bos311_data
-				WHERE 
-					type IN ({SQLConstants.CATEGORY_TYPES['streets']}) 
-					AND {SQLConstants.BOS311_BASE_WHERE}
-				UNION ALL
-				SELECT
-					YEAR(open_dt) AS year,
-					'311 Parking Issues' AS incident_type,
-					QUARTER(open_dt) AS quarter,
-					MONTH(open_dt) AS month
-				FROM bos311_data
-				WHERE 
-					type IN ({SQLConstants.CATEGORY_TYPES['parking']}) 
-					AND {SQLConstants.BOS311_BASE_WHERE}
-			)
-			SELECT
-				year,
-				incident_type,
-				{SQLConstants.BOS911_TIME_BREAKDOWN}
-			FROM incident_data
-			GROUP BY year, incident_type
-			ORDER BY year, incident_type
-
-			"""
+            WITH incident_data AS (
+            SELECT
+                year,
+                '911 Shot Fired Confirmed' AS incident_type,
+                quarter,
+                month
+            FROM shots_fired_data
+            WHERE
+            {SQLConstants.BOS911_BASE_WHERE}
+            AND ballistics_evidence = 1
+            UNION ALL
+            SELECT
+                year,
+                '911 Shot Fired Unconfirmed' AS incident_type,
+                quarter,
+                month
+            FROM shots_fired_data
+            WHERE
+            {SQLConstants.BOS911_BASE_WHERE}
+            AND ballistics_evidence = 0
+            UNION ALL
+            SELECT
+                year,
+                '911 Homicides' AS incident_type,
+                quarter,
+                month
+            FROM homicide_data
+            WHERE
+            {SQLConstants.BOS911_BASE_WHERE}
+            UNION ALL
+            SELECT
+                YEAR(open_dt) AS year,
+                '311 Trash/Dumping Issues' AS incident_type,
+                QUARTER(open_dt) AS quarter,
+                MONTH(open_dt) AS month
+            FROM bos311_data
+            WHERE
+            type IN ({SQLConstants.CATEGORY_TYPES['trash']})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+            UNION ALL
+            SELECT
+                YEAR(open_dt) AS year,
+                '311 Living Condition Issues' AS incident_type,
+                QUARTER(open_dt) AS quarter,
+                MONTH(open_dt) AS month
+            FROM bos311_data
+            WHERE
+            type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+            UNION ALL
+            SELECT
+                YEAR(open_dt) AS year,
+                '311 Streets Issues' AS incident_type,
+                QUARTER(open_dt) AS quarter,
+                MONTH(open_dt) AS month
+            FROM bos311_data
+            WHERE
+            type IN ({SQLConstants.CATEGORY_TYPES['streets']})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+            UNION ALL
+            SELECT
+                YEAR(open_dt) AS year,
+                '311 Parking Issues' AS incident_type,
+                QUARTER(open_dt) AS quarter,
+                MONTH(open_dt) AS month
+            FROM bos311_data
+            WHERE
+            type IN ({SQLConstants.CATEGORY_TYPES['parking']})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+            )
+            SELECT
+                year,
+                incident_type,
+                {SQLConstants.BOS911_TIME_BREAKDOWN}
+            FROM incident_data
+            GROUP BY year, incident_type
+            ORDER BY year, incident_type
+            """
 
             results = run_query(query=query)
             if results:
@@ -371,14 +343,7 @@ def create_gemini_context(
                 display_name = context_request
 
             # Set cache expiration time
-            cache_ttl = (
-                (
-                    datetime.datetime.now(datetime.timezone.utc)
-                    + datetime.timedelta(days=Config.GEMINI_CACHE_TTL)
-                )
-                .isoformat()
-                .replace("+00:00", "Z")
-            )
+            cache_ttl = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=Config.GEMINI_CACHE_TTL)).isoformat().replace("+00:00", "Z")
 
             # Create the cache
             cache = genai_client.caches.create(
@@ -395,9 +360,7 @@ def create_gemini_context(
         else:
             # Return token count for testing
             content["parts"].append({"text": prompt_content})
-            total_tokens = genai_client.models.count_tokens(
-                model=Config.GEMINI_MODEL, contents=content["parts"]
-            )
+            total_tokens = genai_client.models.count_tokens(model=Config.GEMINI_MODEL, contents=content["parts"])
             return total_tokens.total_tokens
 
     except Exception as e:
@@ -429,11 +392,11 @@ def log_event(
         # Insert new entry if no log_id provided
         if not log_id:
             query = """
-			INSERT INTO interaction_log (
-				session_id, app_version, data_selected, data_attributes,
-				prompt_preamble, client_query, app_response, client_response_rating
-			) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-			"""
+                INSERT INTO interaction_log (
+                    session_id, app_version, data_selected, data_attributes,
+                    prompt_preamble, client_query, app_response, client_response_rating
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """
 
             cursor.execute(
                 query,
@@ -524,90 +487,90 @@ def build_311_query(
     """Build SQL query for 311 data based on request parameters."""
     if data_request == "311_on_date_geo":
         return f"""
-		SELECT latitude, longitude
-		FROM bos311_data
-		WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
-			AND type IN ({SQLConstants.CATEGORY_TYPES['all']})
-			AND {SQLConstants.BOS311_BASE_WHERE};
-		"""
+        SELECT latitude, longitude
+        FROM bos311_data
+        WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
+        AND type IN ({SQLConstants.CATEGORY_TYPES['all']})
+        AND {SQLConstants.BOS311_BASE_WHERE};
+        """
     elif data_request == "311_on_date_count":
         query = f"""
-		SELECT
-			CASE
-				WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
-				WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
-				WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
-				WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
-			END AS request_category,
-			COUNT(*) AS request_count,
-			DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
-		FROM bos311_data
-		WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
-		  AND {SQLConstants.BOS311_BASE_WHERE}
-		"""
+        SELECT
+        CASE
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+        END AS request_category,
+        COUNT(*) AS request_count,
+        DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
+        FROM bos311_data
+        WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
+        AND {SQLConstants.BOS311_BASE_WHERE}
+        """
         if request_zipcode:
             query += f"AND location_zipcode = {request_zipcode}\n"
 
         query += """
-		GROUP BY request_category, monthyear
-		HAVING request_category IS NOT NULL;
-		"""
+        GROUP BY request_category, monthyear
+        HAVING request_category IS NOT NULL;
+        """
         return query
     elif data_request == "311_year_month":
         return f"""
-		SELECT DISTINCT DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
-		FROM bos311_data
-		WHERE {SQLConstants.BOS311_BASE_WHERE}
-		ORDER BY monthyear;
-		"""
+        SELECT DISTINCT DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
+        FROM bos311_data
+        WHERE {SQLConstants.BOS311_BASE_WHERE}
+        ORDER BY monthyear;
+        """
     elif data_request == "311_by_type":
         return f"""
-		SELECT
-			police_district,
-			type,
-			YEAR(open_dt) AS year,
-			{SQLConstants.BOS311_TIME_BREAKDOWN}
-		FROM
-			bos311_data
-		WHERE
-			type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-			AND {SQLConstants.BOS311_BASE_WHERE}
-		GROUP BY
-			police_district, type, year 
-		ORDER BY
-			police_district, type, year;
-		"""
+        SELECT
+            police_district,
+            type,
+            YEAR(open_dt) AS year,
+            {SQLConstants.BOS311_TIME_BREAKDOWN}
+        FROM
+            bos311_data
+        WHERE
+            type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+        GROUP BY
+            police_district, type, year
+        ORDER BY
+            police_district, type, year;
+        """
     elif data_request == "311_by_total":
         return f"""
-		SELECT
-			YEAR(open_dt) AS year,
-			'parking' AS incident_type,
-			{SQLConstants.BOS311_TIME_BREAKDOWN}
-		FROM
-			bos311_data
-		WHERE
-			type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-			AND {SQLConstants.BOS311_BASE_WHERE}
-		GROUP BY
-			year
-		ORDER BY
-			year
-		"""
+        SELECT
+            YEAR(open_dt) AS year,
+            'parking' AS incident_type,
+            {SQLConstants.BOS311_TIME_BREAKDOWN}
+        FROM
+            bos311_data
+        WHERE
+            type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+        GROUP BY
+            year
+        ORDER BY
+            year
+        """
     elif data_request == "311_by_geo":
         return f"""
-		SELECT
-			type,
-			open_dt,
-			police_district,
-			#location,
-			latitude,
-			longitude
-		FROM 
-			bos311_data
-		WHERE 
-			type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-			AND {SQLConstants.BOS311_BASE_WHERE}
-		"""
+        SELECT
+            type,
+            open_dt,
+            police_district,
+            #location,
+            latitude,
+            longitude
+        FROM
+            bos311_data
+        WHERE
+            type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+        """
 
     return ""
 
@@ -616,72 +579,72 @@ def build_911_query(data_request: str) -> str:
     """Build SQL query for 911 data based on request parameters."""
     if data_request == "911_homicides":
         return f"""
-		SELECT
-			year,
-			{SQLConstants.BOS911_TIME_BREAKDOWN}
-		FROM homicide_data
-		WHERE {SQLConstants.BOS911_BASE_WHERE}
-		GROUP BY year;
-		"""
+        SELECT
+            year,
+            {SQLConstants.BOS911_TIME_BREAKDOWN}
+        FROM homicide_data
+        WHERE {SQLConstants.BOS911_BASE_WHERE}
+        GROUP BY year;
+        """
     elif data_request == "911_shots_fired":
         return f"""
-		SELECT
+        SELECT
             incident_date_time,
             ballistics_evidence,
             latitude,
             longitude
-		FROM shots_fired_data
-		WHERE {SQLConstants.BOS911_BASE_WHERE}
-        AND latitude IS NOT NULL 
+        FROM shots_fired_data
+        WHERE {SQLConstants.BOS911_BASE_WHERE}
+        AND latitude IS NOT NULL
         AND longitude IS NOT NULL
-		GROUP BY incident_date_time, ballistics_evidence, latitude, longitude;
-		"""
+        GROUP BY incident_date_time, ballistics_evidence, latitude, longitude;
+        """
     elif data_request == "911_shots_fired_count_confirmed":
         return f"""
-		SELECT
-			year,
-			{SQLConstants.BOS911_TIME_BREAKDOWN}
-		FROM shots_fired_data
-		WHERE {SQLConstants.BOS911_BASE_WHERE}
-		AND ballistics_evidence = 1
-		GROUP BY year
-		"""
+        SELECT
+            year,
+            {SQLConstants.BOS911_TIME_BREAKDOWN}
+        FROM shots_fired_data
+        WHERE {SQLConstants.BOS911_BASE_WHERE}
+        AND ballistics_evidence = 1
+        GROUP BY year
+        """
     elif data_request == "911_shots_fired_count_unconfirmed":
         return f"""
-		SELECT
-			year,
-			{SQLConstants.BOS911_TIME_BREAKDOWN}
-		FROM shots_fired_data
-		WHERE {SQLConstants.BOS911_BASE_WHERE}
-		AND ballistics_evidence = 0
-		GROUP BY year
-		"""
+        SELECT
+            year,
+            {SQLConstants.BOS911_TIME_BREAKDOWN}
+        FROM shots_fired_data
+        WHERE {SQLConstants.BOS911_BASE_WHERE}
+        AND ballistics_evidence = 0
+        GROUP BY year
+        """
     elif data_request == "911_homicides_and_shots_fired":
         return """
-		SELECT
-		#	h.year as year,
-		#	h.quarter as quarter,
-		#	h.month as month,
-		#	h.day_of_week as day,
-		#	h.hour_of_day as hour,
-		#	h.district as police_district,
-		#	s.address as shot_address,
-			s.latitude as latitude,
-			s.longitude as longitude
-		FROM
-			shots_fired_data s
-		INNER JOIN
-			homicide_data h
-		ON
-			DATE(s.incident_date_time) = DATE(h.homicide_date)
-			AND s.district = h.district
-		WHERE
-			s.ballistics_evidence = 1
-			AND h.district IN ('B3', 'C11', 'B2')
-			AND h.neighborhood = 'Dorchester'
-			AND s.year >= 2018
-			AND s.year < 2025
-		"""
+        SELECT
+        #	h.year as year,
+        #	h.quarter as quarter,
+        #	h.month as month,
+        #	h.day_of_week as day,
+        #	h.hour_of_day as hour,
+        #	h.district as police_district,
+        #	s.address as shot_address,
+            s.latitude as latitude,
+            s.longitude as longitude
+        FROM
+            shots_fired_data s
+        INNER JOIN
+            homicide_data h
+        ON
+            DATE(s.incident_date_time) = DATE(h.homicide_date)
+            AND s.district = h.district
+        WHERE
+            s.ballistics_evidence = 1
+            AND h.district IN ('B3', 'C11', 'B2')
+            AND h.neighborhood = 'Dorchester'
+            AND s.year >= 2018
+            AND s.year < 2025
+        """
     return ""
 
 
@@ -725,25 +688,19 @@ def route_data_query():
         request_options = request.args.get("category", "")
         if data_request.startswith("311_by") and not request_options:
             return (
-                jsonify(
-                    {"error": "Missing required options parameter for 311 request"}
-                ),
+                jsonify({"error": "Missing required options parameter for 311 request"}),
                 400,
             )
 
         request_date = request.args.get("date", "")
         if data_request.startswith("311_on_date") and not request_date:
             return (
-                jsonify(
-                    {"error": "Missing required options parameter for 311 request"}
-                ),
+                jsonify({"error": "Missing required options parameter for 311 request"}),
                 400,
             )
 
         # Validate date format for date-specific queries
-        if data_request.startswith("311_on_date") and not check_date_format(
-            request_date
-        ):
+        if data_request.startswith("311_on_date") and not check_date_format(request_date):
             return jsonify({"error": 'Incorrect date format. Expects "YYYY-MM"'}), 400
 
         request_zipcode = request.args.get("zipcode", "")
@@ -761,19 +718,19 @@ def route_data_query():
             query = build_911_query(data_request=data_request)
         elif data_request == "zip_geo":
             query = f"""
-			SELECT JSON_OBJECT(
-				'type', 'FeatureCollection',
-				'features', JSON_ARRAYAGG(
-					JSON_OBJECT(
-						'type', 'Feature',
-						'geometry', ST_AsGeoJSON(boundary),
-						'properties', JSON_OBJECT('zipcode', zipcode)
-					)
-				)
-			)
-			FROM zipcode_geo
-			WHERE zipcode IN ({request_zipcode})
-			"""
+            SELECT JSON_OBJECT(
+                'type', 'FeatureCollection',
+                'features', JSON_ARRAYAGG(
+                    JSON_OBJECT(
+                        'type', 'Feature',
+                        'geometry', ST_AsGeoJSON(boundary),
+                        'properties', JSON_OBJECT('zipcode', zipcode)
+                    )
+                )
+            )
+            FROM zipcode_geo
+            WHERE zipcode IN ({request_zipcode})
+            """
         else:
             return jsonify({"error": "Invalid data_request parameter"}), 400
 
@@ -826,9 +783,7 @@ def route_chat():
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        app_response = loop.run_until_complete(
-            get_gemini_response(full_prompt, cache_name)
-        )
+        app_response = loop.run_until_complete(get_gemini_response(full_prompt, cache_name))
         if "❌ Error" in app_response:
             print(f"❌ ERROR from Gemini API: {app_response}")
             return jsonify({"error": app_response}), 500
@@ -892,9 +847,7 @@ def route_chat_context():
 
             if isinstance(token_count, int):
                 return jsonify({"token_count": token_count})
-            elif hasattr(token_count, "total_tokens") and isinstance(
-                token_count.total_tokens, int
-            ):
+            elif hasattr(token_count, "total_tokens") and isinstance(token_count.total_tokens, int):
                 return jsonify({"token_count": token_count.total_tokens})
             else:
                 # Handle the error appropriately, e.g., log the error and return an error response
@@ -929,9 +882,7 @@ def route_chat_context():
             data_selected = data.get("data_selected", "")
             prompt_preamble = data.get("prompt_preamble", "")
 
-            response = create_gemini_context(
-                context_request, data_selected, prompt_preamble
-            )
+            response = create_gemini_context(context_request, data_selected, prompt_preamble)
 
             log_event(
                 session_id=session_id,
@@ -971,9 +922,7 @@ def route_log():
                 app_response="SUCCESS",
             )
             return (
-                jsonify(
-                    {"message": "Log entry created successfully", "log_id": log_id}
-                ),
+                jsonify({"message": "Log entry created successfully", "log_id": log_id}),
                 201,
             )
         else:
@@ -1007,9 +956,7 @@ def route_log():
                 app_response="SUCCESS",
             )
             return (
-                jsonify(
-                    {"message": "Log entry updated successfully", "log_id": log_id}
-                ),
+                jsonify({"message": "Log entry updated successfully", "log_id": log_id}),
                 201,
             )
         else:
