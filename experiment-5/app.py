@@ -1,21 +1,36 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from dash import Dash, dcc, html
-import plotly.graph_objects as go
-import plotly.express as px
-from sqlalchemy import create_engine
-from dash.dependencies import Input, Output, State
-from dotenv import load_dotenv
 import os
-from sqlalchemy import create_engine
+import time
+import json
+import requests
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 from urllib.parse import quote_plus
-from dash import html
-from dash import ctx, dcc
+
+from shapely.geometry import Point, Polygon
+
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
+
+import dash
+from dash import Dash, dcc, html, ctx
+from dash.dependencies import Input, Output, State
+from dash.exceptions import PreventUpdate
+from dash import callback_context, no_update
+
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.figure_factory import create_hexbin_mapbox
 
 
+global_start = time.perf_counter()
+
+start = time.perf_counter()
 load_dotenv()
+print(f"[TIMER] .env loading took {time.perf_counter() - start:.2f} seconds")
 
+
+start = time.perf_counter()
 PORT = os.getenv("EXPERIMENT_5_PORT")
 DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_5_DASH_REQUESTS_PATHNAME")
 
@@ -27,10 +42,94 @@ def get_db_engine():
 
     return create_engine(f"mysql+pymysql://{user}:{password}@{host}/{db}")
 
-PORT = os.getenv("EXPERIMENT_5_PORT")
-DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_5_DASH_REQUESTS_PATHNAME")
+import os
+import time
+import pandas as pd
+import requests
+from sqlalchemy import create_engine
+from urllib.parse import quote_plus
+
+CACHE_DIR = "./cache"
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+
+def cache_stale(path, max_age_minutes=30):
+    return not os.path.exists(path) or \
+           (time.time() - os.path.getmtime(path)) > max_age_minutes * 60
+
+def get_db_engine():
+    user = os.getenv("DB_USER")
+    password = quote_plus(os.getenv("DB_PASSWORD"))
+    host = os.getenv("DB_HOST")
+    db = os.getenv("DB_NAME")
+    return create_engine(f"mysql+pymysql://{user}:{password}@{host}/{db}")
+
+
+def load_311_data(force_refresh=False):
+    cache_path = os.path.join(CACHE_DIR, "df_311.parquet")
+    if not force_refresh and not cache_stale(cache_path):
+        print("[CACHE] Using cached 311 data")
+        return pd.read_parquet(cache_path)
+
+    print("[LOAD] Fetching 311 data from API...")
+    api_url = "https://boston.ourcommunity.is/api/data/query?request=311_by_geo&category=all"
+    resp = requests.get(api_url)
+    resp.raise_for_status()
+    df = pd.DataFrame(resp.json())
+
+    df.rename(columns={'open_dt': 'date'}, inplace=True)
+    df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
+    df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    df.dropna(subset=["latitude", "longitude", "date"], inplace=True)
+    df['normalized_type'] = df['type'].str.strip().str.title()
+
+    df.to_parquet(cache_path, index=False)
+    return df
+
+
+
+def load_homicide_data(engine, force_refresh=False):
+    cache_path = os.path.join(CACHE_DIR, "df_homicide.parquet")
+    if not force_refresh and not cache_stale(cache_path):
+        print("[CACHE] Using cached homicide data")
+        return pd.read_parquet(cache_path)
+
+    print("[LOAD] Fetching homicide data from DB...")
+    df = pd.read_sql("SELECT homicide_date AS date FROM homicide_data", con=engine)
+    df['date'] = pd.to_datetime(df['date'])
+
+    df.to_parquet(cache_path, index=False)
+    return df
+
+def load_shots_fired_data(engine, force_refresh=False):
+    cache_path = os.path.join(CACHE_DIR, "df_shots.parquet")
+    if not force_refresh and not cache_stale(cache_path):
+        print("[CACHE] Using cached shots fired data")
+        return pd.read_parquet(cache_path)
+
+    print("[LOAD] Fetching shots fired data from DB...")
+    df = pd.read_sql(
+        "SELECT incident_date_time AS date, longitude, latitude, ballistics_evidence FROM shots_fired_data",
+        con=engine
+    )
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    df['ballistics_evidence'] = pd.to_numeric(df['ballistics_evidence'], errors='coerce')
+    df = df[df['ballistics_evidence'].isin([0, 1])]
+    df = df.dropna(subset=['latitude', 'longitude', 'date'])
+    df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
+    df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
+    df = df.dropna(subset=["latitude", "longitude"])
+    df["month"] = df["date"].dt.to_period("M").dt.to_timestamp()
+
+    df.to_parquet(cache_path, index=False)
+    return df
+
 
 engine = get_db_engine()
+df_311 = load_311_data()
+df_hom = load_homicide_data(engine)
+df_shots = load_shots_fired_data(engine)
 
 raw_type_to_category = {
     'Poor Conditions of Property': 'Living Conditions',
@@ -76,34 +175,22 @@ type_to_category = {
 allowed_types = list(type_to_category.keys())
 types_str = "', '".join(allowed_types)
 
-import requests
 
 api_url = "https://boston.ourcommunity.is/api/data/query?request=311_by_geo&category=all"
 
+start = time.perf_counter()
+start = time.perf_counter()
+df_311 = load_311_data()
+print(f"[TIMER] 311 data fetch + cleaning took {time.perf_counter() - start:.2f} seconds")
 
-resp = requests.get(api_url)
-resp.raise_for_status()
+start = time.perf_counter()
+df_hom = load_homicide_data(engine)
+print(f"[TIMER] Homicide data fetch took {time.perf_counter() - start:.2f} seconds")
 
-# Parse as list of dicts
-data = resp.json()
+start = time.perf_counter()
+df_shots = load_shots_fired_data(engine)
+print(f"[TIMER] Shots fired data fetch + cleaning took {time.perf_counter() - start:.2f} seconds")
 
-# Now make DataFrame
-df_311 = pd.DataFrame(data)
-
-df_311.rename(columns={'open_dt': 'date'}, inplace=True)
-df_311['latitude'] = pd.to_numeric(df_311['latitude'], errors='coerce')
-df_311['longitude'] = pd.to_numeric(df_311['longitude'], errors='coerce')
-df_311['date'] = pd.to_datetime(df_311['date'], errors='coerce')
-df_311.dropna(subset=["latitude", "longitude", "date"], inplace=True)
-
-df_311['normalized_type'] = df_311['type'].str.strip().str.title()
-
-df_hom = pd.read_sql("SELECT homicide_date AS date FROM homicide_data", con=engine)
-
-df_shots = pd.read_sql(
-    "SELECT incident_date_time AS date, longitude, latitude, ballistics_evidence FROM shots_fired_data",
-    con=engine
-)
 
 df_shots['ballistics_evidence'] = pd.to_numeric(df_shots['ballistics_evidence'], errors='coerce')
 df_shots = df_shots[df_shots['ballistics_evidence'].isin([0, 1])]
@@ -132,7 +219,6 @@ print("remaining rows:", len(df_311))
 
 df_311['date'] = pd.to_datetime(df_311['date'])
 df_hom['date'] = pd.to_datetime(df_hom['date'])
-df_shots['date'] = pd.to_datetime(df_shots['date'])
 df_shots['date'] = pd.to_datetime(df_shots['date'])
 df_shots = df_shots.dropna(subset=['latitude', 'longitude'])
 
@@ -171,8 +257,6 @@ category_colors = {
 
 
 #hexbin map
-from plotly.figure_factory import create_hexbin_mapbox
-
 df_311 = df_311.dropna(subset=["latitude", "longitude"])
 
 map_center = {
@@ -227,7 +311,6 @@ fig_map.update_coloraxes(
     )
 )
 
-import requests
 
 for district_code, color in districts.items():
     params = {
@@ -385,7 +468,6 @@ app.layout = html.Div(style={'backgroundColor': 'black', 'padding': '10px'}, chi
             'verticalAlign': 'top'
         }),
 
-
         html.Div([
             html.Div("🤖 Assistant", style={
                 'color': 'white',
@@ -393,17 +475,22 @@ app.layout = html.Div(style={'backgroundColor': 'black', 'padding': '10px'}, chi
                 'marginBottom': '8px',
                 'fontSize': '16px'
             }),
-            html.Div(id='chat-display', style={
-                'height': '480px',
-                'backgroundColor': '#1a1a1a',
-                'color': 'white',
-                'border': '1px solid #444',
-                'borderRadius': '8px',
-                'padding': '10px',
-                'overflowY': 'auto',
-                'marginBottom': '10px',
-                'fontSize': '13px'
-            }),
+            dcc.Loading(
+                id="chat-loading",
+                type="circle",
+                color="#ff69b4",
+                children=html.Div(id='chat-display', style={
+                    'height': '480px',
+                    'backgroundColor': '#1a1a1a',
+                    'color': 'white',
+                    'border': '1px solid #444',
+                    'borderRadius': '8px',
+                    'padding': '10px',
+                    'overflowY': 'auto',
+                    'marginBottom': '10px',
+                    'fontSize': '13px'
+                })
+            ),
             dcc.Textarea(
                 id='chat-input',
                 placeholder='Type your question here...',
@@ -431,7 +518,6 @@ app.layout = html.Div(style={'backgroundColor': 'black', 'padding': '10px'}, chi
                 'cursor': 'pointer'
             }),
 
-
         ], style={
             'width': '38%',
             'display': 'inline-block',
@@ -441,7 +527,6 @@ app.layout = html.Div(style={'backgroundColor': 'black', 'padding': '10px'}, chi
 
     ], style={'marginBottom': '2rem'}),
 
-   
     html.Div([
         dcc.Slider(
             id='hexbin-slider',
@@ -490,6 +575,7 @@ from shapely.geometry import Point, Polygon
     [State('hexbin-map', 'figure')]
 )
 def update_hover_chart(hoverData, hexmap_fig):
+    start = time.perf_counter()
 
     if not hoverData or 'points' not in hoverData:
         return go.Figure(), {'display': 'none'}
@@ -592,7 +678,7 @@ def update_hover_chart(hoverData, hexmap_fig):
     }
 
 
-    print("hover chart is generated")
+    print(f"[TIMER] update_hover_chart took {time.perf_counter() - start:.2f} seconds")
     return fig, style
 
 def add_district_boundaries(fig):
@@ -630,6 +716,7 @@ def add_district_boundaries(fig):
     Input('hexbin-slider', 'value')
 )
 def update_hexbin_map(month_index):
+    start = time.perf_counter()
     selected_month = available_months[month_index]
     month_str = selected_month.strftime('%B %Y')
 
@@ -667,8 +754,6 @@ def update_hexbin_map(month_index):
     ))
 
 
-
-    # Add district outlines
     for district_code, color in districts.items():
         try:
             params = {
@@ -810,14 +895,9 @@ def update_hexbin_map(month_index):
         )
 
     )
-
+    print(f"[TIMER] update_hexbin_map ({month_str}) took {time.perf_counter() - start:.2f} seconds")
     return fig
 
-from dash import ctx
-import requests
-import json
-
-app.clientside_callback_context = ctx
 
 chat_history = []
 
@@ -831,15 +911,6 @@ def chat_display_div(history):
     ]
 
 
-
-import dash
-from dash import ctx
-import time
-from dash.exceptions import PreventUpdate
-import requests
-from dash import callback_context
-from dash import callback_context, no_update
-
 @app.callback(
     [Output("chat-history-store", "data"),
      Output("chat-display", "children"),
@@ -850,9 +921,7 @@ from dash import callback_context, no_update
      State("chat-history-store", "data")]
 )
 def handle_chat_simple(n_clicks, slider_val, user_input, history):
-    from dash.exceptions import PreventUpdate
-    import requests
-
+    start = time.perf_counter()
     triggered_id = ctx.triggered_id
 
     if history is None:
@@ -920,9 +989,12 @@ def handle_chat_simple(n_clicks, slider_val, user_input, history):
         reply = f"[Error: {e}]"
 
     history.append(("Assistant", reply))
+    print(f"[TIMER] handle_chat_simple triggered by {triggered_id} took {time.perf_counter() - start:.2f} seconds")
     return history, chat_display_div(history), ""
 
 server = app.server
+print(f"[TIMER] Total Dash app setup time: {time.perf_counter() - global_start:.2f} seconds")
+
 
 if __name__ == "__main__":
     app.run_server(debug=True)
