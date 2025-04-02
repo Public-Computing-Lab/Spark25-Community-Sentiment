@@ -6,27 +6,33 @@ This project is a **Flask-based REST-ish API** supporting the RethinkAI experime
 
 #### **GET crime and 311 data as geoJson objects***
 ```
-GET /data/query?request=<request_type>&date=%Y-%m&zipcode=<zipcode>
+GET /data/query?app_version=<0.0>&request=<request_type>&category=<311_category>&date=%Y-%m&zipcode=<zipcode>&stream=<True/False>
 ```
-```<request_type>``` is one of: 
-##### Crime Data
+##### Query arguments:
+```request=<request_type>``` is one of: 
+**Crime Data**
 - **911_shots_fired** - return shots fired w/ location
 - **911_shots_fired_count_confirmed** - return count of confirmed shots fired by year with totals by quarter, and month
 - **911_shots_fired_count_unconfirmed** - return count of unconfirmed shots fired by year with totals by quarter, and month
 - **911_homicides** - return counts for homicides by year with totals by quarter, and month
 - **911_homicides_and_shots_fired** - return matches where a homicide and shot_fired occurred same date, same police district
 
-##### 311 Data
-> 311_by\* requires ?category={living_conditions | trash | streets | parking}  
-> 311_on\* requires ?date=%Y-%m  
+**311 Data**
+> 311_by\* requires ```category={living_conditions | trash | streets | parking | all}```  
+> 311_on\* requires ```date=%Y-%m ```  
 > 311_on_date_count optionally takes &zipcode=\<zipcode\> to filter by zip (for hover chart)  
-- **311_by_geo** - return locations of 311 data, by type option below
+- **311_by_geo** - return locations of 311 data, by type option below. *Large data set*.
 - **311_by_total** - return total counts by year with quarter and month, by type option below
 - **311_by_type** - return counts for each type in type option below
 - **311_year_month** - return all 311 dates in %Y-%m format
 - **311_on_date_count** - return category counts by date, 
 - **311_on_date_geo** - returns all lat/longs for 311 categories by date, requires '&date=%Y-%m'
-
+  
+    
+```category={living_conditions | trash | streets | parking | all}```  
+```date=%Y-%m``` is date in format 2020-04  
+```zipcode=<zipcode>``` can take one or more zipcodes: 02121, 02124  
+```stream=<True/False>``` toggles streamed data on query, important for queries that return large sets
 ##### Other
 - **zip_geo** - returns geojson object for requested zipcodes, requires &zipcode=\<zipcode,zipcode,...\>
 
