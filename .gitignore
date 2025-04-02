@@ -76,10 +76,12 @@ gemini_api.key.txt
 .nova
 
 # exclude data files from data folders
+**/cache/*
 **/data/*
 api/datastore/*
 
 # exception to the rule
+**/cache/.gitkeep
 **/data/.gitkeep
 !api/datastore/.gitkeep 
 !api/*.sqlexperiment-5/cache/
