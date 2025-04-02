@@ -55,3 +55,4 @@ urllib3==2.3.0
 Werkzeug==3.0.6
 xyzservices==2025.1.0
 zipp==3.21.0
+pyarrow==19.0.1
