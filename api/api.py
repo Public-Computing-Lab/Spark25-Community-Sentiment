@@ -1,10 +1,10 @@
-from flask import Flask, request, jsonify, g, session
+from flask import Flask, request, jsonify, g, session, Response, stream_with_context
 import csv
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from pathlib import Path
-from typing import List, Dict, Union, Optional, Any
+from typing import List, Dict, Union, Optional, Any, Generator
 import mysql.connector
 from mysql.connector.pooling import MySQLConnectionPool
 import datetime
@@ -13,6 +13,8 @@ import re
 import io
 import uuid
 import asyncio
+import json
+import decimal
 
 # Load environment variables
 load_dotenv()
@@ -308,18 +310,34 @@ def create_gemini_context(
             ORDER BY year, incident_type
             """
 
-            results = run_query(query=query)
-            if results:
-                output = io.StringIO()
-                writer = csv.DictWriter(output, fieldnames=results[0].keys())
-                writer.writeheader()
-                writer.writerows(results)
-                content["parts"].append({"text": output.getvalue()})
+            try:
+                conn = get_db_connection()
+                with conn.cursor(dictionary=True) as cursor:
+
+                    cursor.execute(query)
+                    fieldnames = [desc[0] for desc in cursor.description]
+
+                    output = io.StringIO()
+                    writer = csv.DictWriter(output, fieldnames=fieldnames)
+                    writer.writeheader()
+
+                    for row in cursor:
+                        writer.writerow(row)
+
+                    content["parts"].append({"text": output.getvalue()})
+
+            except mysql.connector.Error as err:
+                print(f"Database error: {str(err)}")
+                return None
+
+            finally:
+                if "conn" in locals():
+                    cursor.close()
+                    conn.close()
 
             preamble_file = "experiment_5.txt"
 
         # Read contents of found files
-
         for file in files_list:
             file_content = get_file_content(file)
             if file_content is not None:
@@ -455,14 +473,14 @@ def log_event(
 
 
 # DB Query
-def run_query(query: str) -> Optional[List[Dict[str, Any]]]:
+def return_query_results(query: str) -> Optional[List[Dict[str, Any]]]:
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute(query)
         result = cursor.fetchall()
-        # print(result)
+
         return result if result else None
 
     except mysql.connector.Error as err:
@@ -475,8 +493,51 @@ def run_query(query: str) -> Optional[List[Dict[str, Any]]]:
             conn.close()
 
 
+def stream_query_results(query: str) -> Generator[str]:
+    conn = None
+    cursor = None
+    print("here")
+    try:
+        conn = get_db_connection()
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(query)
+        # Stream the results
+        yield "[\n"
+        first_row = True
+        for row in cursor:
+            if not first_row:
+                yield ",\n"
+            else:
+                first_row = False
+
+            # Convert mysql objects to something json-friendly
+            processed_row = {}
+            for key, value in row.items():
+                if hasattr(value, "isoformat"):  # Check if it has isoformat method (datetime objects do)
+                    processed_row[key] = value.isoformat()
+                elif isinstance(value, decimal.Decimal):  # Handle Decimal objects
+                    processed_row[key] = float(value)
+                else:
+                    processed_row[key] = value
+
+            yield json.dumps(processed_row)
+
+        # Close the JSON structure
+        yield "\n]"
+
+    except mysql.connector.Error as err:
+        # Handle database errors
+        yield json.dumps({"error": f"Database error: {str(err)}"})
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 #
-# Query Builder
+# Query Builders
 #
 def build_311_query(
     data_request: str,
@@ -484,7 +545,6 @@ def build_311_query(
     request_date: str = "",
     request_zipcode: str = "",
 ) -> str:
-    """Build SQL query for 311 data based on request parameters."""
     if data_request == "311_on_date_geo":
         return f"""
         SELECT latitude, longitude
@@ -571,12 +631,10 @@ def build_311_query(
             type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
             AND {SQLConstants.BOS311_BASE_WHERE}
         """
-
     return ""
 
 
 def build_911_query(data_request: str) -> str:
-    """Build SQL query for 911 data based on request parameters."""
     if data_request == "911_homicides":
         return f"""
         SELECT
@@ -622,13 +680,6 @@ def build_911_query(data_request: str) -> str:
     elif data_request == "911_homicides_and_shots_fired":
         return """
         SELECT
-        #	h.year as year,
-        #	h.quarter as quarter,
-        #	h.month as month,
-        #	h.day_of_week as day,
-        #	h.hour_of_day as hour,
-        #	h.district as police_district,
-        #	s.address as shot_address,
             s.latitude as latitude,
             s.longitude as longitude
         FROM
@@ -678,7 +729,11 @@ def check_session():
 @app.route("/data/query", methods=["GET"])
 def route_data_query():
     session_id = session.get("session_id")
+    # Get query parameters
     app_version = request.args.get("app_version", "0")
+    stream_result = request.args.get("stream", "False")
+    request_zipcode = request.args.get("zipcode", "")
+
     try:
         # Get and validate request parameters
         data_request = request.args.get("request", "")
@@ -703,10 +758,7 @@ def route_data_query():
         if data_request.startswith("311_on_date") and not check_date_format(request_date):
             return jsonify({"error": 'Incorrect date format. Expects "YYYY-MM"'}), 400
 
-        request_zipcode = request.args.get("zipcode", "")
-
         # Build query using the appropriate query builder
-
         if data_request.startswith("311"):
             query = build_311_query(
                 data_request=data_request,
@@ -737,16 +789,20 @@ def route_data_query():
         if not query:
             return jsonify({"error": "Failed to build query"}), 500
 
-        # Execute the query and return results
-        result = run_query(query=query)
+        # Return w/ streaming
+        if stream_result == "True":
+            return Response(stream_with_context(stream_query_results(query=query)), mimetype="application/json")
+        # Return bulk result
+        else:
+            result = return_query_results(query=query)
 
-        log_event(
-            session_id=session_id,
-            app_version=app_version,
-            log_id=g.log_entry,
-            app_response="SUCCESS",
-        )
-        return jsonify(result)
+            log_event(
+                session_id=session_id,
+                app_version=app_version,
+                log_id=g.log_entry,
+                app_response="SUCCESS",
+            )
+            return jsonify(result)
 
     except Exception as e:
         log_event(
@@ -893,7 +949,6 @@ def route_chat_context():
             return jsonify(response)
 
 
-# query string log_action [insert, client_response_rating]
 @app.route("/log", methods=["POST", "PUT"])
 def route_log():
     session_id = session.get("session_id")
