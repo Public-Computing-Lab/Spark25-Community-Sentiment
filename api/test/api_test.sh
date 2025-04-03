@@ -241,31 +241,40 @@ test_log_update() {
 test_data_query() {
 	
 	ENDPOINTS_OPTIONS=(
-		# "311_on_date_geo&app_version=5.5&date=2019-02"
-		# "311_on_date_count&app_version=5.5&date=2020-04"
-		# "311_on_date_count&app_version=5.5&date=2021-06&zipcode=02121"
-		# "311_year_month&app_version=5.5"
-		# "311_by_type&app_version=5.5&category=living_conditions"
-		# "311_by_type&app_version=5.5&category=trash"
-		# "311_by_type&app_version=5.5&category=streets"
-		# "311_by_type&app_version=5.5&category=parking"
-		"311_by_type&app_version=5.5&category=all&stream=False"
-		# "311_by_total&app_version=5.5&category=living_conditions"
-		# "311_by_total&app_version=5.5&category=trash"
-		# "311_by_total&app_version=5.5&category=streets"
-		# "311_by_total&app_version=5.5&category=parking"
-		# "311_by_total&app_version=5.5&category=all"
-		# "311_by_geo&app_version=5.5&category=living_conditions"
-		# "311_by_geo&app_version=5.5&category=trash"
-		# "311_by_geo&app_version=5.5&category=streets"
-		# "311_by_geo&app_version=5.5&category=parking"
+		"311_by_geo&app_version=5.5&category=living_conditions&date=2019-02&stream=True"
+		"311_by_geo&app_version=5.5&category=trash&date=2019-02&stream=True"
+		"311_by_geo&app_version=5.5&category=streets&date=2019-02&stream=True"
+		"311_by_geo&app_version=5.5&category=parking&date=2019-02&stream=True"
+		"311_by_geo&app_version=5.5&category=all&date=2019-02&stream=True"
+		#
+		# "311_on_date_count&app_version=5.5&date=2020-04&stream=True"
+		# "311_on_date_count&app_version=5.5&date=2021-06&zipcode=02121&stream=True"
+		#		
+		# "311_by_category&app_version=5.5&category=living_conditions&stream=True"
+		# "311_by_category&app_version=5.5&category=trash&stream=True"
+		# "311_by_category&app_version=5.5&category=streets&stream=True"
+		# "311_by_category&app_version=5.5&category=parking&stream=True"
+		# "311_by_category&app_version=5.5&category=all&stream=True"
+		#
+		# "311_by_total&app_version=5.5&category=living_conditions&stream=True"
+		# "311_by_total&app_version=5.5&category=trash&stream=True"
+		# "311_by_total&app_version=5.5&category=streets&stream=True"
+		# "311_by_total&app_version=5.5&category=parking&stream=True"
+		# "311_by_total&app_version=5.5&category=all&stream=True"
+		#
+		"311_by_geo&app_version=5.5&category=living_conditions&stream=True"
+		"311_by_geo&app_version=5.5&category=trash&stream=True"
+		"311_by_geo&app_version=5.5&category=streets&stream=True"
+		"311_by_geo&app_version=5.5&category=parking&stream=True"
 		"311_by_geo&app_version=5.5&category=all&stream=True"
-		# "911_homicides&app_version=5.5"
-		# "911_shots_fired&app_version=5.5"
-		# "911_shots_fired_count_confirmed&app_version=5.5"
-		# "911_shots_fired_count_unconfirmed&app_version=5.5"
-		# "911_homicides_and_shots_fired&app_version=5.5"
-		# "zip_geo&app_version=5.5&zipcode=02121,02115"
+		#
+		#"911_homicides&app_version=5.5&stream=True"
+		"911_shots_fired&app_version=5.5&stream=True"
+		#"911_shots_fired_count_confirmed&app_version=5.5&stream=True"
+		#"911_shots_fired_count_unconfirmed&app_version=5.5&stream=True"
+		"911_homicides_and_shots_fired&app_version=5.5&stream=True"
+		#
+		"zip_geo&app_version=5.5&zipcode=02121,02115&stream=True"
 	)
 	start_time_big=$(perl -MTime::HiRes=time -e 'printf "%.9f", time')
 	for endpoint in "${ENDPOINTS_OPTIONS[@]}"; do
@@ -296,7 +305,7 @@ test_data_query() {
 		
 		# Check if curl command was successful
 		if [ $? -eq 0 ]; then
-			#echo "Response Length: ${#response}"
+			echo "Response: ${response}" | head -n 5
 			echo "Request completed in ${elapsed} seconds"
 			echo -e "${GREEN}Log endpoint test completed${NC}"
 		else
@@ -325,11 +334,11 @@ test_data_zip() {
 		--cookie "app_version=0" \
 		-H "Content-Type: application/json" \
 		-d "$log_data" \
-		"${API_URL}/data/query?request=zip_geo&zipcode=02121,02115")
+		"${API_URL}/data/query?request=zip_geo&zipcode=02121,02115&stream=True")
 
 	# Check if curl command was successful
 	if [ $? -eq 0 ]; then
-		echo "Response: $response"
+		echo "Response: $response" | head -n 5
 		echo -e "${GREEN}Log endpoint test completed${NC}"
 	else
 		echo -e "${RED}Log endpoint test failed${NC}"
