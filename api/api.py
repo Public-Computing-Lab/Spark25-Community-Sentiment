@@ -27,7 +27,6 @@ class Config:
     GEMINI_CACHE_TTL = int(os.getenv("GEMINI_CACHE_TTL", "7"))
     HOST = os.getenv("API_HOST")
     PORT = os.getenv("API_PORT")
-    DATASTORE_HOST = os.getenv("DATASTORE_HOST")
     DATASTORE_PATH = Path(os.getenv("DATASTORE_PATH", "."))
     PROMPTS_PATH = Path(os.getenv("PROMPTS_PATH", "."))
     ALLOWED_EXTENSIONS = {"csv", "txt"}
