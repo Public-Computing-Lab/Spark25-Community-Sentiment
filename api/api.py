@@ -956,8 +956,6 @@ def route_llm_summary():
         cursor = conn.cursor(dictionary=True)
         cursor.execute("SELECT summary FROM llm_summaries WHERE month_label = %s", (month,))
         row = cursor.fetchone()
-        cursor.close()
-        conn.close()
 
         if not row:
             log_event(
@@ -1001,8 +999,6 @@ def route_all_llm_summaries():
         cursor = conn.cursor(dictionary=True)
         cursor.execute("SELECT month_label, summary FROM llm_summaries ORDER BY month_label ASC")
         rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
 
         log_event(
             session_id=session_id,
