@@ -684,7 +684,7 @@ def route_data_query():
                 request_date=request_date,
                 request_zipcode=request_zipcode,
             )
-            print(query)
+
         elif data_request.startswith("911"):
             query = build_911_query(data_request=data_request)
         elif data_request == "zip_geo":
