@@ -58,6 +58,15 @@ class SQLConstants:
 
     # Set the 'all' category to include all individual categories
     CATEGORY_TYPES["all"] = ", ".join([cat for cat in ", ".join(CATEGORY_TYPES.values()).split(", ")])
+
+    BOS311_NORMALIZED_TYPE_CASE = f"""
+    CASE
+        WHEN type IN ({CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+        WHEN type IN ({CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+        WHEN type IN ({CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+        WHEN type IN ({CATEGORY_TYPES['parking']}) THEN 'Parking'
+    END AS normalized_type,
+    """
     # Common aggregation columns for monthly/quarterly breakdowns
     BOS911_TIME_BREAKDOWN = """
     COUNT(*) AS total_by_year,
@@ -496,7 +505,7 @@ def return_query_results(query: str) -> Optional[List[Dict[str, Any]]]:
 def stream_query_results(query: str) -> Generator[str]:
     conn = None
     cursor = None
-    print("here")
+
     try:
         conn = get_db_connection()
 
@@ -545,109 +554,37 @@ def build_311_query(
     request_date: str = "",
     request_zipcode: str = "",
 ) -> str:
-    if data_request == "311_on_date_geo":
-        return f"""
-        SELECT latitude, longitude
-        FROM bos311_data
-        WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
-        AND type IN ({SQLConstants.CATEGORY_TYPES['all']})
-        AND {SQLConstants.BOS311_BASE_WHERE};
-        """
-    elif data_request == "311_on_date_count":
+    if data_request == "311_by_geo":
         query = f"""
         SELECT
-        CASE
-            WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
-            WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
-            WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
-            WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
-        END AS request_category,
-        COUNT(*) AS request_count,
-        DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
-        FROM bos311_data
-        WHERE DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
-        AND {SQLConstants.BOS311_BASE_WHERE}
-        """
-        if request_zipcode:
-            query += f"AND location_zipcode = {request_zipcode}\n"
-
-        query += """
-        GROUP BY request_category, monthyear
-        HAVING request_category IS NOT NULL;
-        """
-        return query
-    elif data_request == "311_year_month":
-        return f"""
-        SELECT DISTINCT DATE_FORMAT(open_dt, '%Y-%m') AS monthyear
-        FROM bos311_data
-        WHERE {SQLConstants.BOS311_BASE_WHERE}
-        ORDER BY monthyear;
-        """
-    elif data_request == "311_by_type":
-        return f"""
-        SELECT
-            police_district,
             type,
-            YEAR(open_dt) AS year,
-            {SQLConstants.BOS311_TIME_BREAKDOWN}
-        FROM
-            bos311_data
-        WHERE
-            type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
-        GROUP BY
-            police_district, type, year
-        ORDER BY
-            police_district, type, year;
-        """
-    elif data_request == "311_by_total":
-        return f"""
-        SELECT
-            YEAR(open_dt) AS year,
-            'parking' AS incident_type,
-            {SQLConstants.BOS311_TIME_BREAKDOWN}
-        FROM
-            bos311_data
-        WHERE
-            type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
-        GROUP BY
-            year
-        ORDER BY
-            year
-        """
-    elif data_request == "311_by_geo":
-        return f"""
-        SELECT
-            type,
-            open_dt,
-            police_district,
-            #location,
+            open_dt AS date,
             latitude,
-            longitude
+            longitude,
+            CASE
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+            END AS normalized_type
         FROM
             bos311_data
         WHERE
             type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
             AND {SQLConstants.BOS311_BASE_WHERE}
         """
-    return ""
+        if request_date:
+            query += f"""AND DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'"""
+        return query
+    else:
+        return ""
 
 
 def build_911_query(data_request: str) -> str:
-    if data_request == "911_homicides":
+    if data_request == "911_shots_fired":
         return f"""
         SELECT
-            year,
-            {SQLConstants.BOS911_TIME_BREAKDOWN}
-        FROM homicide_data
-        WHERE {SQLConstants.BOS911_BASE_WHERE}
-        GROUP BY year;
-        """
-    elif data_request == "911_shots_fired":
-        return f"""
-        SELECT
-            incident_date_time,
+            incident_date_time AS date,
             ballistics_evidence,
             latitude,
             longitude
@@ -655,31 +592,12 @@ def build_911_query(data_request: str) -> str:
         WHERE {SQLConstants.BOS911_BASE_WHERE}
         AND latitude IS NOT NULL
         AND longitude IS NOT NULL
-        GROUP BY incident_date_time, ballistics_evidence, latitude, longitude;
-        """
-    elif data_request == "911_shots_fired_count_confirmed":
-        return f"""
-        SELECT
-            year,
-            {SQLConstants.BOS911_TIME_BREAKDOWN}
-        FROM shots_fired_data
-        WHERE {SQLConstants.BOS911_BASE_WHERE}
-        AND ballistics_evidence = 1
-        GROUP BY year
-        """
-    elif data_request == "911_shots_fired_count_unconfirmed":
-        return f"""
-        SELECT
-            year,
-            {SQLConstants.BOS911_TIME_BREAKDOWN}
-        FROM shots_fired_data
-        WHERE {SQLConstants.BOS911_BASE_WHERE}
-        AND ballistics_evidence = 0
-        GROUP BY year
+        GROUP BY date, ballistics_evidence, latitude, longitude;
         """
     elif data_request == "911_homicides_and_shots_fired":
         return """
         SELECT
+            h.homicide_date as date,
             s.latitude as latitude,
             s.longitude as longitude
         FROM
@@ -766,6 +684,7 @@ def route_data_query():
                 request_date=request_date,
                 request_zipcode=request_zipcode,
             )
+            print(query)
         elif data_request.startswith("911"):
             query = build_911_query(data_request=data_request)
         elif data_request == "zip_geo":
@@ -1022,6 +941,55 @@ def route_log():
                 app_response="ERROR: Log entry not updated",
             )
             return jsonify({"error": "Failed to update log entry"}), 500
+
+
+@app.route("/llm_summaries", methods=["GET"])
+def get_summary():
+    month = request.args.get("month")
+
+    if not month:
+        return jsonify({"error"}), 400
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT summary FROM llm_summaries WHERE month_label = %s", (month,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not row:
+            return jsonify({"summary": "[No summary available for this month]"}), 404
+        return jsonify({"month": month, "summary": row["summary"]})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        if "conn" in locals():
+            cursor.close()
+            conn.close()
+
+
+@app.route("/llm_summaries/all", methods=["GET"])
+def get_all_summaries():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT month_label, summary FROM llm_summaries ORDER BY month_label ASC")
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return jsonify(rows)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        if "conn" in locals():
+            cursor.close()
+            conn.close()
 
 
 if __name__ == "__main__":

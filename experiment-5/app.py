@@ -1,23 +1,14 @@
 import os
 import time
-import json
 import requests
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from urllib.parse import quote_plus
-
-from shapely.geometry import Point, Polygon
-
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-
-import dash
 from dash import Dash, dcc, html, ctx
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
-from dash import callback_context, no_update
-
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.figure_factory import create_hexbin_mapbox
@@ -25,14 +16,46 @@ from plotly.figure_factory import create_hexbin_mapbox
 
 global_start = time.perf_counter()
 
-start = time.perf_counter()
 load_dotenv()
-print(f"[TIMER] .env loading took {time.perf_counter() - start:.2f} seconds")
 
-
-start = time.perf_counter()
 PORT = os.getenv("EXPERIMENT_5_PORT")
 DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_5_DASH_REQUESTS_PATHNAME")
+
+raw_type_to_category = {
+    "Poor Conditions of Property": "Living Conditions",
+    "Needle Pickup": "Living Conditions",
+    "Unsatisfactory Living Conditions": "Living Conditions",
+    "Rodent Activity": "Living Conditions",
+    "Heat - Excessive Insufficient": "Living Conditions",
+    "Unsafe Dangerous Conditions": "Living Conditions",
+    "Pest Infestation - Residential": "Living Conditions",
+    "Missed Trash/Recycling/Yard Waste/Bulk Item": "Trash, Recycling, And Waste",
+    "Schedule a Bulk Item Pickup": "Trash, Recycling, And Waste",
+    "CE Collection": "Trash, Recycling, And Waste",
+    "Schedule a Bulk Item Pickup SS": "Trash, Recycling, And Waste",
+    "Request for Recycling Cart": "Trash, Recycling, And Waste",
+    "Illegal Dumping": "Trash, Recycling, And Waste",
+    "Requests for Street Cleaning": "Streets, Sidewalks, And Parks",
+    "Request for Pothole Repair": "Streets, Sidewalks, And Parks",
+    "Unshoveled Sidewalk": "Streets, Sidewalks, And Parks",
+    "Tree Maintenance Requests": "Streets, Sidewalks, And Parks",
+    "Sidewalk Repair (Make Safe)": "Streets, Sidewalks, And Parks",
+    "Street Light Outages": "Streets, Sidewalks, And Parks",
+    "Sign Repair": "Streets, Sidewalks, And Parks",
+    "Pothole": "Streets, Sidewalks, And Parks",
+    "Parking Enforcement": "Parking",
+    "Space Savers": "Parking",
+    "Parking on Front/Back Yards (Illegal Parking)": "Parking",
+    "Municipal Parking Lot Complaints": "Parking",
+    "Valet Parking Problems": "Parking",
+    "Private Parking Lot Complaints": "Parking",
+}
+
+districts = {"B3": "rgba(255, 255, 0, 0.7)", "B2": "rgba(0, 255, 255, 0.7)", "C11": "rgba(0, 255, 0, 0.7)"}
+boston_url = "https://gisportal.boston.gov/ArcGIS/rest/services/PublicSafety/OpenData/MapServer/5/query"
+
+type_to_category = {k.strip().title(): v for k, v in raw_type_to_category.items()}
+
 
 def get_db_engine():
     user = os.getenv("DB_USER")
@@ -42,27 +65,13 @@ def get_db_engine():
 
     return create_engine(f"mysql+pymysql://{user}:{password}@{host}/{db}")
 
-import os
-import time
-import pandas as pd
-import requests
-from sqlalchemy import create_engine
-from urllib.parse import quote_plus
 
 CACHE_DIR = "./cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 
 def cache_stale(path, max_age_minutes=30):
-    return not os.path.exists(path) or \
-           (time.time() - os.path.getmtime(path)) > max_age_minutes * 60
-
-def get_db_engine():
-    user = os.getenv("DB_USER")
-    password = quote_plus(os.getenv("DB_PASSWORD"))
-    host = os.getenv("DB_HOST")
-    db = os.getenv("DB_NAME")
-    return create_engine(f"mysql+pymysql://{user}:{password}@{host}/{db}")
+    return not os.path.exists(path) or (time.time() - os.path.getmtime(path)) > max_age_minutes * 60
 
 
 def load_311_data(force_refresh=False):
@@ -72,480 +81,168 @@ def load_311_data(force_refresh=False):
         return pd.read_parquet(cache_path)
 
     print("[LOAD] Fetching 311 data from API...")
-    api_url = "https://boston.ourcommunity.is/api/data/query?request=311_by_geo&category=all"
-    resp = requests.get(api_url)
-    resp.raise_for_status()
-    df = pd.DataFrame(resp.json())
+    url = "https://boston.ourcommunity.is/api/data/query?request=311_by_geo&category=all&app_version=0.5.1"
+    df = pd.DataFrame(requests.get(url).json())
 
-    df.rename(columns={'open_dt': 'date'}, inplace=True)
-    df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
-    df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
-    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    df.rename(columns={"open_dt": "date"}, inplace=True)
+    df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
+    df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df.dropna(subset=["latitude", "longitude", "date"], inplace=True)
-    df['normalized_type'] = df['type'].str.strip().str.title()
+    df["normalized_type"] = df["type"].str.strip().str.title()
+
+    valid_districts = ["B2", "B3", "C11"]
+    df = df[df["police_district"].isin(valid_districts)]
+
+    df = df[(df["latitude"] > 40) & (df["latitude"] < 43) & (df["longitude"] > -72) & (df["longitude"] < -70)]
 
     df.to_parquet(cache_path, index=False)
     return df
-
 
 
 def load_homicide_data(engine, force_refresh=False):
     cache_path = os.path.join(CACHE_DIR, "df_homicide.parquet")
     if not force_refresh and not cache_stale(cache_path):
         print("[CACHE] Using cached homicide data")
-        return pd.read_parquet(cache_path)
+        df = pd.read_parquet(cache_path)
+    else:
+        print("[LOAD] Fetching homicide data from DB...")
+        df = pd.read_sql("SELECT homicide_date AS date FROM homicide_data", con=engine)
+        df["date"] = pd.to_datetime(df["date"])
+        df.to_parquet(cache_path, index=False)
 
-    print("[LOAD] Fetching homicide data from DB...")
-    df = pd.read_sql("SELECT homicide_date AS date FROM homicide_data", con=engine)
-    df['date'] = pd.to_datetime(df['date'])
-
-    df.to_parquet(cache_path, index=False)
+    df["day"] = df["date"].dt.date
     return df
 
-def load_shots_fired_data(engine, force_refresh=False):
-    cache_path = os.path.join(CACHE_DIR, "df_shots.parquet")
-    if not force_refresh and not cache_stale(cache_path):
-        print("[CACHE] Using cached shots fired data")
-        return pd.read_parquet(cache_path)
 
-    print("[LOAD] Fetching shots fired data from DB...")
-    df = pd.read_sql(
-        "SELECT incident_date_time AS date, longitude, latitude, ballistics_evidence FROM shots_fired_data",
-        con=engine
-    )
-    df['date'] = pd.to_datetime(df['date'], errors='coerce')
-    df['ballistics_evidence'] = pd.to_numeric(df['ballistics_evidence'], errors='coerce')
-    df = df[df['ballistics_evidence'].isin([0, 1])]
-    df = df.dropna(subset=['latitude', 'longitude', 'date'])
+def load_shots_fired_data(engine, df_hom, force_refresh=False):
+    cache_path_shots = os.path.join(CACHE_DIR, "df_shots.parquet")
+    cache_path_matched = os.path.join(CACHE_DIR, "df_hom_shot_matched.parquet")
+
+    if not force_refresh and not cache_stale(cache_path_shots) and not cache_stale(cache_path_matched):
+        df = pd.read_parquet(cache_path_shots)
+        df_matched = pd.read_parquet(cache_path_matched)
+        return df, df_matched
+
+    print("[LOAD] Fetching shots fired data from API...")
+    url = "http://boston.ourcommunity.is/api/data/query?app_version=0.5.1&request=911_shots_fired"
+    resp = requests.get(url)
+    resp.raise_for_status()
+    df = pd.DataFrame(resp.json())
+
+    df.rename(columns={"incident_date_time": "date"}, inplace=True)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["ballistics_evidence"] = pd.to_numeric(df["ballistics_evidence"], errors="coerce")
     df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
     df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
-    df = df.dropna(subset=["latitude", "longitude"])
-    df["month"] = df["date"].dt.to_period("M").dt.to_timestamp()
 
-    df.to_parquet(cache_path, index=False)
-    return df
+    df.dropna(subset=["latitude", "longitude", "date"], inplace=True)
+    df = df[df["ballistics_evidence"].isin([0, 1])]
+    df["month"] = df["date"].dt.to_period("M").dt.to_timestamp()
+    df["day"] = df["date"].dt.date
+
+    confirmed = df[df["ballistics_evidence"] == 1].copy()
+    hom_days_set = set(df_hom["day"])
+    matched = confirmed[confirmed["day"].apply(lambda d: any((d + pd.Timedelta(days=offset)) in hom_days_set for offset in [-1, 0, 1]))]
+    matched["month"] = matched["date"].dt.to_period("M").dt.to_timestamp()
+
+    df.to_parquet(cache_path_shots, index=False)
+    matched.to_parquet(cache_path_matched, index=False)
+
+    return df, matched
 
 
 engine = get_db_engine()
-df_311 = load_311_data()
 df_hom = load_homicide_data(engine)
-df_shots = load_shots_fired_data(engine)
-
-raw_type_to_category = {
-    'Poor Conditions of Property': 'Living Conditions',
-    'Needle Pickup': 'Living Conditions',
-    'Unsatisfactory Living Conditions': 'Living Conditions',
-    'Rodent Activity': 'Living Conditions',
-    'Heat - Excessive Insufficient': 'Living Conditions',
-    'Unsafe Dangerous Conditions': 'Living Conditions',
-    'Pest Infestation - Residential': 'Living Conditions',
-    'Missed Trash/Recycling/Yard Waste/Bulk Item': 'Trash, Recycling, And Waste',
-    'Schedule a Bulk Item Pickup': 'Trash, Recycling, And Waste',
-    'CE Collection': 'Trash, Recycling, And Waste',
-    'Schedule a Bulk Item Pickup SS': 'Trash, Recycling, And Waste',
-    'Request for Recycling Cart': 'Trash, Recycling, And Waste',
-    'Illegal Dumping': 'Trash, Recycling, And Waste',
-    'Requests for Street Cleaning': 'Streets, Sidewalks, And Parks',
-    'Request for Pothole Repair': 'Streets, Sidewalks, And Parks',
-    'Unshoveled Sidewalk': 'Streets, Sidewalks, And Parks',
-    'Tree Maintenance Requests': 'Streets, Sidewalks, And Parks',
-    'Sidewalk Repair (Make Safe)': 'Streets, Sidewalks, And Parks',
-    'Street Light Outages': 'Streets, Sidewalks, And Parks',
-    'Sign Repair': 'Streets, Sidewalks, And Parks',
-    'Pothole': 'Streets, Sidewalks, And Parks',
-    'Parking Enforcement': 'Parking',
-    'Space Savers': 'Parking',
-    'Parking on Front/Back Yards (Illegal Parking)': 'Parking',
-    'Municipal Parking Lot Complaints': 'Parking',
-    'Valet Parking Problems': 'Parking',
-    'Private Parking Lot Complaints': 'Parking',
-}
-
-districts = {
-    "B3": "rgba(255, 255, 0, 0.7)",  
-    "B2": "rgba(0, 255, 255, 0.7)",   
-    "C11": "rgba(0, 255, 0, 0.7)"     
-}
-boston_url = "https://gisportal.boston.gov/ArcGIS/rest/services/PublicSafety/OpenData/MapServer/5/query"
-
-type_to_category = {
-    k.strip().title(): v for k, v in raw_type_to_category.items()
-}
-
-allowed_types = list(type_to_category.keys())
-types_str = "', '".join(allowed_types)
-
-
-api_url = "https://boston.ourcommunity.is/api/data/query?request=311_by_geo&category=all"
-
-start = time.perf_counter()
-start = time.perf_counter()
+df_shots, df_hom_shot_matched = load_shots_fired_data(engine, df_hom)
 df_311 = load_311_data()
-print(f"[TIMER] 311 data fetch + cleaning took {time.perf_counter() - start:.2f} seconds")
+engine.dispose()
 
-start = time.perf_counter()
-df_hom = load_homicide_data(engine)
-print(f"[TIMER] Homicide data fetch took {time.perf_counter() - start:.2f} seconds")
-
-start = time.perf_counter()
-df_shots = load_shots_fired_data(engine)
-print(f"[TIMER] Shots fired data fetch + cleaning took {time.perf_counter() - start:.2f} seconds")
+df_311["category"] = df_311["normalized_type"].map(type_to_category)
 
 
-df_shots['ballistics_evidence'] = pd.to_numeric(df_shots['ballistics_evidence'], errors='coerce')
-df_shots = df_shots[df_shots['ballistics_evidence'].isin([0, 1])]
+# slider months
+available_months = df_shots[(df_shots["month"] >= "2018-01-01") & (df_shots["month"] <= "2024-12-31")]["month"].dropna().sort_values().unique()
 
-engine.dispose()  
-
-df_311['category'] = df_311['normalized_type'].map(type_to_category)
-valid_districts = ['B2', 'B3', 'C11']
-df_311 = df_311[
-    df_311['category'].notna() &
-    df_311['police_district'].isin(valid_districts)
-]
-
-print("\ncoordinate ranges before filtering:")
-print(df_311[['latitude', 'longitude']].describe())
-
-df_311 = df_311[
-    (df_311['latitude'] > 40) & (df_311['latitude'] < 43) &  
-    (df_311['longitude'] > -72) & (df_311['longitude'] < -70)  
-]
-
-print("\ncoordinate ranges after filtering:")
-print(df_311[['latitude', 'longitude']].describe())
-print("remaining rows:", len(df_311))
-
-
-df_311['date'] = pd.to_datetime(df_311['date'])
-df_hom['date'] = pd.to_datetime(df_hom['date'])
-df_shots['date'] = pd.to_datetime(df_shots['date'])
-df_shots = df_shots.dropna(subset=['latitude', 'longitude'])
-
-
-df_shots = df_shots[
-    (df_shots['latitude'] > 40) & (df_shots['latitude'] < 43) &
-    (df_shots['longitude'] > -72) & (df_shots['longitude'] < -70)
-]
-df_shots['month'] = df_shots['date'].dt.to_period('M').dt.to_timestamp()
-df_shots['month'] = df_shots['date'].dt.to_period('M').dt.to_timestamp()
-
-
-#preparing coordinates, month, and ballistic evidence
-df_shots = df_shots.dropna(subset=["latitude", "longitude", "date"])
-df_shots["latitude"] = pd.to_numeric(df_shots["latitude"], errors="coerce")
-df_shots["longitude"] = pd.to_numeric(df_shots["longitude"], errors="coerce")
-df_shots = df_shots.dropna(subset=["latitude", "longitude"])
-
-df_shots["month"] = df_shots["date"].dt.to_period("M").dt.to_timestamp()
-
-#slider months
-available_months = df_shots[
-    (df_shots["month"] >= "2018-01-01") & (df_shots["month"] <= "2024-12-31")
-]["month"].dropna().sort_values().unique()
-
-month_labels = pd.Series(available_months).dt.strftime('%Y-%m').tolist()
+month_labels = pd.Series(available_months).dt.strftime("%Y-%m").tolist()
 slider_marks = {i: label for i, label in enumerate(month_labels) if i % 3 == 0}
 
 
 category_colors = {
-    'Living Conditions': "#ff7f0e",  
-    'Trash, Recycling, And Waste': "#2ca02c",     
-   'Streets, Sidewalks, And Parks': "#9467bd",   
-   'Parking': "#FFC0CB",
+    "Living Conditions": "#ff7f0e",
+    "Trash, Recycling, And Waste": "#2ca02c",
+    "Streets, Sidewalks, And Parks": "#9467bd",
+    "Parking": "#FFC0CB",
 }
 
 
-#hexbin map
-df_311 = df_311.dropna(subset=["latitude", "longitude"])
-
-map_center = {
-    "lat": df_311["latitude"].mean(),
-    "lon": df_311["longitude"].mean()
-}
+def chat_display_div(history):
+    return [html.Div([html.Strong(who + ":", style={"color": "#ff69b4" if who == "You" else "#00ffff"}), html.Span(" " + msg, style={"marginLeft": "6px", "fontStyle": "italic"} if msg == "_typing_..." else {"marginLeft": "6px"})], style={"marginBottom": "10px"}) for who, msg in history]
 
 
-df_311['count'] = 1
-grouped = df_311.groupby(['latitude', 'longitude', 'category']).size().reset_index(name='count')
-pivot = grouped.pivot_table(index=['latitude', 'longitude'], columns='category', values='count', fill_value=0).reset_index()
-pivot['total_count'] = pivot.drop(columns=['latitude', 'longitude']).sum(axis=1)
-def format_hover(row):
-    parts = [f"{col}: {int(row[col])}" for col in row.index if col not in ['latitude', 'longitude', 'total_count']]
-    return f"<b>Total: {int(row['total_count'])}</b><br>" + "<br>".join(parts)
+chat_history = [
+    (
+        "Assistant",
+        """**City Safety and Service Trends: January 2018**
 
-pivot['text'] = pivot.apply(format_hover, axis=1)
+**Overview:** January 2018 saw a typical seasonal uptick in 311 service requests related to winter weather and its impact on living conditions, trash collection, and street maintenance. However, concerning spikes in 911 incidents involving gun violence cast a shadow over otherwise expected trends.
+
+**311 Service Requests:**
+* **Living Conditions:** Requests for this category were elevated, likely due to heating issues and building maintenance challenges exacerbated by cold weather. This trend directly impacts resident quality of life, potentially increasing risks for vulnerable populations.
+* **Trash/Recycling/Waste:** Requests saw a minor increase, possibly attributable to holiday waste accumulation and weather-related collection delays. This impacts neighborhood cleanliness and can contribute to resident dissatisfaction.
+* **Streets/Sidewalks/Parks:** Requests significantly spiked, driven by snow removal needs, icy conditions, and pothole formation. This directly impacts pedestrian and vehicle safety, highlighting the need for timely and efficient winter street maintenance.
+* **Parking:** Requests were high, likely due to snow-related parking restrictions and limited space availability. This adds stress for residents already navigating challenging winter conditions.
+
+**911 Incident Data:**
+* **Homicides:** While the overall number remains relatively low, two homicides occurring in January represent a concerning start to the year and warrant further investigation into potential causes and contributing factors.
+* **Shots Fired:** Both confirmed and unconfirmed reports of shots fired were notably high in January, indicating a significant spike in gun violence. This trend raises serious concerns for neighborhood safety and necessitates a proactive response from law enforcement and community organizations.
+
+**Key Implications:**
+* While January typically sees increased 311 requests due to winter weather, the city must ensure efficient service delivery to maintain quality of life and address potential safety risks, particularly for vulnerable residents.
+* The surge in gun violence reflected in the 911 data demands immediate attention. Investigating underlying causes, implementing effective prevention strategies, and strengthening community partnerships are crucial to addressing this alarming trend and ensuring neighborhood safety.""",
+    )
+]
 
 
-fig_map = create_hexbin_mapbox(
-    data_frame=pivot,
-    lat="latitude",
-    lon="longitude",
-    nx_hexagon=30,
-    agg_func=np.sum,
-    color="total_count", 
-    opacity=0.7,
-    color_continuous_scale="Plasma",
-    mapbox_style="carto-darkmatter",
-    center=dict(lat=42.304, lon=-71.07),
-    zoom=11.5,
-    min_count=1,
-    labels={"total_count": "311 Requests"}
-)
-fig_map.update_layout(height=700, width=500)
-hexbin_geojson = fig_map.data[0].geojson
-
-fig_map.update_coloraxes(
-    colorbar=dict(
-        title=dict(
-            text="311 Requests",
-            font=dict(size=12, color="white")
+# dash initiate
+app = Dash(__name__, suppress_callback_exceptions=True, serve_locally=False, requests_pathname_prefix=DASH_REQUESTS_PATHNAME)
+app.layout = html.Div(
+    style={"backgroundColor": "black", "padding": "10px"},
+    children=[
+        html.H1("City Safety Dashboard", style={"textAlign": "center", "color": "white", "marginBottom": "15px"}),
+        dcc.Store(id="chat-history-store", data=chat_history),
+        html.Div([html.Div(id="cookie-setter-trigger", style={"display": "none"}), dcc.Store(id="page-load", data="loaded")]),
+        html.Div(
+            [
+                html.Div(
+                    [
+                        dcc.Graph(id="hexbin-map", style={"height": "800px", "width": "900px"}),
+                    ],
+                    style={"width": "58%", "display": "inline-block", "paddingLeft": "2%", "position": "relative", "verticalAlign": "top"},
+                ),
+                html.Div(
+                    [
+                        html.Div("🤖 Assistant", style={"color": "white", "fontWeight": "bold", "marginBottom": "8px", "fontSize": "16px"}),
+                        dcc.Loading(
+                            id="chat-loading",
+                            type="circle",
+                            color="#ff69b4",
+                            children=html.Div(chat_display_div(chat_history), id="chat-display", style={"height": "480px", "backgroundColor": "#1a1a1a", "color": "white", "border": "1px solid #444", "borderRadius": "8px", "padding": "10px", "overflowY": "auto", "marginBottom": "10px", "fontSize": "13px"}),
+                        ),
+                        dcc.Textarea(id="chat-input", placeholder="Type your question here...", style={"width": "100%", "height": "80px", "borderRadius": "8px", "backgroundColor": "#333", "color": "white", "border": "1px solid #555", "padding": "8px", "resize": "none", "fontSize": "13px"}),
+                        html.Button("SEND", id="send-button", n_clicks=0, style={"marginTop": "8px", "width": "100%", "backgroundColor": "#ff69b4", "color": "white", "border": "none", "borderRadius": "6px", "padding": "10px", "fontWeight": "bold", "cursor": "pointer"}),
+                    ],
+                    style={"width": "38%", "display": "inline-block", "paddingLeft": "2%", "verticalAlign": "top"},
+                ),
+            ],
+            style={"marginBottom": "2rem"},
         ),
-        orientation="h",
-        x=0.5,
-        y=1.1,
-        xanchor="center",
-        len=0.5,
-        thickness=12,
-        tickfont=dict(size=10, color="white"),
-        bgcolor="rgba(0,0,0,0)"
-    )
+        html.Div(
+            [dcc.Slider(id="hexbin-slider", min=0, max=len(month_labels) - 1, step=1, value=0, marks={i: {"label": label, "style": {"color": "white"}} for i, label in slider_marks.items()}, tooltip={"placement": "bottom", "always_visible": True}, className="rc-slider-311")],
+            style={"width": "100%", "margin": "0 auto", "paddingTop": "30px", "paddingBottom": "0px", "backgroundColor": "black"},
+        ),
+    ],
 )
-
-
-for district_code, color in districts.items():
-    params = {
-        "where": f"DISTRICT='{district_code}'",
-        "outFields": "DISTRICT",
-        "f": "geojson",
-        "outSR": "4326"
-    }
-    try:
-        resp = requests.get(boston_url, params=params)
-        geojson = resp.json()
-        coords = geojson['features'][0]['geometry']['coordinates']
-        poly_list = coords if isinstance(coords[0][0][0], float) else [p[0] for p in coords]
-        for poly in poly_list:
-            lons = [pt[0] for pt in poly]
-            lats = [pt[1] for pt in poly]
-            lons.append(poly[0][0]); lats.append(poly[0][1])
-            fig_map.add_trace(go.Scattermapbox(
-                lat=lats, lon=lons, mode='lines',
-                line=dict(color=color, width=3),
-                name=f"District {district_code}",
-                legendgroup=f"District {district_code}",
-                showlegend=(poly == poly_list[0]),  
-                hoverinfo='skip'
-            ))
-
-    except Exception as e:
-        print(f"district {district_code} boundary not added", e)
-
-
-
-center_lat = map_center["lat"]
-center_lon = map_center["lon"]
-
-print(f"map center set to: lat={center_lat}, lon={center_lon}")
-
-fig_map.update_layout(
-    mapbox=dict(
-        style="carto-darkmatter",
-        center=dict(lat=42.29, lon=-71.08),  # adjust center
-        zoom=12.2,  # tighter zoom
-        bounds=dict(
-            west=-71.125,  # left edge
-            east=-71.035,  # right edge
-            south=42.25,   # bottom edge
-            north=42.34    # top edge
-        )
-    ),
-    paper_bgcolor="black",
-    plot_bgcolor="black",
-    font_color="white",
-    legend=dict(
-        orientation="v",
-        x=1.02,
-        y=0.95,
-        font=dict(color='white'),
-        bgcolor="rgba(0,0,0,0)",
-        bordercolor="rgba(255,255,255,0.2)",
-        borderwidth=1
-    )
-)
-
-#legend
-for cat, col in category_colors.items():
-    fig_map.add_trace(go.Scattermapbox(
-        lat=[None], lon=[None], mode='markers',
-        marker=dict(size=10, color=col),
-        legendgroup=cat, showlegend=True, name=cat, hoverinfo='skip'
-    ))
-
-print("cats in filtered df_311:", df_311['category'].unique())
-
-
-#temporal chart
-df_311['month'] = df_311['date'].dt.to_period('M').dt.to_timestamp()  
-monthly_counts = df_311.groupby(['month', 'category']).size().reset_index(name='count')
-print("type of px:", type(px))  
-
-if monthly_counts.empty:
-    print(" no data to plot.")
-else:
-    fig_timeline = px.area(
-        monthly_counts, x='month', y='count', color='category',
-        title="311 Requests Over Time by Category",
-        color_discrete_map=category_colors,
-        labels={"count": "Number of Requests", "month": "Date", "category": "Category"}
-    )
-
-print("monthly counts:")
-print(monthly_counts.groupby('category')['count'].sum())
-
-
-fig_timeline.update_layout(
-    height=500,
-    paper_bgcolor="black", plot_bgcolor="black",
-    font_color="white", legend_bgcolor="rgba(0,0,0,0)",
-    xaxis=dict(title='Date', color='white', showgrid=False), yaxis=dict(title='311 Requests', color='white', showgrid=False)
-)
-
-#trend chart shots fired/ homicides
-df_hom['day'] = df_hom['date'].dt.date  
-df_shots['day'] = df_shots['date'].dt.date
-
-confirmed_shots = df_shots[df_shots["ballistics_evidence"] == 1].copy()
-confirmed_shots["day"] = confirmed_shots["date"].dt.date
-
-hom_days_set = set(df_hom['date'].dt.date)
-hom_matched = confirmed_shots[confirmed_shots["day"].apply(lambda d: any((d + pd.Timedelta(days=offset)) in hom_days_set for offset in [-1, 0, 1]))]
-
-df_hom_shot_matched = hom_matched.copy()
-df_hom_shot_matched["month"] = df_hom_shot_matched["date"].dt.to_period("M").dt.to_timestamp()
-
-
-hom_daily = df_hom.groupby('day').size().reset_index(name='homicides')
-shots_daily = df_shots.groupby('day').size().reset_index(name='shots')
-daily_merge = pd.merge(hom_daily, shots_daily, on='day', how='outer').fillna(0)
-daily_merge = daily_merge.sort_values('day')
-
-
-
-#dash initiate
-app = Dash(__name__, suppress_callback_exceptions=True,serve_locally=False, requests_pathname_prefix=DASH_REQUESTS_PATHNAME)
-app.layout = html.Div(style={'backgroundColor': 'black', 'padding': '10px'}, children=[    
-    html.H1("City Safety Dashboard", style={
-        'textAlign': 'center',
-        'color': 'white',
-        'marginBottom': '15px'
-    }),    
-    dcc.Store(id="chat-history-store", data=[]),
-    #set the cookie
-    html.Div([
-       html.Div(id="cookie-setter-trigger", style={"display": "none"}),
-       dcc.Store(id="page-load", data="loaded")
-    ]),
-    html.Div([
-        html.Div([
-            dcc.Graph(id='hexbin-map', style={'height': '800px', 'width': '900px'}),
-            html.Div([
-                dcc.Graph(id='hover-chart', style={'height': '180px', 'width': '250px'})
-            ], id='hover-container', style={
-                'display': 'none',
-                'backgroundColor': 'rgba(42,42,42,0.95)',
-                'borderRadius': '8px',
-                'padding': '4px',
-                'overflow': 'hidden',
-                'position': 'absolute',
-                'zIndex': 1000,
-                'boxShadow': '2px 2px 12px rgba(0,0,0,0.5)'
-            })
-        ], style={
-            'width': '58%',
-            'display': 'inline-block',
-            'paddingLeft': '2%',
-            'position': 'relative',
-            'verticalAlign': 'top'
-        }),
-
-        html.Div([
-            html.Div("🤖 Assistant", style={
-                'color': 'white',
-                'fontWeight': 'bold',
-                'marginBottom': '8px',
-                'fontSize': '16px'
-            }),
-            dcc.Loading(
-                id="chat-loading",
-                type="circle",
-                color="#ff69b4",
-                children=html.Div(id='chat-display', style={
-                    'height': '480px',
-                    'backgroundColor': '#1a1a1a',
-                    'color': 'white',
-                    'border': '1px solid #444',
-                    'borderRadius': '8px',
-                    'padding': '10px',
-                    'overflowY': 'auto',
-                    'marginBottom': '10px',
-                    'fontSize': '13px'
-                })
-            ),
-            dcc.Textarea(
-                id='chat-input',
-                placeholder='Type your question here...',
-                style={
-                    'width': '100%',
-                    'height': '80px',
-                    'borderRadius': '8px',
-                    'backgroundColor': '#333',
-                    'color': 'white',
-                    'border': '1px solid #555',
-                    'padding': '8px',
-                    'resize': 'none',
-                    'fontSize': '13px'
-                }
-            ),
-            html.Button("SEND", id='send-button', n_clicks=0, style={
-                'marginTop': '8px',
-                'width': '100%',
-                'backgroundColor': '#ff69b4',
-                'color': 'white',
-                'border': 'none',
-                'borderRadius': '6px',
-                'padding': '10px',
-                'fontWeight': 'bold',
-                'cursor': 'pointer'
-            }),
-
-        ], style={
-            'width': '38%',
-            'display': 'inline-block',
-            'paddingLeft': '2%',
-            'verticalAlign': 'top'
-        })
-
-    ], style={'marginBottom': '2rem'}),
-
-    html.Div([
-        dcc.Slider(
-            id='hexbin-slider',
-            min=0,
-            max=len(month_labels) - 1,
-            step=1,
-            value=0,
-            marks={i: {'label': label, 'style': {'color': 'white'}} for i, label in slider_marks.items()},
-            tooltip={"placement": "bottom", "always_visible": True},
-            className='rc-slider-311'
-        )
-    ], style={
-        'width': '100%',
-        'margin': '0 auto',
-        'paddingTop': '30px',
-        'paddingBottom': '0px',
-        'backgroundColor': 'black'
-    })
-])
 
 
 # Clientside callback to set cookie on page load
@@ -561,279 +258,84 @@ app.clientside_callback(
     }
     """,
     Output("cookie-status", "children"),
-    Input("page-load", "data")
+    Input("page-load", "data"),
 )
 
 
-from dash.dependencies import Input, Output, State
-from shapely.geometry import Point, Polygon
-
-@app.callback(
-    [Output('hover-chart', 'figure'),
-     Output('hover-container', 'style')],
-    [Input('hexbin-map', 'hoverData')],
-    [State('hexbin-map', 'figure')]
-)
-def update_hover_chart(hoverData, hexmap_fig):
-    start = time.perf_counter()
-
-    if not hoverData or 'points' not in hoverData:
-        return go.Figure(), {'display': 'none'}
-
-    point = hoverData['points'][0]
-
-    if 'location' not in point:
-        return go.Figure(), {'display': 'none'}
-
-    hex_id = point['location']
-
-    bbox = point.get('bbox', {})
-
-    if not hex_id or 'x0' not in bbox or 'y0' not in bbox:
-        return go.Figure(), {'display': 'none'}
-
-    x_pos = bbox['x0']
-    y_pos = bbox['y0']
-
-    geojson = hexmap_fig['data'][0].get('geojson')
-    if not geojson:
-
-        return go.Figure(), {'display': 'none'}
-
-    coords = None
-    for feature in geojson['features']:
-        if feature.get('id') == hex_id:
-            coords = feature['geometry']['coordinates'][0]
-            break
-
-    if not coords:
-
-        return go.Figure(), {'display': 'none'}
-    
-    
-
-    polygon = Polygon(coords)
-    from shapely import vectorized
-
-    lons = df_311['longitude'].values
-    lats = df_311['latitude'].values
-    mask = vectorized.contains(polygon, lons, lats)
-    points_in_hex = df_311[mask]
-
-
-    print(f"points in hoveredhex: {len(points_in_hex)}")
-
-    if points_in_hex.empty:
-        
-        return go.Figure(), {'display': 'none'}
-
-    cat_counts = points_in_hex['category'].value_counts().reset_index()
-    cat_counts.columns = ['Category', 'Count']
-    print("cat counts in hex:\n", cat_counts)
-
-    if cat_counts.empty:
-        print("no cat data")
-        return go.Figure(), {'display': 'none'}
-
-    fig = px.bar(
-        cat_counts, x='Category', y='Count',
-        title='311 Requests in Area',
-        color='Category',
-        color_discrete_map=category_colors
-    )
-    fig.update_layout(
-        height=180, width=250,
-        margin=dict(t=30, b=20, l=10, r=10),
-        paper_bgcolor='#2a2a2a',  # dark grey
-        plot_bgcolor='#2a2a2a',
-        font=dict(size=10, color='white'),
-        showlegend=False,
-        title=dict(font=dict(size=12, color='white'), x=0.5, xanchor='center'),
-        xaxis=dict(
-            tickangle=-35, 
-            tickfont=dict(size=8, color='white'),
-            title=None
-        ),
-        yaxis=dict(
-            showgrid=False,
-            zeroline=False,
-            tickfont=dict(size=8, color='white'),
-            title='Count'
-        )
-    )
-   
-
-
-    style = {
-        'position': 'absolute',
-        'top': f'{y_pos - 50}px',
-        'left': f'{x_pos + 20}px',
-        'display': 'block',
-        'backgroundColor': '#2a2a2a',  
-        'boxShadow': '3px 3px 12px rgba(0,0,0,0.6)',
-        'borderRadius': '10px',
-        'padding': '6px',
-        'zIndex': 1000,
-        'border': '1px solid #444'
-    }
-
-
-    print(f"[TIMER] update_hover_chart took {time.perf_counter() - start:.2f} seconds")
-    return fig, style
-
-def add_district_boundaries(fig):
-    for district_code, color in districts.items():
-        params = {
-            "where": f"DISTRICT='{district_code}'",
-            "outFields": "DISTRICT",
-            "f": "geojson",
-            "outSR": "4326"
-        }
-        try:
-            resp = requests.get(boston_url, params=params)
-            geojson = resp.json()
-            coords = geojson['features'][0]['geometry']['coordinates']
-            poly_list = coords if isinstance(coords[0][0][0], float) else [p[0] for p in coords]
-            for poly in poly_list:
-                lons = [pt[0] for pt in poly]
-                lats = [pt[1] for pt in poly]
-                lons.append(poly[0][0]); lats.append(poly[0][1])
-                fig.add_trace(go.Scattermapbox(
-                    lat=lats, lon=lons, mode='lines',
-                    line=dict(color=color, width=3),
-                    name=f"District {district_code}",
-                    legendgroup=f"District {district_code}",
-                    showlegend=(poly == poly_list[0]),  
-                    hoverinfo='skip'
-                ))
-
-        except Exception as e:
-            print(f"district {district_code} boundary not added", e)
-
-
-@app.callback(
-    Output('hexbin-map', 'figure'),
-    Input('hexbin-slider', 'value')
-)
+@app.callback(Output("hexbin-map", "figure"), Input("hexbin-slider", "value"))
 def update_hexbin_map(month_index):
     start = time.perf_counter()
     selected_month = available_months[month_index]
-    month_str = selected_month.strftime('%B %Y')
+    month_str = selected_month.strftime("%B %Y")
 
-    df_month = df_311[df_311['date'].dt.to_period('M').dt.to_timestamp() == selected_month]
+    df_month = df_311[df_311["date"].dt.to_period("M").dt.to_timestamp() == selected_month]
     if df_month.empty:
         return go.Figure()
 
     # Prepare hexbin
-    df_month['count'] = 1
-    grouped = df_month.groupby(['latitude', 'longitude', 'category']).size().reset_index(name='count')
-    pivot = grouped.pivot_table(index=['latitude', 'longitude'], columns='category', values='count', fill_value=0).reset_index()
-    pivot['total_count'] = pivot.drop(columns=['latitude', 'longitude']).sum(axis=1)
-    pivot['text'] = pivot.apply(format_hover, axis=1)
+    df_month["count"] = 1
+    grouped = df_month.groupby(["latitude", "longitude", "category"]).size().reset_index(name="count")
+    pivot = grouped.pivot_table(index=["latitude", "longitude"], columns="category", values="count", fill_value=0).reset_index()
+    pivot["total_count"] = pivot.drop(columns=["latitude", "longitude"]).sum(axis=1)
 
-    fig = create_hexbin_mapbox(
-        data_frame=pivot,
-        lat="latitude",
-        lon="longitude",
-        nx_hexagon=20,
-        agg_func=np.sum,
-        color="total_count",
-        opacity=0.7,
-        color_continuous_scale=px.colors.sequential.Plasma[::-1],
-        mapbox_style="carto-darkmatter",
-        center=dict(lat=42.304, lon=-71.07),
-        zoom=11.9,
-        min_count=1,
-        labels={"total_count": "311 Requests"}
-    )
+    fig = create_hexbin_mapbox(data_frame=pivot, lat="latitude", lon="longitude", nx_hexagon=20, agg_func=np.sum, color="total_count", opacity=0.7, color_continuous_scale=px.colors.sequential.Plasma[::-1], mapbox_style="carto-darkmatter", center=dict(lat=42.304, lon=-71.07), zoom=11.9, min_count=1, labels={"total_count": "311 Requests"})
+    fig.data[0].hovertemplate = "incidents = %{z}<extra></extra>"
 
-    fig.update_coloraxes(colorbar=dict(
-        title=dict(text="311 Requests", font=dict(size=12, color="white")),
-        orientation="h", x=0.5, y=1.0, xanchor="center", len=0.5,
-        thickness=12, tickfont=dict(size=10, color="white"), bgcolor="rgba(0,0,0,0)"
-    ))
-
+    fig.update_coloraxes(colorbar=dict(title=dict(text="311 Requests", font=dict(size=12, color="white")), orientation="h", x=0.5, y=1.0, xanchor="center", len=0.5, thickness=12, tickfont=dict(size=10, color="white"), bgcolor="rgba(0,0,0,0)"))
 
     for district_code, color in districts.items():
         try:
-            params = {
-                "where": f"DISTRICT='{district_code}'",
-                "outFields": "DISTRICT", "f": "geojson", "outSR": "4326"
-            }
+            params = {"where": f"DISTRICT='{district_code}'", "outFields": "DISTRICT", "f": "geojson", "outSR": "4326"}
             resp = requests.get(boston_url, params=params)
             geojson = resp.json()
-            coords = geojson['features'][0]['geometry']['coordinates']
+            coords = geojson["features"][0]["geometry"]["coordinates"]
             poly_list = coords if isinstance(coords[0][0][0], float) else [p[0] for p in coords]
             for i, poly in enumerate(poly_list):
                 lons = [pt[0] for pt in poly] + [poly[0][0]]
                 lats = [pt[1] for pt in poly] + [poly[0][1]]
-                fig.add_trace(go.Scattermapbox(
-                    lat=lats, lon=lons, mode='lines',
-                    line=dict(color=color, width=3),
-                    name=f"District {district_code}",
-                    legendgroup=f"District {district_code}",
-                    showlegend=(i == 0), 
-                    hoverinfo='skip'
-                ))
+                fig.add_trace(go.Scattermapbox(lat=lats, lon=lons, mode="lines", line=dict(color=color, width=3), name=f"District {district_code}", legendgroup=f"District {district_code}", showlegend=(i == 0), hoverinfo="skip"))
 
         except Exception as e:
             print(f"district {district_code} boundary not added", e)
 
-
     dorchester_url = "https://gis.bostonplans.org/hosting/rest/services/Hosted/Boston_Neighborhood_Boundaries/FeatureServer/1/query"
-    params = {
-        "where": "name='Dorchester'",
-        "outFields": "*",
-        "f": "geojson",
-        "outSR": "4326"
-    }
+    params = {"where": "name='Dorchester'", "outFields": "*", "f": "geojson", "outSR": "4326"}
 
     try:
-        
-        resp = requests.get(dorchester_url, params=params)
 
+        resp = requests.get(dorchester_url, params=params)
 
         if resp.status_code != 200:
 
             raise Exception(f"Request failed with status code {resp.status_code}")
 
-        
-        geojson = resp.json()  
-        features = geojson.get('features', [])
-
+        geojson = resp.json()
+        features = geojson.get("features", [])
 
         if not features:
             print("no features found in geojson")
         else:
-            geometry = features[0].get('geometry', {})
-            print("geometry type:", geometry.get('type'))
+            geometry = features[0].get("geometry", {})
+            print("geometry type:", geometry.get("type"))
 
-            if geometry['type'] == "Polygon":
-                polygons = [geometry['coordinates']]
-            elif geometry['type'] == "MultiPolygon":
-                polygons = geometry['coordinates']
+            if geometry["type"] == "Polygon":
+                polygons = [geometry["coordinates"]]
+            elif geometry["type"] == "MultiPolygon":
+                polygons = geometry["coordinates"]
             else:
-                print("unexpected geometry type:", geometry['type'])
+                print("unexpected geometry type:", geometry["type"])
                 polygons = []
 
             for i, polygon in enumerate(polygons):
                 for j, ring in enumerate(polygon):
-                    show = (i == 0 and j == 0)
+                    show = i == 0 and j == 0
                     lons = [pt[0] for pt in ring] + [ring[0][0]]
                     lats = [pt[1] for pt in ring] + [ring[0][1]]
-                    fig.add_trace(go.Scattermapbox(
-                        lat=lats, lon=lons, mode='lines',
-                        line=dict(color='white', width=3),
-                        name="Neighborhood: Dorchester",
-                        legendgroup="Neighborhood: Dorchester",
-                        showlegend=show,
-                        hoverinfo='skip'
-                    ))
+                    fig.add_trace(go.Scattermapbox(lat=lats, lon=lons, mode="lines", line=dict(color="white", width=3), name="Neighborhood: Dorchester", legendgroup="Neighborhood: Dorchester", showlegend=show, hoverinfo="skip"))
             print("dorchester boundary successfully added.")
 
     except Exception as e:
         print("dorchester boundary not added:", e)
-
 
     df_month_shots = df_shots[df_shots["month"] == selected_month]
     confirmed = df_month_shots[df_month_shots["ballistics_evidence"] == 1]
@@ -843,83 +345,26 @@ def update_hexbin_map(month_index):
     hom_this_month["latitude"] += 0.0020
     hom_this_month["longitude"] += 0.0020
 
+    fig.add_trace(go.Scattermapbox(lat=confirmed["latitude"], lon=confirmed["longitude"], mode="markers", name="Confirmed (Ballistic)", marker=dict(color="red", size=9, opacity=1), hoverinfo="text", text=confirmed["date"].dt.strftime("%Y-%m-%d %H:%M")))
 
-    fig.add_trace(go.Scattermapbox(
-        lat=confirmed["latitude"],
-        lon=confirmed["longitude"],
-        mode="markers",
-        name="Confirmed (Ballistic)",
-        marker=dict(color="red", size=9, opacity=1),
-        hoverinfo="text",
-        text=confirmed["date"].dt.strftime('%Y-%m-%d %H:%M')
-    ))
+    fig.add_trace(go.Scattermapbox(lat=unconfirmed["latitude"], lon=unconfirmed["longitude"], mode="markers", name="Unconfirmed", marker=dict(color="#1E90FF", size=7, opacity=1), hoverinfo="text", text=unconfirmed["date"].dt.strftime("%Y-%m-%d %H:%M")))
 
-
-    fig.add_trace(go.Scattermapbox(
-        lat=unconfirmed["latitude"],
-        lon=unconfirmed["longitude"],
-        mode="markers",
-        name="Unconfirmed",
-        marker=dict(color="#1E90FF", size=7, opacity=1),
-        hoverinfo="text",
-        text=unconfirmed["date"].dt.strftime('%Y-%m-%d %H:%M')
-    ))
-
-
-    fig.add_trace(go.Scattermapbox(
-        lat=hom_this_month["latitude"],
-        lon=hom_this_month["longitude"],
-        mode="markers",
-        name="Matched Homicides",
-        marker=dict(color="limegreen", size=10, opacity=1),
-        hoverinfo="text",
-        text=hom_this_month["date"].dt.strftime('%Y-%m-%d %H:%M')
-    ))
+    fig.add_trace(go.Scattermapbox(lat=hom_this_month["latitude"], lon=hom_this_month["longitude"], mode="markers", name="Matched Homicides", marker=dict(color="limegreen", size=10, opacity=1), hoverinfo="text", text=hom_this_month["date"].dt.strftime("%Y-%m-%d %H:%M")))
 
     fig.update_layout(
         title=f"311 Requests + Shots Fired + Homicides ({month_str})",
-        title_font=dict(size=18, color='white'),
+        title_font=dict(size=18, color="white"),
         title_x=0.5,
         paper_bgcolor="black",
         plot_bgcolor="black",
         font_color="white",
-        legend=dict(
-            orientation="h",
-            x=0.5,
-            y=0.01,
-            xanchor="center",
-            font=dict(color='white'),
-            bgcolor="rgba(0,0,0,0)",
-            bordercolor="rgba(255,255,255,0.2)",
-            borderwidth=1
-        )
-
+        legend=dict(orientation="h", x=0.5, y=0.01, xanchor="center", font=dict(color="white"), bgcolor="rgba(0,0,0,0)", bordercolor="rgba(255,255,255,0.2)", borderwidth=1),
     )
     print(f"[TIMER] update_hexbin_map ({month_str}) took {time.perf_counter() - start:.2f} seconds")
     return fig
 
 
-chat_history = []
-
-def chat_display_div(history):
-    return [
-        html.Div([
-            html.Strong(who + ":", style={"color": "#ff69b4" if who == "You" else "#00ffff"}),
-            html.Span(" " + msg, style={"marginLeft": "6px", "fontStyle": "italic"} if msg == "_typing_..." else {"marginLeft": "6px"})
-        ], style={"marginBottom": "10px"})
-        for who, msg in history
-    ]
-
-
-@app.callback(
-    [Output("chat-history-store", "data"),
-     Output("chat-display", "children"),
-     Output("chat-input", "value")],
-    [Input("send-button", "n_clicks"),
-     Input("hexbin-slider", "value")],
-    [State("chat-input", "value"),
-     State("chat-history-store", "data")]
-)
+@app.callback([Output("chat-history-store", "data"), Output("chat-display", "children"), Output("chat-input", "value")], [Input("send-button", "n_clicks"), Input("hexbin-slider", "value")], [State("chat-input", "value"), State("chat-history-store", "data")])
 def handle_chat_simple(n_clicks, slider_val, user_input, history):
     start = time.perf_counter()
     triggered_id = ctx.triggered_id
@@ -927,11 +372,10 @@ def handle_chat_simple(n_clicks, slider_val, user_input, history):
     if history is None:
         history = []
 
-    selected_date = available_months[slider_val].strftime('%B %Y')
-
+    selected_date = available_months[slider_val].strftime("%B %Y")
 
     if triggered_id == "hexbin-slider":
-
+        history = []
         prompt = (
             f"Provide a professional summary of key trends in the city's safety and service data for {selected_date}. "
             f"Use both 311 service request data (grouped into four categories: Living Conditions, Trash/Recycling/Waste, "
@@ -947,7 +391,6 @@ def handle_chat_simple(n_clicks, slider_val, user_input, history):
         history.append(("You", user_input.strip()))
         prompt = (
             f"The data shows 311 service requests and 911 incidents for {selected_date} in Boston neighborhoods.\n\n"
-            
             f"311 data reflects concerns about neighborhood conditions and quality of life. The request types are grouped into four major categories:\n"
             "- **Living Conditions**: 'Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', "
             "'Rodent Activity', 'Heat - Excessive Insufficient', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential'\n"
@@ -957,32 +400,22 @@ def handle_chat_simple(n_clicks, slider_val, user_input, history):
             "'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair', 'Pothole'\n"
             "- **Parking**: 'Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', "
             "'Valet Parking Problems', 'Private Parking Lot Complaints'\n\n"
-
             f"911 data includes reported homicides and shots fired, indicating incidents of violent crime.\n\n"
-
             f"Text content includes quotes from community meetings and interviews. Some residents believe violence is decreasing, while others still feel unsafe. "
             f"Concerns range from housing quality and trash overflow to gang activity and street-level violence.\n\n"
-
             f"Using both data and text content, explain how these two types of information reflect community safety. "
             f"Describe why there might be disagreement between what the data shows and how people feel. "
             f"Point out notable spikes, drops, or emerging patterns in the data for {selected_date}, and connect them to lived experiences and perceptions. "
             f"Use the grouped 311 categories and the 911 incident data together to provide a holistic, narrative-driven analysis.\n\n"
-
             f"User's question: {user_input.strip()}"
         )
 
-
     else:
-        
+
         raise PreventUpdate
 
-
     try:
-        response = requests.post(
-            "https://boston.ourcommunity.is/api/chat?context_request=experiment_5",
-            headers={"Content-Type": "application/json"},
-            json={"client_query": prompt, "app_version": "5"}
-        )
+        response = requests.post("https://boston.ourcommunity.is/api/chat?context_request=experiment_5", headers={"Content-Type": "application/json"}, json={"client_query": prompt, "app_version": "5"})
         response.raise_for_status()
         reply = response.json().get("response", "[No reply received]")
     except Exception as e:
@@ -992,9 +425,9 @@ def handle_chat_simple(n_clicks, slider_val, user_input, history):
     print(f"[TIMER] handle_chat_simple triggered by {triggered_id} took {time.perf_counter() - start:.2f} seconds")
     return history, chat_display_div(history), ""
 
+
 server = app.server
 print(f"[TIMER] Total Dash app setup time: {time.perf_counter() - global_start:.2f} seconds")
 
-
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    app.run(debug=True)

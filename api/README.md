@@ -6,39 +6,71 @@ This project is a **Flask-based REST-ish API** supporting the RethinkAI experime
 
 #### **GET crime and 311 data as geoJson objects***
 ```
-GET /data/query?app_version=<0.0>&request=<request_type>&category=<311_category>&date=%Y-%m&zipcode=<zipcode>&stream=<True/False>
+GET /data/query?request=<request_type>&category=<311_category>&date=%Y-%m&zipcode=<zipcode>&stream&app_version=<0.0>=<True/False>
 ```
 ##### Query arguments:
-```request=<request_type>``` is one of: 
-**Crime Data**
-- **911_shots_fired** - return shots fired w/ location
-- **911_shots_fired_count_confirmed** - return count of confirmed shots fired by year with totals by quarter, and month
-- **911_shots_fired_count_unconfirmed** - return count of unconfirmed shots fired by year with totals by quarter, and month
-- **911_homicides** - return counts for homicides by year with totals by quarter, and month
-- **911_homicides_and_shots_fired** - return matches where a homicide and shot_fired occurred same date, same police district
-
-**311 Data**
-> 311_by\* requires ```category={living_conditions | trash | streets | parking | all}```  
-> 311_on\* requires ```date=%Y-%m ```  
-> 311_on_date_count optionally takes &zipcode=\<zipcode\> to filter by zip (for hover chart)  
-- **311_by_geo** - return locations of 311 data, by type option below. *Large data set*.
-- **311_by_total** - return total counts by year with quarter and month, by type option below
-- **311_by_type** - return counts for each type in type option below
-- **311_year_month** - return all 311 dates in %Y-%m format
-- **311_on_date_count** - return category counts by date, 
-- **311_on_date_geo** - returns all lat/longs for 311 categories by date, requires '&date=%Y-%m'
-  
-    
+```app_version=<n.n>```    
 ```category={living_conditions | trash | streets | parking | all}```  
 ```date=%Y-%m``` is date in format 2020-04  
-```zipcode=<zipcode>``` can take one or more zipcodes: 02121, 02124  
-```stream=<True/False>``` toggles streamed data on query, important for queries that return large sets
-##### Other
-- **zip_geo** - returns geojson object for requested zipcodes, requires &zipcode=\<zipcode,zipcode,...\>
+```stream=<True/False>``` toggles streamed data on query, important for queries that return large sets  
+```request=<request_type>``` is one of:   
 
-*Response*
+**Required**:
+Set 'category=\<category_name\>' 
 
-{json object}
+**Requested**:
+Set 'app_version' for logging purposes
+Set 'stream=True' to return data streams for large queries, default is 'False'
+
+**Optional**:
+When 'date' is set, response is only for that date (YYYY-MM)
+When 'zipcode' is set, response is limited to that (or those) zipcodes
+
+##### Examples:
+
+```GET /data/query?request=311_by_geo&app_version=5.5&category=all&date=2019-02&stream=True```   
+
+*Response*: 
+```
+[{"type": "Street Light Outages", "date": "2019-02-01T01:01:00", "latitude": 42.28815955047899, "longitude": -71.07624064392203, "normalized_type": "Streets, Sidewalks, And Parks"},
+{"type": "Request for Pothole Repair", "date": "2019-02-01T02:36:00", "latitude": 42.28799780855182, "longitude": -71.07788181270013, "normalized_type": "Streets, Sidewalks, And Parks"},
+{"type": "Illegal Dumping", "date": "2019-02-01T03:34:00", "latitude": 42.3136695303992, "longitude": -71.06354055837639, "normalized_type": "Trash, Recycling, And Waste"},
+{"type": "Parking Enforcement", "date": "2019-02-01T03:42:00", "latitude": 42.30033128015117, "longitude": -71.05554981087488, "normalized_type": "Parking"},
+...]
+```  
+
+```GET /data/query?request=311_by_geo&app_version=5.5&category=all&stream=True```
+  
+*Response*: 
+```
+[{"type": "Unshoveled Sidewalk", "date": "2018-01-01T01:13:49", "latitude": 42.29328953098479, "longitude": -71.06248060117767, "normalized_type": "Streets, Sidewalks, And Parks"},
+{"type": "Requests for Street Cleaning", "date": "2018-01-01T01:17:25", "latitude": 42.29318951933669, "longitude": -71.05414058306353, "normalized_type": "Streets, Sidewalks, And Parks"},
+{"type": "Pest Infestation - Residential", "date": "2018-01-01T04:42:00", "latitude": 42.29162964489721, "longitude": -71.07515104543928, "normalized_type": "Living Conditions"},
+{"type": "Poor Conditions of Property", "date": "2018-01-01T07:14:03", "latitude": 42.31125956241783, "longitude": -71.08671061589506, "normalized_type": "Living Conditions"},
+...]
+```  
+
+```GET /data/query?request=911_shots_fired&app_version=5.5&stream=True```
+
+*Response*: 
+```
+[{"date": "2018-11-27T18:28:00", "ballistics_evidence": 0, "latitude": 42.31106389, "longitude": -71.07089457},
+{"date": "2018-11-30T05:24:00", "ballistics_evidence": 0, "latitude": 42.29899805, "longitude": -71.06538128},
+{"date": "2018-12-02T02:45:00", "ballistics_evidence": 1, "latitude": 42.30201489, "longitude": -71.0777625},
+{"date": "2018-11-30T23:44:00", "ballistics_evidence": 1, "latitude": 42.30312067, "longitude": -71.06066511},
+...]
+```  
+
+```GET /data/query?request=911_homicides_and_shots_fired&app_version=5.5&stream=True```
+
+*Response*: 
+```
+[{"date": "2019-08-06T05:29:20", "latitude": 42.27119574, "longitude": -71.09732141},
+{"date": "2019-08-06T05:29:20", "latitude": 42.30473204, "longitude": -71.08111101},
+{"date": "2020-01-23T00:15:39", "latitude": 42.31419046, "longitude": -71.06550668},
+{"date": "2020-02-05T23:28:42", "latitude": 42.31372767, "longitude": -71.07216273},
+...]
+```
 
 
 ### /chat \[ POST \]
