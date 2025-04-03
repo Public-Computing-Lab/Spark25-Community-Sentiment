@@ -91,8 +91,8 @@ def load_311_data(force_refresh=False):
     df.dropna(subset=["latitude", "longitude", "date"], inplace=True)
     df["normalized_type"] = df["type"].str.strip().str.title()
 
-    valid_districts = ["B2", "B3", "C11"]
-    df = df[df["police_district"].isin(valid_districts)]
+    # valid_districts = ["B2", "B3", "C11"]
+    # df = df[df["police_district"].isin(valid_districts)]
 
     df = df[(df["latitude"] > 40) & (df["latitude"] < 43) & (df["longitude"] > -72) & (df["longitude"] < -70)]
 
