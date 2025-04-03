@@ -71,6 +71,7 @@ build/
 *.tmp
 *.log
 gemini_api.key.txt
+cookies.txt
 
 # nova
 .nova

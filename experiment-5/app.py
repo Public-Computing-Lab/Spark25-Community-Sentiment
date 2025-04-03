@@ -3,15 +3,14 @@ import time
 import requests
 import numpy as np
 import pandas as pd
-from urllib.parse import quote_plus
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
 from dash import Dash, dcc, html, ctx
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.figure_factory import create_hexbin_mapbox
+import io
 
 
 global_start = time.perf_counter()
@@ -20,51 +19,11 @@ load_dotenv()
 
 PORT = os.getenv("EXPERIMENT_5_PORT")
 DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_5_DASH_REQUESTS_PATHNAME")
-
-raw_type_to_category = {
-    "Poor Conditions of Property": "Living Conditions",
-    "Needle Pickup": "Living Conditions",
-    "Unsatisfactory Living Conditions": "Living Conditions",
-    "Rodent Activity": "Living Conditions",
-    "Heat - Excessive Insufficient": "Living Conditions",
-    "Unsafe Dangerous Conditions": "Living Conditions",
-    "Pest Infestation - Residential": "Living Conditions",
-    "Missed Trash/Recycling/Yard Waste/Bulk Item": "Trash, Recycling, And Waste",
-    "Schedule a Bulk Item Pickup": "Trash, Recycling, And Waste",
-    "CE Collection": "Trash, Recycling, And Waste",
-    "Schedule a Bulk Item Pickup SS": "Trash, Recycling, And Waste",
-    "Request for Recycling Cart": "Trash, Recycling, And Waste",
-    "Illegal Dumping": "Trash, Recycling, And Waste",
-    "Requests for Street Cleaning": "Streets, Sidewalks, And Parks",
-    "Request for Pothole Repair": "Streets, Sidewalks, And Parks",
-    "Unshoveled Sidewalk": "Streets, Sidewalks, And Parks",
-    "Tree Maintenance Requests": "Streets, Sidewalks, And Parks",
-    "Sidewalk Repair (Make Safe)": "Streets, Sidewalks, And Parks",
-    "Street Light Outages": "Streets, Sidewalks, And Parks",
-    "Sign Repair": "Streets, Sidewalks, And Parks",
-    "Pothole": "Streets, Sidewalks, And Parks",
-    "Parking Enforcement": "Parking",
-    "Space Savers": "Parking",
-    "Parking on Front/Back Yards (Illegal Parking)": "Parking",
-    "Municipal Parking Lot Complaints": "Parking",
-    "Valet Parking Problems": "Parking",
-    "Private Parking Lot Complaints": "Parking",
-}
+APP_VERSION = os.getenv("EXPERIMENT_5_VERSION", "0.5.1")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://boston.ourcommunity.is/api")
 
 districts = {"B3": "rgba(255, 255, 0, 0.7)", "B2": "rgba(0, 255, 255, 0.7)", "C11": "rgba(0, 255, 0, 0.7)"}
 boston_url = "https://gisportal.boston.gov/ArcGIS/rest/services/PublicSafety/OpenData/MapServer/5/query"
-
-type_to_category = {k.strip().title(): v for k, v in raw_type_to_category.items()}
-
-
-def get_db_engine():
-    user = os.getenv("DB_USER")
-    password = quote_plus(os.getenv("DB_PASSWORD"))
-    host = os.getenv("DB_HOST")
-    db = os.getenv("DB_NAME")
-
-    return create_engine(f"mysql+pymysql://{user}:{password}@{host}/{db}")
-
 
 CACHE_DIR = "./cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
@@ -74,6 +33,76 @@ def cache_stale(path, max_age_minutes=30):
     return not os.path.exists(path) or (time.time() - os.path.getmtime(path)) > max_age_minutes * 60
 
 
+def stream_to_dataframe(url: str) -> pd.DataFrame:
+
+    with requests.get(url, stream=True) as response:
+        if response.status_code != 200:
+            raise Exception(f"Error: {response.status_code} - {response.text}")
+
+        json_data = io.StringIO()
+
+        buffer = ""
+        in_array = False
+
+        for chunk in response.iter_content(chunk_size=1024, decode_unicode=True):
+            if not chunk:
+                continue
+
+            buffer += chunk
+
+            # Handle the opening of the JSON array
+            if not in_array and "[\n" in buffer:
+                in_array = True
+                json_data.write("[")
+                buffer = buffer.replace("[\n", "")
+
+            # Process complete JSON objects
+            while in_array:
+                if ",\n" in buffer:
+                    obj_end = buffer.find(",\n")
+                    obj_text = buffer[:obj_end]
+
+                    json_data.write(obj_text + ",")
+
+                    buffer = buffer[obj_end + 2 :]  # +2 for ",\n"
+
+                elif "\n]" in buffer:
+                    obj_end = buffer.find("\n]")
+                    obj_text = buffer[:obj_end]
+
+                    if obj_text.strip():
+                        json_data.write(obj_text)
+                    json_data.write("]")
+
+                    buffer = buffer[obj_end + 2 :]  # +2 for "\n]"
+                    in_array = False
+                    break
+
+                else:
+                    break
+
+        json_data.seek(0)
+
+        try:
+            return pd.read_json(json_data, orient="records")
+        except Exception as e:
+            if "Unexpected end of file" in str(e) or "Empty data passed" in str(e):
+                return pd.DataFrame()
+            json_str = json_data.getvalue()
+            if json_str.strip() and json_str.strip() != "[" and json_str.strip() != "[]":
+                try:
+                    if not json_str.rstrip().endswith("]"):
+                        if json_str.rstrip().endswith(","):
+                            json_str = json_str.rstrip()[:-1] + "]"
+                        else:
+                            json_str += "]"
+                    return pd.read_json(io.StringIO(json_str), orient="records")
+                except Exception:
+                    pass
+            # If all recovery attempts fail, raise the original error
+            raise
+
+
 def load_311_data(force_refresh=False):
     cache_path = os.path.join(CACHE_DIR, "df_311.parquet")
     if not force_refresh and not cache_stale(cache_path):
@@ -81,93 +110,62 @@ def load_311_data(force_refresh=False):
         return pd.read_parquet(cache_path)
 
     print("[LOAD] Fetching 311 data from API...")
-    url = "https://boston.ourcommunity.is/api/data/query?request=311_by_geo&category=all&app_version=0.5.1"
-    df = pd.DataFrame(requests.get(url).json())
+    url = f"{API_BASE_URL}/data/query?request=311_by_geo&category=all&stream=True&app_version={APP_VERSION}"
+    df = stream_to_dataframe(url)
 
-    df.rename(columns={"open_dt": "date"}, inplace=True)
     df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
     df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df.dropna(subset=["latitude", "longitude", "date"], inplace=True)
-    df["normalized_type"] = df["type"].str.strip().str.title()
-
-    # valid_districts = ["B2", "B3", "C11"]
-    # df = df[df["police_district"].isin(valid_districts)]
-
     df = df[(df["latitude"] > 40) & (df["latitude"] < 43) & (df["longitude"] > -72) & (df["longitude"] < -70)]
-
+    df = df.rename(columns={"normalized_type": "category"})
+    df.dropna(subset=["category"], inplace=True)
     df.to_parquet(cache_path, index=False)
     return df
 
 
-def load_homicide_data(engine, force_refresh=False):
-    cache_path = os.path.join(CACHE_DIR, "df_homicide.parquet")
-    if not force_refresh and not cache_stale(cache_path):
-        print("[CACHE] Using cached homicide data")
-        df = pd.read_parquet(cache_path)
-    else:
-        print("[LOAD] Fetching homicide data from DB...")
-        df = pd.read_sql("SELECT homicide_date AS date FROM homicide_data", con=engine)
-        df["date"] = pd.to_datetime(df["date"])
-        df.to_parquet(cache_path, index=False)
-
-    df["day"] = df["date"].dt.date
-    return df
-
-
-def load_shots_fired_data(engine, df_hom, force_refresh=False):
+def load_shots_fired_data(force_refresh=False):
     cache_path_shots = os.path.join(CACHE_DIR, "df_shots.parquet")
     cache_path_matched = os.path.join(CACHE_DIR, "df_hom_shot_matched.parquet")
 
     if not force_refresh and not cache_stale(cache_path_shots) and not cache_stale(cache_path_matched):
+        print("[CACHE] Using cached shots + matched data")
         df = pd.read_parquet(cache_path_shots)
         df_matched = pd.read_parquet(cache_path_matched)
         return df, df_matched
 
     print("[LOAD] Fetching shots fired data from API...")
-    url = "http://boston.ourcommunity.is/api/data/query?app_version=0.5.1&request=911_shots_fired"
-    resp = requests.get(url)
-    resp.raise_for_status()
-    df = pd.DataFrame(resp.json())
+    url = f"{API_BASE_URL}/data/query?app_version={APP_VERSION}&request=911_shots_fired&stream=True"
+    df = stream_to_dataframe(url)
 
-    df.rename(columns={"incident_date_time": "date"}, inplace=True)
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["ballistics_evidence"] = pd.to_numeric(df["ballistics_evidence"], errors="coerce")
     df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
     df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
-
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df.dropna(subset=["latitude", "longitude", "date"], inplace=True)
-    df = df[df["ballistics_evidence"].isin([0, 1])]
+    df["ballistics_evidence"] = pd.to_numeric(df["ballistics_evidence"], errors="coerce")
     df["month"] = df["date"].dt.to_period("M").dt.to_timestamp()
     df["day"] = df["date"].dt.date
 
-    confirmed = df[df["ballistics_evidence"] == 1].copy()
-    hom_days_set = set(df_hom["day"])
-    matched = confirmed[confirmed["day"].apply(lambda d: any((d + pd.Timedelta(days=offset)) in hom_days_set for offset in [-1, 0, 1]))]
-    matched["month"] = matched["date"].dt.to_period("M").dt.to_timestamp()
+    print("[LOAD] Fetching matched homicides from API...")
+    url_matched = f"{API_BASE_URL}/data/query?app_version={APP_VERSION}&request=911_homicides_and_shots_fired&stream=True"
+    df_matched = stream_to_dataframe(url_matched)
+
+    df_matched["date"] = pd.to_datetime(df_matched["date"], errors="coerce")
+    df_matched.dropna(subset=["latitude", "longitude", "date"], inplace=True)
+    df_matched["month"] = df_matched["date"].dt.to_period("M").dt.to_timestamp()
 
     df.to_parquet(cache_path_shots, index=False)
-    matched.to_parquet(cache_path_matched, index=False)
+    df_matched.to_parquet(cache_path_matched, index=False)
+    return df, df_matched
 
-    return df, matched
 
-
-engine = get_db_engine()
-df_hom = load_homicide_data(engine)
-df_shots, df_hom_shot_matched = load_shots_fired_data(engine, df_hom)
+df_shots, df_hom_shot_matched = load_shots_fired_data()
 df_311 = load_311_data()
-engine.dispose()
-
-df_311["category"] = df_311["normalized_type"].map(type_to_category)
-
 
 # slider months
 available_months = df_shots[(df_shots["month"] >= "2018-01-01") & (df_shots["month"] <= "2024-12-31")]["month"].dropna().sort_values().unique()
-
 month_labels = pd.Series(available_months).dt.strftime("%Y-%m").tolist()
 slider_marks = {i: label for i, label in enumerate(month_labels) if i % 3 == 0}
-
-
 category_colors = {
     "Living Conditions": "#ff7f0e",
     "Trash, Recycling, And Waste": "#2ca02c",
@@ -247,15 +245,15 @@ app.layout = html.Div(
 
 # Clientside callback to set cookie on page load
 app.clientside_callback(
-    """
-    function(data) {
+    f"""
+    function(data) {{
         const d = new Date();
         d.setTime(d.getTime() + (30*24*60*60*1000));
         const expires = "expires=" + d.toUTCString();
-        document.cookie = "app_version=5;" + expires + ";path=/";
+        document.cookie = "app_version={APP_VERSION};" + expires + ";path=/";
 
         return "Cookie 'app_version=5' has been set successfully!";
-    }
+    }}
     """,
     Output("cookie-status", "children"),
     Input("page-load", "data"),
@@ -415,7 +413,7 @@ def handle_chat_simple(n_clicks, slider_val, user_input, history):
         raise PreventUpdate
 
     try:
-        response = requests.post("https://boston.ourcommunity.is/api/chat?context_request=experiment_5", headers={"Content-Type": "application/json"}, json={"client_query": prompt, "app_version": "5"})
+        response = requests.post("{API_BASE_URL}/chat?context_request=experiment_5", headers={"Content-Type": "application/json"}, json={"client_query": prompt, "app_version": f"{APP_VERSION}"})
         response.raise_for_status()
         reply = response.json().get("response", "[No reply received]")
     except Exception as e:
