@@ -413,7 +413,7 @@ def handle_chat_simple(n_clicks, slider_val, user_input, history):
         raise PreventUpdate
 
     try:
-        response = requests.post("{API_BASE_URL}/chat?context_request=experiment_5", headers={"Content-Type": "application/json"}, json={"client_query": prompt, "app_version": f"{APP_VERSION}"})
+        response = requests.post(f"{API_BASE_URL}/chat?context_request=experiment_5", headers={"Content-Type": "application/json"}, json={"client_query": prompt, "app_version": f"{APP_VERSION}"})
         response.raise_for_status()
         reply = response.json().get("response", "[No reply received]")
     except Exception as e:
