@@ -944,7 +944,7 @@ def route_log():
 
 
 @app.route("/llm_summaries", methods=["GET"])
-def route_summary():
+def route_llm_summary():
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
     month = request.args.get("month")
@@ -993,7 +993,7 @@ def route_summary():
 
 
 @app.route("/llm_summaries/all", methods=["GET"])
-def route_all_summaries():
+def route_all_llm_summaries():
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
 
