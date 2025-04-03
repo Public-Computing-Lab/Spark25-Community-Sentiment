@@ -944,7 +944,9 @@ def route_log():
 
 
 @app.route("/llm_summaries", methods=["GET"])
-def get_summary():
+def route_summary():
+    session_id = session.get("session_id")
+    app_version = request.args.get("app_version", "0")
     month = request.args.get("month")
 
     if not month:
@@ -959,10 +961,29 @@ def get_summary():
         conn.close()
 
         if not row:
+            log_event(
+                session_id=session_id,
+                app_version=app_version,
+                log_id=g.log_entry,
+                app_response="ERROR",
+            )
             return jsonify({"summary": "[No summary available for this month]"}), 404
+
+        log_event(
+            session_id=session_id,
+            app_version=app_version,
+            log_id=g.log_entry,
+            app_response="SUCCESS",
+        )
         return jsonify({"month": month, "summary": row["summary"]})
 
     except Exception as e:
+        log_event(
+            session_id=session_id,
+            app_version=app_version,
+            log_id=g.log_entry,
+            app_response=f"ERROR: {str(e)}",
+        )
         return jsonify({"error": str(e)}), 500
 
     finally:
@@ -972,7 +993,10 @@ def get_summary():
 
 
 @app.route("/llm_summaries/all", methods=["GET"])
-def get_all_summaries():
+def route_all_summaries():
+    session_id = session.get("session_id")
+    app_version = request.args.get("app_version", "0")
+
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
@@ -981,9 +1005,22 @@ def get_all_summaries():
         cursor.close()
         conn.close()
 
+        log_event(
+            session_id=session_id,
+            app_version=app_version,
+            log_id=g.log_entry,
+            app_response="SUCCESS",
+        )
+
         return jsonify(rows)
 
     except Exception as e:
+        log_event(
+            session_id=session_id,
+            app_version=app_version,
+            log_id=g.log_entry,
+            app_response=f"ERROR: {str(e)}",
+        )
         return jsonify({"error": str(e)}), 500
 
     finally:
