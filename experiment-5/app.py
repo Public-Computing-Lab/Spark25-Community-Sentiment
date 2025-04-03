@@ -54,18 +54,6 @@ raw_type_to_category = {
 districts = {"B3": "rgba(255, 255, 0, 0.7)", "B2": "rgba(0, 255, 255, 0.7)", "C11": "rgba(0, 255, 0, 0.7)"}
 boston_url = "https://gisportal.boston.gov/ArcGIS/rest/services/PublicSafety/OpenData/MapServer/5/query"
 
-type_to_category = {k.strip().title(): v for k, v in raw_type_to_category.items()}
-
-
-def get_db_engine():
-    user = os.getenv("DB_USER")
-    password = quote_plus(os.getenv("DB_PASSWORD"))
-    host = os.getenv("DB_HOST")
-    db = os.getenv("DB_NAME")
-
-    return create_engine(f"mysql+pymysql://{user}:{password}@{host}/{db}")
-
-
 CACHE_DIR = "./cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
@@ -81,93 +69,60 @@ def load_311_data(force_refresh=False):
         return pd.read_parquet(cache_path)
 
     print("[LOAD] Fetching 311 data from API...")
-    url = "https://boston.ourcommunity.is/api/data/query?request=311_by_geo&category=all&app_version=0.5.1"
+    url = "https://boston.ourcommunity.is/api/data/query?request=311_by_geo&category=all&stream=True&app_version=5.5"
     df = pd.DataFrame(requests.get(url).json())
 
-    df.rename(columns={"open_dt": "date"}, inplace=True)
-    df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
-    df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
+    df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
     df.dropna(subset=["latitude", "longitude", "date"], inplace=True)
-    df["normalized_type"] = df["type"].str.strip().str.title()
-
-    # valid_districts = ["B2", "B3", "C11"]
-    # df = df[df["police_district"].isin(valid_districts)]
-
     df = df[(df["latitude"] > 40) & (df["latitude"] < 43) & (df["longitude"] > -72) & (df["longitude"] < -70)]
-
+    df = df.rename(columns={"normalized_type": "category"})
+    df.dropna(subset=["category"], inplace=True)
     df.to_parquet(cache_path, index=False)
     return df
 
-
-def load_homicide_data(engine, force_refresh=False):
-    cache_path = os.path.join(CACHE_DIR, "df_homicide.parquet")
-    if not force_refresh and not cache_stale(cache_path):
-        print("[CACHE] Using cached homicide data")
-        df = pd.read_parquet(cache_path)
-    else:
-        print("[LOAD] Fetching homicide data from DB...")
-        df = pd.read_sql("SELECT homicide_date AS date FROM homicide_data", con=engine)
-        df["date"] = pd.to_datetime(df["date"])
-        df.to_parquet(cache_path, index=False)
-
-    df["day"] = df["date"].dt.date
-    return df
-
-
-def load_shots_fired_data(engine, df_hom, force_refresh=False):
+def load_shots_fired_data(force_refresh=False):
     cache_path_shots = os.path.join(CACHE_DIR, "df_shots.parquet")
     cache_path_matched = os.path.join(CACHE_DIR, "df_hom_shot_matched.parquet")
 
     if not force_refresh and not cache_stale(cache_path_shots) and not cache_stale(cache_path_matched):
+        print("[CACHE] Using cached shots + matched data")
         df = pd.read_parquet(cache_path_shots)
         df_matched = pd.read_parquet(cache_path_matched)
         return df, df_matched
 
     print("[LOAD] Fetching shots fired data from API...")
-    url = "http://boston.ourcommunity.is/api/data/query?app_version=0.5.1&request=911_shots_fired"
-    resp = requests.get(url)
-    resp.raise_for_status()
-    df = pd.DataFrame(resp.json())
+    url = "http://boston.ourcommunity.is/api/data/query?app_version=5.5&request=911_shots_fired&stream=True"
+    df = pd.DataFrame(requests.get(url).json())
 
-    df.rename(columns={"incident_date_time": "date"}, inplace=True)
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["ballistics_evidence"] = pd.to_numeric(df["ballistics_evidence"], errors="coerce")
-    df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
-    df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
-
+    df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
+    df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
     df.dropna(subset=["latitude", "longitude", "date"], inplace=True)
-    df = df[df["ballistics_evidence"].isin([0, 1])]
-    df["month"] = df["date"].dt.to_period("M").dt.to_timestamp()
-    df["day"] = df["date"].dt.date
+    df['ballistics_evidence'] = pd.to_numeric(df['ballistics_evidence'], errors='coerce')
+    df['month'] = df['date'].dt.to_period("M").dt.to_timestamp()
+    df['day'] = df['date'].dt.date
 
-    confirmed = df[df["ballistics_evidence"] == 1].copy()
-    hom_days_set = set(df_hom["day"])
-    matched = confirmed[confirmed["day"].apply(lambda d: any((d + pd.Timedelta(days=offset)) in hom_days_set for offset in [-1, 0, 1]))]
-    matched["month"] = matched["date"].dt.to_period("M").dt.to_timestamp()
+    print("[LOAD] Fetching matched homicides from API...")
+    url_matched = "http://boston.ourcommunity.is/api/data/query?app_version=5.5&request=911_homicides_and_shots_fired&stream=True"
+    df_matched = pd.DataFrame(requests.get(url_matched).json())
+    df_matched['date'] = pd.to_datetime(df_matched['date'], errors='coerce')
+    df_matched.dropna(subset=["latitude", "longitude", "date"], inplace=True)
+    df_matched['month'] = df_matched['date'].dt.to_period("M").dt.to_timestamp()
 
     df.to_parquet(cache_path_shots, index=False)
-    matched.to_parquet(cache_path_matched, index=False)
+    df_matched.to_parquet(cache_path_matched, index=False)
+    return df, df_matched
 
-    return df, matched
 
-
-engine = get_db_engine()
-df_hom = load_homicide_data(engine)
-df_shots, df_hom_shot_matched = load_shots_fired_data(engine, df_hom)
+df_shots, df_hom_shot_matched = load_shots_fired_data()
 df_311 = load_311_data()
-engine.dispose()
-
-df_311["category"] = df_311["normalized_type"].map(type_to_category)
-
 
 # slider months
 available_months = df_shots[(df_shots["month"] >= "2018-01-01") & (df_shots["month"] <= "2024-12-31")]["month"].dropna().sort_values().unique()
-
 month_labels = pd.Series(available_months).dt.strftime("%Y-%m").tolist()
 slider_marks = {i: label for i, label in enumerate(month_labels) if i % 3 == 0}
-
-
 category_colors = {
     "Living Conditions": "#ff7f0e",
     "Trash, Recycling, And Waste": "#2ca02c",
