@@ -551,6 +551,7 @@ def build_311_query(
     if data_request == "311_by_geo":
         query = f"""
         SELECT
+            id,
             type,
             open_dt AS date,
             latitude,
@@ -578,6 +579,7 @@ def build_911_query(data_request: str) -> str:
     if data_request == "911_shots_fired":
         return f"""
         SELECT
+            id,
             incident_date_time AS date,
             ballistics_evidence,
             latitude,
@@ -591,6 +593,7 @@ def build_911_query(data_request: str) -> str:
     elif data_request == "911_homicides_and_shots_fired":
         return """
         SELECT
+            s.id as id,
             h.homicide_date as date,
             s.latitude as latitude,
             s.longitude as longitude
