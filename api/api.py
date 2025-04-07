@@ -954,7 +954,7 @@ def route_log():
 def route_llm_summary():
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
-    month = request.args.get("month")
+    month = request.args.get("month", request.args.get("date", ""))
 
     if not month:
         return jsonify({"error"}), 400
