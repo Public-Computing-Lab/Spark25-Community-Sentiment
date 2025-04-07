@@ -19,8 +19,9 @@ load_dotenv()
 
 PORT = os.getenv("EXPERIMENT_5_PORT")
 DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_5_DASH_REQUESTS_PATHNAME")
-APP_VERSION = os.getenv("EXPERIMENT_5_VERSION", "0.5.1")
-API_BASE_URL = os.getenv("API_BASE_URL", "https://boston.ourcommunity.is/api")
+API_BASE_URL = os.getenv("API_BASE_URL")
+APP_VERSION = os.getenv("APP_VERSION", "5")
+
 
 districts = {"B3": "rgba(255, 255, 0, 0.7)", "B2": "rgba(0, 255, 255, 0.7)", "C11": "rgba(0, 255, 0, 0.7)"}
 boston_url = "https://gisportal.boston.gov/ArcGIS/rest/services/PublicSafety/OpenData/MapServer/5/query"
@@ -225,7 +226,9 @@ app.layout = html.Div(
                             id="chat-loading",
                             type="circle",
                             color="#ff69b4",
-                            children=html.Div(chat_display_div(chat_history), id="chat-display", style={"height": "480px", "backgroundColor": "#1a1a1a", "color": "white", "border": "1px solid #444", "borderRadius": "8px", "padding": "10px", "overflowY": "auto", "marginBottom": "10px", "fontSize": "13px"}),
+                            children=html.Div(
+                                chat_display_div(chat_history), id="chat-display", style={"height": "480px", "backgroundColor": "#1a1a1a", "color": "white", "border": "1px solid #444", "borderRadius": "8px", "padding": "10px", "overflowY": "auto", "marginBottom": "10px", "fontSize": "13px"}
+                            ),
                         ),
                         dcc.Textarea(id="chat-input", placeholder="Type your question here...", style={"width": "100%", "height": "80px", "borderRadius": "8px", "backgroundColor": "#333", "color": "white", "border": "1px solid #555", "padding": "8px", "resize": "none", "fontSize": "13px"}),
                         html.Button("SEND", id="send-button", n_clicks=0, style={"marginTop": "8px", "width": "100%", "backgroundColor": "#ff69b4", "color": "white", "border": "none", "borderRadius": "6px", "padding": "10px", "fontWeight": "bold", "cursor": "pointer"}),
@@ -276,7 +279,21 @@ def update_hexbin_map(month_index):
     pivot = grouped.pivot_table(index=["latitude", "longitude"], columns="category", values="count", fill_value=0).reset_index()
     pivot["total_count"] = pivot.drop(columns=["latitude", "longitude"]).sum(axis=1)
 
-    fig = create_hexbin_mapbox(data_frame=pivot, lat="latitude", lon="longitude", nx_hexagon=20, agg_func=np.sum, color="total_count", opacity=0.7, color_continuous_scale=px.colors.sequential.Plasma[::-1], mapbox_style="carto-darkmatter", center=dict(lat=42.304, lon=-71.07), zoom=11.9, min_count=1, labels={"total_count": "311 Requests"})
+    fig = create_hexbin_mapbox(
+        data_frame=pivot,
+        lat="latitude",
+        lon="longitude",
+        nx_hexagon=20,
+        agg_func=np.sum,
+        color="total_count",
+        opacity=0.7,
+        color_continuous_scale=px.colors.sequential.Plasma[::-1],
+        mapbox_style="carto-darkmatter",
+        center=dict(lat=42.304, lon=-71.07),
+        zoom=11.9,
+        min_count=1,
+        labels={"total_count": "311 Requests"},
+    )
     fig.data[0].hovertemplate = "incidents = %{z}<extra></extra>"
 
     fig.update_coloraxes(colorbar=dict(title=dict(text="311 Requests", font=dict(size=12, color="white")), orientation="h", x=0.5, y=1.0, xanchor="center", len=0.5, thickness=12, tickfont=dict(size=10, color="white"), bgcolor="rgba(0,0,0,0)"))
@@ -371,53 +388,60 @@ def handle_chat_simple(n_clicks, slider_val, user_input, history):
         history = []
 
     selected_date = available_months[slider_val].strftime("%B %Y")
+    selected_month_str = available_months[slider_val].strftime("%Y-%m")
 
     if triggered_id == "hexbin-slider":
         history = []
-        prompt = (
-            f"Provide a professional summary of key trends in the city's safety and service data for {selected_date}. "
-            f"Use both 311 service request data (grouped into four categories: Living Conditions, Trash/Recycling/Waste, "
-            f"Streets/Sidewalks/Parks, and Parking) and 911 incident data (homicides and shots fired). "
-            f"Highlight any significant changes, spikes, or drops in activity across these categories. "
-            f"Where applicable, connect these trends to potential implications for neighborhood safety or quality of life. "
-            f"This summary should help stakeholders understand the most relevant patterns in the data for this time period."
-        )
-    elif triggered_id == "send-button":
+        try:
+            response = requests.get(f"{API_BASE_URL}/llm_summaries?date={selected_month_str}&app_version={APP_VERSION}")
+            response.raise_for_status()
+            reply = response.json().get("summary", "[No summary available]")
+        except Exception as e:
+            reply = f"[Error fetching summary for {selected_month_str}: {e}]"
 
+    elif triggered_id == "send-button":
         if not user_input or not user_input.strip():
             raise PreventUpdate
         history.append(("You", user_input.strip()))
+        # prompt = (
+        #     f"The data shows 311 service requests and 911 incidents for {selected_date} in Boston neighborhoods.\n\n"
+        #     f"311 data reflects concerns about neighborhood conditions and quality of life. The request types are grouped into four major categories:\n"
+        #     "- **Living Conditions**: 'Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', "
+        #     "'Rodent Activity', 'Heat - Excessive Insufficient', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential'\n"
+        #     "- **Trash, Recycling, And Waste**: 'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Schedule a Bulk Item Pickup', 'CE Collection', "
+        #     "'Schedule a Bulk Item Pickup SS', 'Request for Recycling Cart', 'Illegal Dumping'\n"
+        #     "- **Streets, Sidewalks, And Parks**: 'Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', "
+        #     "'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair', 'Pothole'\n"
+        #     "- **Parking**: 'Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', "
+        #     "'Valet Parking Problems', 'Private Parking Lot Complaints'\n\n"
+        #     f"911 data includes reported homicides and shots fired, indicating incidents of violent crime.\n\n"
+        #     f"Text content includes quotes from community meetings and interviews. Some residents believe violence is decreasing, while others still feel unsafe. "
+        #     f"Concerns range from housing quality and trash overflow to gang activity and street-level violence.\n\n"
+        #     f"Using both data and text content, explain how these two types of information reflect community safety. "
+        #     f"Describe why there might be disagreement between what the data shows and how people feel. "
+        #     f"Point out notable spikes, drops, or emerging patterns in the data for {selected_date}, and connect them to lived experiences and perceptions. "
+        #     f"Use the grouped 311 categories and the 911 incident data together to provide a holistic, narrative-driven analysis.\n\n"
+        #     f"User's question: {user_input.strip()}"
+        # )
+
         prompt = (
-            f"The data shows 311 service requests and 911 incidents for {selected_date} in Boston neighborhoods.\n\n"
-            f"311 data reflects concerns about neighborhood conditions and quality of life. The request types are grouped into four major categories:\n"
-            "- **Living Conditions**: 'Poor Conditions of Property', 'Needle Pickup', 'Unsatisfactory Living Conditions', "
-            "'Rodent Activity', 'Heat - Excessive Insufficient', 'Unsafe Dangerous Conditions', 'Pest Infestation - Residential'\n"
-            "- **Trash, Recycling, And Waste**: 'Missed Trash/Recycling/Yard Waste/Bulk Item', 'Schedule a Bulk Item Pickup', 'CE Collection', "
-            "'Schedule a Bulk Item Pickup SS', 'Request for Recycling Cart', 'Illegal Dumping'\n"
-            "- **Streets, Sidewalks, And Parks**: 'Requests for Street Cleaning', 'Request for Pothole Repair', 'Unshoveled Sidewalk', "
-            "'Tree Maintenance Requests', 'Sidewalk Repair (Make Safe)', 'Street Light Outages', 'Sign Repair', 'Pothole'\n"
-            "- **Parking**: 'Parking Enforcement', 'Space Savers', 'Parking on Front/Back Yards (Illegal Parking)', 'Municipal Parking Lot Complaints', "
-            "'Valet Parking Problems', 'Private Parking Lot Complaints'\n\n"
-            f"911 data includes reported homicides and shots fired, indicating incidents of violent crime.\n\n"
-            f"Text content includes quotes from community meetings and interviews. Some residents believe violence is decreasing, while others still feel unsafe. "
-            f"Concerns range from housing quality and trash overflow to gang activity and street-level violence.\n\n"
-            f"Using both data and text content, explain how these two types of information reflect community safety. "
-            f"Describe why there might be disagreement between what the data shows and how people feel. "
-            f"Point out notable spikes, drops, or emerging patterns in the data for {selected_date}, and connect them to lived experiences and perceptions. "
-            f"Use the grouped 311 categories and the 911 incident data together to provide a holistic, narrative-driven analysis.\n\n"
+            f"The user has selected a subset of the available 311 and 911 data. They are only looking at the data for {selected_date} in the Dorchester neighborhood.\n\n"
+            f"Describe the conditions captured in the meeting transcripts and interviews and how those related to the trends seein the 911 and 311 CSV data for "
+            f"the date {selected_date}.\n\n"
+            f"Point out notable spikes, drops, or emerging patterns in the data for {selected_date}, and connect them to lived experiences and perceptions.\n\n"
+            f"Use the grouped 311 categories and the 911 incident data together to provide a holistic, narrative-driven analysis."
             f"User's question: {user_input.strip()}"
         )
 
+        try:
+            response = requests.post(f"{API_BASE_URL}/chat?request=experiment_5&app_version={APP_VERSION}", headers={"Content-Type": "application/json"}, json={"client_query": prompt})
+            response.raise_for_status()
+            reply = response.json().get("response", "[No reply received]")
+        except Exception as e:
+            reply = f"[Error: {e}]"
+
     else:
-
         raise PreventUpdate
-
-    try:
-        response = requests.post(f"{API_BASE_URL}/chat?context_request=experiment_5", headers={"Content-Type": "application/json"}, json={"client_query": prompt, "app_version": f"{APP_VERSION}"})
-        response.raise_for_status()
-        reply = response.json().get("response", "[No reply received]")
-    except Exception as e:
-        reply = f"[Error: {e}]"
 
     history.append(("Assistant", reply))
     print(f"[TIMER] handle_chat_simple triggered by {triggered_id} took {time.perf_counter() - start:.2f} seconds")
