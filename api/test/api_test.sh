@@ -1,351 +1,175 @@
 #!/bin/bash
 
-# API base URL
-API_URL="http://127.0.0.1:8888/"
+# Configuration
+API_URL="http://127.0.0.1:8888"
 #API_URL="https://boston.ourcommunity.is/api"
-# Colors for output
+APP_VERSION="test.x"
+COOKIE_FILE="cookies.txt"
+
+# Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# Global variables
 LOG_ID=0
 SESSION_ID="\"TEST_SESSION_ID\""
 
+# Helper functions
+make_request() {
+	local method="$1"
+	local endpoint="$2"
+	local data="$3"
+	local additional_args="${4:-}"
 
-# Function to test /data/context endpoint
-test_context_create(){
-	context_data='{
+	echo -e "\n${GREEN}Testing ${method} ${endpoint}${NC}"
+
+	local response
+	if [ -n "$data" ]; then
+		response=$(curl -s -X "$method" \
+			-b "$COOKIE_FILE" \
+			-c "$COOKIE_FILE" \
+			-H "Content-Type: application/json" \
+			-d "$data" \
+			"${API_URL}${endpoint}" $additional_args)
+	else
+		response=$(curl -s -X "$method" \
+			-b "$COOKIE_FILE" \
+			-c "$COOKIE_FILE" \
+			-H "Content-Type: application/json" \
+			"${API_URL}${endpoint}" $additional_args)
+	fi
+	
+	local status=$?
+	
+	if [ $status -eq 0 ]; then
+		echo -e "\nResponse: $response"
+		echo -e "\n${GREEN}Request completed successfully${NC}"
+	else
+		echo -e "\n${RED}Request failed${NC}"
+	fi
+	
+	# echo "$response"
+}
+
+# Context functions
+test_context_create() {
+	local context_type="${1:-experiment_5}"
+	local context_data='{
 		"data_selected": "",
 		"prompt_preamble":""
 	}'
-	
-	# echo -e "\n${GREEN}Testing POST /chat/context?context_request=structured${NC}"
-	# response=$(curl -s -X POST \
-	# 	-b cookies.txt \
-	# 	-c cookies.txt \
-	# 	--cookie "app_version=0" \
-	# 	-H "Content-Type: application/json" \
-	# 	-d "$context_data" \
-	# 	"${API_URL}/chat/context?context_request=structured")
-	# 
-	# if [ $? -eq 0 ]; then
-	# 	echo "Response: $response"
-	# 	echo -e "${GREEN}Chat endpoint test completed${NC}"
-	# else
-	# 	echo -e "${RED}Chat endpoint test failed${NC}"
-	# fi
-	# 
-	# echo -e "\n${GREEN}Testing POST /chat/context?context_request=unstructured${NC}"
-	# response=$(curl -s -X POST \
-	# 	-b cookies.txt \
-	# 	-c cookies.txt \
-	# 	--cookie "app_version=0" \
-	# 	-H "Content-Type: application/json" \
-	# 	-d "$context_data" \
-	# 	"${API_URL}/chat/context?context_request=unstructured")
-	# 
-	# if [ $? -eq 0 ]; then
-	# 	echo "Response: $response"
-	# 	echo -e "${GREEN}Chat endpoint test completed${NC}"
-	# else
-	# 	echo -e "${RED}Chat endpoint test failed${NC}"
-	# fi
-	# 
-	# echo -e "\n${GREEN}Testing POST /chat/context?context_request=all${NC}"
-	# response=$(curl -s -X POST \
-	# 	-b cookies.txt \
-	# 	-c cookies.txt \
-	# 	--cookie "app_version=0" \
-	# 	-H "Content-Type: application/json" \
-	# 	-d "$context_data" \
-	# 	"${API_URL}/chat/context?context_request=all")
-	# 
-	# if [ $? -eq 0 ]; then
-	# 	echo "Response: $response"
-	# 	echo -e "${GREEN}Chat endpoint test completed${NC}"
-	# else
-	# 	echo -e "${RED}Chat endpoint test failed${NC}"
-	# fi
-	
-	echo -e "\n${GREEN}Testing POST /chat/context?context_request=experiment_5${NC}"
-	response=$(curl -s -X POST \
-		-b cookies.txt \
-		-c cookies.txt \
-		--cookie "app_version=0" \
-		-H "Content-Type: application/json" \
-		-d "$context_data" \
-		"${API_URL}/chat/context?context_request=experiment_5")
-	
-	if [ $? -eq 0 ]; then
-		echo "Response: $response"
-		echo -e "${GREEN}Chat endpoint test completed${NC}"
-	else
-		echo -e "${RED}Chat endpoint test failed${NC}"
-	fi
-	
+
+	local endpoint="/chat/context?context_request=${context_type}&app_version=${APP_VERSION}"
+	make_request "POST" "$endpoint" "$context_data"
 }
 
-test_context_list(){
-	echo -e "\n${GREEN}Testing GET /chat/context${NC}"
-	response=$(curl -X GET \
-		-b cookies.txt \
-		-c cookies.txt \
-		--cookie "app_version=0" \
-		-H "Content-Type: application/json" \
-		"${API_URL}/chat/context")
-	
-	if [ $? -eq 0 ]; then
-		echo "Response: $response"
-		echo -e "${GREEN}Chat endpoint test completed${NC}"
-	else
-		echo -e "${RED}Chat endpoint test failed${NC}"
-	fi
+test_context_list() {
+	local endpoint="/chat/context?app_version=${APP_VERSION}"
+	make_request "GET" "$endpoint"
 }
 
-# Function to test /data/context/token_count
-test_context_token_count(){	
-	echo -e "\n${GREEN}Testing GET /chat/context?context_request=experiment_5${NC}"
-	response=$(curl -X GET \
-		-b cookies.txt \
-		-c cookies.txt \
-		--cookie "app_version=0" \
-		-H "Content-Type: application/json" \
-		"${API_URL}/chat/context?context_request=experiment_5")
-	
-	if [ $? -eq 0 ]; then
-		echo "Response: $response"
-		echo -e "${GREEN}Chat endpoint test completed${NC}"
-	else
-		echo -e "${RED}Chat endpoint test failed${NC}"
-	fi
-	
+test_context_token_count() {
+	local context_type="${1:-experiment_5}"
+	local endpoint="/chat/context?context_request=${context_type}&app_version=${APP_VERSION}"
+	make_request "GET" "$endpoint"
 }
 
-test_context_clear(){
-	echo -e "\n${GREEN}Testing POST /chat/context?context_request=experiment_5&option=clear${NC}"
-	context_data='{
+test_context_clear() {
+	local context_data='{
 		"data_selected": "",
 		"prompt_preamble":""
 	}'
-	
-	response=$(curl -s -X POST \
-	-b cookies.txt \
-	-c cookies.txt \
-	--cookie "app_version=0" \
-	-H "Content-Type: application/json" \
-	-d "$context_data" \
-	"${API_URL}/chat/context?context_request=all&option=clear")
-	
-	if [ $? -eq 0 ]; then
-		echo "Response: $response"
-		echo -e "${GREEN}Chat endpoint test completed${NC}"
-	else
-		echo -e "${RED}Chat endpoint test failed${NC}"
-	fi
-	
+
+	local endpoint="/chat/context?context_request=all&option=clear&app_version=${APP_VERSION}"
+	make_request "POST" "$endpoint" "$context_data"
 }
 
-
+# Chat function
 test_chat() {
-	echo -e "\n${GREEN}Testing POST /chat${NC}"
-	
-	chat_data='{
-		"client_query": "The data content describes 311 reports over time to indicate relative health and conditions of the neighborhood, and 911 reports of homicides and shots fired over time indicating incidents of violent crime in the neighborhood. The text content are community meetings and interviews about experiences of safety and voilence in the neighborhood and community meetings discussing community concerns and priorities. Some people think that violence is decreasing, other people still do not feel safe in their neighborhood. Using the data and text content, describe how the two are related and why there is disagreement on the safety of the neighborhood.",		
-		"app_version": "0",
+	local context_type="${1:-experiment_5}"
+	local endpoint="/chat?context_request=${context_type}&app_version=${APP_VERSION}"
+
+	local chat_data='{
+		"client_query": "The data content describes 311 reports over time to indicate relative health and conditions of the neighborhood, and 911 reports of homicides and shots fired over time indicating incidents of violent crime in the neighborhood. The text content are community meetings and interviews about experiences of safety and voilence in the neighborhood and community meetings discussing community concerns and priorities. Some people think that violence is decreasing, other people still do not feel safe in their neighborhood. Using the data and text content, describe how the two are related and why there is disagreement on the safety of the neighborhood.",        
 		"data_selected": "",
 		"data_attributes": ""
 	}'
-		
-	echo -e "\n${GREEN}Testing POST /chat?context_request=experiment_5${NC}"
-	response=$(curl -s -X POST \
-		-b cookies.txt \
-		-c cookies.txt \
-		--cookie "app_version=0" \
-		-H "Content-Type: application/json" \
-		-d "$chat_data" \
-		"${API_URL}/chat?context_request=experiment_5")
-	echo "Response: $response"
-	
-	LOG_ID=$(echo "$response" | jq ".log_id")
-	# Check if curl command was successful
-	if [ $? -eq 0 ]; then
-		echo -e "${GREEN}Chat endpoint test completed${NC}"
-	else
-		echo -e "${RED}Chat endpoint test failed${NC}"
-	fi
+
+	local response=$(make_request "POST" "$endpoint" "$chat_data")		
+	echo $response
+	LOG_ID=$(echo "$response" | grep -o '"log_id": [0-9]*' | sed 's/"log_id": //')	
+	echo "Log ID: $LOG_ID"
 }
 
-# Function to test /log endpoint
+# Log functions
 test_log_insert() {
-	echo -e "\n${GREEN}Testing POST /log${NC}"
+	local endpoint="/log?app_version=${APP_VERSION}"
 
-	# Current timestamp in ISO format
-	#timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-	log_data='{		
+	local log_data='{        
 		"data_selected": "NONE",
 		"data_attributes": "NONE",
 		"client_query": "Test log entry: QUERY",
 		"app_response": "Test log entry: RESPONSE",
 		"client_response_rating": ""
 	}'
-	
-	response=$(curl -s -X POST \
-		-b cookies.txt \
-		-c cookies.txt \
-		--cookie "app_version=0" \
-		-H "Content-Type: application/json" \
-		-d "$log_data" \
-		"${API_URL}/log")
-	
-	LOG_ID=$(echo "$response" | jq ".log_id")
-	echo $LOG_ID
-	# Check if curl command was successful
-	if [ $? -eq 0 ]; then
-		echo "Response: $response"
-		echo -e "${GREEN}Log endpoint test completed${NC}"
-	else
-		echo -e "${RED}Log endpoint test failed${NC}"
-	fi
+
+	local response=$(make_request "POST" "$endpoint" "$log_data")
+	echo $response
+	LOG_ID=$(echo "$response" | grep -o '"log_id": [0-9]*' | sed 's/"log_id": //')
+	echo "Log ID: $LOG_ID"
 }
 
-# Function to test /log?log_action=update_client_response_rating endpoint
 test_log_update() {
-	echo -e "\n${GREEN}Testing POST /log${NC}"
-	
-	# Current timestamp in ISO format
-	#timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-	echo $LOG_ID
-	log_data='{
-		"log_id": '${LOG_ID}',			
+	local endpoint="/log?app_version=${APP_VERSION}"
+
+	local log_data='{
+		"log_id": '${LOG_ID}',            
 		"client_response_rating": "UPDATED"
 	}'
-	
-	response=$(curl -s -X PUT \
-		-b cookies.txt \
-		-c cookies.txt \
-		--cookie "app_version=0" \
-		-H "Content-Type: application/json" \
-		-d "$log_data" \
-		"${API_URL}/log")
 
-	# Check if curl command was successful
-	if [ $? -eq 0 ]; then
-		echo "Response: $response"
-		echo -e "${GREEN}Log endpoint test completed${NC}"
-	else
-		echo -e "${RED}Log endpoint test failed${NC}"
-	fi
+	make_request "PUT" "$endpoint" "$log_data"
 }
 
-# Function to test /data/query?request=
+# Data query functions
 test_data_query() {
-	
-	ENDPOINTS_OPTIONS=(
-		"311_by_geo&app_version=5.5&category=living_conditions&date=2019-02&stream=True"
-		"311_by_geo&app_version=5.5&category=trash&date=2019-02&stream=True"
-		"311_by_geo&app_version=5.5&category=streets&date=2019-02&stream=True"
-		"311_by_geo&app_version=5.5&category=parking&date=2019-02&stream=True"
-		"311_by_geo&app_version=5.5&category=all&date=2019-02&stream=True"
-		#
-		# "311_on_date_count&app_version=5.5&date=2020-04&stream=True"
-		# "311_on_date_count&app_version=5.5&date=2021-06&zipcode=02121&stream=True"
-		#		
-		# "311_by_category&app_version=5.5&category=living_conditions&stream=True"
-		# "311_by_category&app_version=5.5&category=trash&stream=True"
-		# "311_by_category&app_version=5.5&category=streets&stream=True"
-		# "311_by_category&app_version=5.5&category=parking&stream=True"
-		# "311_by_category&app_version=5.5&category=all&stream=True"
-		#
-		# "311_by_total&app_version=5.5&category=living_conditions&stream=True"
-		# "311_by_total&app_version=5.5&category=trash&stream=True"
-		# "311_by_total&app_version=5.5&category=streets&stream=True"
-		# "311_by_total&app_version=5.5&category=parking&stream=True"
-		# "311_by_total&app_version=5.5&category=all&stream=True"
-		#
-		"311_by_geo&app_version=5.5&category=living_conditions&stream=True"
-		"311_by_geo&app_version=5.5&category=trash&stream=True"
-		"311_by_geo&app_version=5.5&category=streets&stream=True"
-		"311_by_geo&app_version=5.5&category=parking&stream=True"
-		"311_by_geo&app_version=5.5&category=all&stream=True"
-		#
-		#"911_homicides&app_version=5.5&stream=True"
-		"911_shots_fired&app_version=5.5&stream=True"
-		#"911_shots_fired_count_confirmed&app_version=5.5&stream=True"
-		#"911_shots_fired_count_unconfirmed&app_version=5.5&stream=True"
-		"911_homicides_and_shots_fired&app_version=5.5&stream=True"
-		#
-		"zip_geo&app_version=5.5&zipcode=02121,02115&stream=True"
+	local ENDPOINTS=(
+		"/data/query?request=311_by_geo&app_version=${APP_VERSION}&category=living_conditions&date=2019-02&stream=True"
+		"/data/query?request=311_by_geo&app_version=${APP_VERSION}&category=trash&date=2019-02&stream=True"
+		"/data/query?request=311_by_geo&app_version=${APP_VERSION}&category=streets&date=2019-02&stream=True"
+		"/data/query?request=311_by_geo&app_version=${APP_VERSION}&category=parking&date=2019-02&stream=True"
+		"/data/query?request=311_by_geo&app_version=${APP_VERSION}&category=all&date=2019-02&stream=True"
+		"/data/query?request=311_by_geo&app_version=${APP_VERSION}&category=living_conditions&stream=True"
+		"/data/query?request=311_by_geo&app_version=${APP_VERSION}&category=trash&stream=True"
+		"/data/query?request=311_by_geo&app_version=${APP_VERSION}&category=streets&stream=True"
+		"/data/query?request=311_by_geo&app_version=${APP_VERSION}&category=parking&stream=True"
+		"/data/query?request=311_by_geo&app_version=${APP_VERSION}&category=all&stream=True"
+		"/data/query?request=911_shots_fired&app_version=${APP_VERSION}&stream=True"
+		"/data/query?request=911_homicides_and_shots_fired&app_version=${APP_VERSION}&stream=True"
+		"/data/query?request=zip_geo&app_version=${APP_VERSION}&zipcode=02121,02115&stream=True"
 	)
+
 	start_time_big=$(perl -MTime::HiRes=time -e 'printf "%.9f", time')
-	for endpoint in "${ENDPOINTS_OPTIONS[@]}"; do
-		
-		echo -e "\n${GREEN}Testing GET /data/query?request=${endpoint}${NC}"
-		# Current timestamp in ISO format
-		#timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-		# log_data='{
-		# 	"log_id": '${LOG_ID}',			
-		# 	"client_response_rating": "UPDATED"
-		# }'
-		#read -p "Press Enter to execute this query (or type 'skip' to skip, 'quit' to exit): " user_input
-		start_time=$(perl -MTime::HiRes=time -e 'printf "%.9f", time')		
-		
-		echo "Timing GET request to: $URL"
-		response=$(curl -X GET \
-			-b cookies.txt \
-			-c cookies.txt \
-			--cookie "app_version=0" \
-			-H "Content-Type: application/json" \
-			-d "$log_data" \
-			"${API_URL}/data/query?request=${endpoint}")
-		#End timing
+
+	for endpoint in "${ENDPOINTS[@]}"; do
+		start_time=$(perl -MTime::HiRes=time -e 'printf "%.9f", time')
+		make_request "GET" "$endpoint"
 		end_time=$(perl -MTime::HiRes=time -e 'printf "%.9f", time')
-		
-		# Calculate elapsed time
 		elapsed=$(echo "$end_time - $start_time" | bc)
-		
-		# Check if curl command was successful
-		if [ $? -eq 0 ]; then
-			echo "Response: ${response}" | head -n 5
-			echo "Request completed in ${elapsed} seconds"
-			echo -e "${GREEN}Log endpoint test completed${NC}"
-		else
-			echo -e "${RED}Log endpoint test failed${NC}"
-		fi
+		echo "Request completed in ${elapsed} seconds"
 	done
+
 	end_time_big=$(perl -MTime::HiRes=time -e 'printf "%.9f", time')
 	elapsed=$(echo "$end_time_big - $start_time_big" | bc)
-	echo "Request completed in ${elapsed} seconds"
+	echo "All data queries completed in ${elapsed} seconds"
 }
 
-# Function to test /data/zipcode?request=
 test_data_zip() {
-	echo -e "\n${GREEN}Testing GET /data/query?request=zip_geo&zipcode=02115${NC}"
-	
-	# Current timestamp in ISO format
-	#timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-	# log_data='{
-	# 	"log_id": '${LOG_ID}',			
-	# 	"client_response_rating": "UPDATED"
-	# }'
-	
-	response=$(curl -X GET \
-		-b cookies.txt \
-		-c cookies.txt \
-		--cookie "app_version=0" \
-		-H "Content-Type: application/json" \
-		-d "$log_data" \
-		"${API_URL}/data/query?request=zip_geo&zipcode=02121,02115&stream=True")
-
-	# Check if curl command was successful
-	if [ $? -eq 0 ]; then
-		echo "Response: $response" | head -n 5
-		echo -e "${GREEN}Log endpoint test completed${NC}"
-	else
-		echo -e "${RED}Log endpoint test failed${NC}"
-	fi
+	local endpoint="/data/query?request=zip_geo&zipcode=02121,02115&stream=True&app_version=${APP_VERSION}"
+	make_request "GET" "$endpoint" "" "| head -n 5"
 }
 
-# Function to run all tests
+# Run all tests
 run_all_tests() {
 	echo -e "${GREEN}Starting API tests...${NC}"
 	test_context_list
@@ -360,7 +184,7 @@ run_all_tests() {
 # Main execution
 case "$1" in
 	"context_create")
-		test_context_create
+		test_context_create "$2"
 		;;
 	"context_list")
 		test_context_list
@@ -369,10 +193,10 @@ case "$1" in
 		test_context_clear
 		;;
 	"context_token")
-		test_context_token_count
+		test_context_token_count "$2"
 		;;
 	"chat")
-		test_chat
+		test_chat "$2"
 		;;
 	"log")
 		test_log_insert
@@ -388,7 +212,7 @@ case "$1" in
 		run_all_tests
 		;;
 	*)
-		echo "Usage: $0 [cache_create | cache_list | cache_clear | data | chat | chat_single | log | all]"
+		echo "Usage: $0 [context_create|context_list|context_clear|context_token|chat|log|zip|data|all] [optional_context_type]"
 		exit 1
 		;;
 esac
