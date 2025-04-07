@@ -19,8 +19,9 @@ load_dotenv()
 
 PORT = os.getenv("EXPERIMENT_5_PORT")
 DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_5_DASH_REQUESTS_PATHNAME")
-APP_VERSION = os.getenv("EXPERIMENT_5_VERSION", "0.5.1")
-API_BASE_URL = os.getenv("API_BASE_URL", "https://boston.ourcommunity.is/api")
+API_BASE_URL = os.getenv("API_BASE_URL")
+APP_VERSION = os.getenv("APP_VERSION", "5")
+
 
 districts = {"B3": "rgba(255, 255, 0, 0.7)", "B2": "rgba(0, 255, 255, 0.7)", "C11": "rgba(0, 255, 0, 0.7)"}
 boston_url = "https://gisportal.boston.gov/ArcGIS/rest/services/PublicSafety/OpenData/MapServer/5/query"
@@ -362,7 +363,15 @@ def update_hexbin_map(month_index):
     return fig
 
 
-@app.callback([Output("chat-history-store", "data"), Output("chat-display", "children"), Output("chat-input", "value")], [Input("send-button", "n_clicks"), Input("hexbin-slider", "value")], [State("chat-input", "value"), State("chat-history-store", "data")])
+@app.callback(
+    [Output("chat-history-store", "data"),
+     Output("chat-display", "children"),
+     Output("chat-input", "value")],
+    [Input("send-button", "n_clicks"),
+     Input("hexbin-slider", "value")],
+    [State("chat-input", "value"),
+     State("chat-history-store", "data")]
+)
 def handle_chat_simple(n_clicks, slider_val, user_input, history):
     start = time.perf_counter()
     triggered_id = ctx.triggered_id
@@ -371,19 +380,18 @@ def handle_chat_simple(n_clicks, slider_val, user_input, history):
         history = []
 
     selected_date = available_months[slider_val].strftime("%B %Y")
+    selected_month_str = available_months[slider_val].strftime("%Y-%m")
 
     if triggered_id == "hexbin-slider":
         history = []
-        prompt = (
-            f"Provide a professional summary of key trends in the city's safety and service data for {selected_date}. "
-            f"Use both 311 service request data (grouped into four categories: Living Conditions, Trash/Recycling/Waste, "
-            f"Streets/Sidewalks/Parks, and Parking) and 911 incident data (homicides and shots fired). "
-            f"Highlight any significant changes, spikes, or drops in activity across these categories. "
-            f"Where applicable, connect these trends to potential implications for neighborhood safety or quality of life. "
-            f"This summary should help stakeholders understand the most relevant patterns in the data for this time period."
-        )
-    elif triggered_id == "send-button":
+        try:
+            response = requests.get(f"{API_BASE_URL}/llm_summaries?month={selected_month_str}")
+            response.raise_for_status()
+            reply = response.json().get("summary", "[No summary available]")
+        except Exception as e:
+            reply = f"[Error fetching summary for {selected_month_str}: {e}]"
 
+    elif triggered_id == "send-button":
         if not user_input or not user_input.strip():
             raise PreventUpdate
         history.append(("You", user_input.strip()))
@@ -408,20 +416,25 @@ def handle_chat_simple(n_clicks, slider_val, user_input, history):
             f"User's question: {user_input.strip()}"
         )
 
+        try:
+            response = requests.post(
+                f"{API_BASE_URL}/chat?context_request=experiment_5",
+                headers={"Content-Type": "application/json"},
+                json={"client_query": prompt, "app_version": f"{APP_VERSION}"}
+            )
+            response.raise_for_status()
+            reply = response.json().get("response", "[No reply received]")
+        except Exception as e:
+            reply = f"[Error: {e}]"
+
     else:
-
         raise PreventUpdate
-
-    try:
-        response = requests.post(f"{API_BASE_URL}/chat?context_request=experiment_5", headers={"Content-Type": "application/json"}, json={"client_query": prompt, "app_version": f"{APP_VERSION}"})
-        response.raise_for_status()
-        reply = response.json().get("response", "[No reply received]")
-    except Exception as e:
-        reply = f"[Error: {e}]"
 
     history.append(("Assistant", reply))
     print(f"[TIMER] handle_chat_simple triggered by {triggered_id} took {time.perf_counter() - start:.2f} seconds")
     return history, chat_display_div(history), ""
+
+
 
 
 server = app.server
