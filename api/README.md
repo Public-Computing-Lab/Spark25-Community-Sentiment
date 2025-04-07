@@ -77,7 +77,7 @@ When 'zipcode' is set, response is limited to that (or those) zipcodes
 ---
 #### **POST user question with prompt preamble for data context**
 ```
-POST /chat?context_request={structured | unstructured | all | specific}
+POST /chat?request={structured | unstructured | all | specific}
 ```
 *Json Data object*
 ```
@@ -164,7 +164,46 @@ Returns token count for requested context – does not create the context
 }
 ```
 
+### /llm_summaries \[ GET \] 
 
+#### **GET LLM Summaries by date***
+```
+GET /llm_summaries?month=%Y-%m&app_version=<0.0>
+```
+Returns a pre-fetched LLM summary for given month in YYYY-MM format
+
+*Response*
+```
+{
+  "month": "2022-08",
+  "summary": "## August 2022: City Safety and Service Summary\n\nThis report summarizes..."
+}  
+```
+
+### /llm_summaries/all \[ GET \] 
+
+#### **GET all LLM Summaries***
+```
+GET /llm_summaries/all?app_version=<0.0>
+```
+*Response*
+```
+[
+  {
+    "month_label": "2018-01",
+    "summary": "## City Safety & Service Snapshot: January 2018\n\nThis summary highlights..."
+  },
+  {
+    "month_label": "2018-02",
+    "summary": "While the provided data spans 2018 through 2024, you're requesting a summary ..."
+  },
+  {
+    "month_label": "2018-03",
+    "summary": "## Boston Safety & Service Trends: 2018-2023 (Year-to-Date)\n\nThis summary ..."
+  }.
+  ...
+]
+```
 ### /log \[ POST \]
 ---
 #### **POST user action logging**

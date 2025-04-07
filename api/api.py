@@ -19,16 +19,19 @@ import decimal
 # Load environment variables
 load_dotenv()
 
+BASE_DIR = Path(__file__).parent
+
 
 # Configuration constants
 class Config:
+    API_VERSION = "API v 0.2.1"
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL")
     GEMINI_CACHE_TTL = int(os.getenv("GEMINI_CACHE_TTL", "7"))
     HOST = os.getenv("API_HOST")
     PORT = os.getenv("API_PORT")
-    DATASTORE_PATH = Path(os.getenv("DATASTORE_PATH", "."))
-    PROMPTS_PATH = Path(os.getenv("PROMPTS_PATH", "."))
+    DATASTORE_PATH = BASE_DIR / Path(os.getenv("DATASTORE_PATH", ".").lstrip("./"))
+    PROMPTS_PATH = BASE_DIR / Path(os.getenv("PROMPTS_PATH", ".").lstrip("./"))
     ALLOWED_EXTENSIONS = {"csv", "txt"}
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit
     FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "rethinkAI2025!")
@@ -199,24 +202,19 @@ async def get_gemini_response(prompt: str, cache_name: str) -> str:
                 config=types.GenerateContentConfig(cached_content=cache_name),
             )
         )
-        print(f"\n✅ Gemini Response: {response.text}")
+        # print(f"\n✅ Gemini Response: {response.text}")
         return response.text
     except Exception as e:
-        print(f"❌ Error generating response: {e}")  # ✅ Log the error!
+        print(f"❌ Error generating response: {e}")
         return f"❌ Error generating response: {e}"
 
 
 # TODO: Unsure if this should be async as well
-def create_gemini_context(
-    context_request: str,
-    files: str = "",
-    preamble: str = "",
-    generate_cache: bool = True,
-) -> Union[str, int, bool]:
+def create_gemini_context(context_request: str, files: str = "", preamble: str = "", generate_cache: bool = True, app_version: str = "") -> Union[str, int, bool]:
     # test if cache exists
     if generate_cache:
         for cache in genai_client.caches.list():
-            if cache.display_name == context_request + files:
+            if cache.display_name == context_request + "_" + app_version:
                 return cache.name
 
     try:
@@ -356,18 +354,14 @@ def create_gemini_context(
             path = Config.PROMPTS_PATH / preamble_file
             if not path.is_file():
                 raise FileNotFoundError(f"File not found: {path}")
-            prompt_content = path.read_text(encoding="utf-8")
+            system_prompt = path.read_text(encoding="utf-8")
         else:
-            prompt_content = preamble
+            system_prompt = preamble
+
+        display_name = context_request + "_" + app_version
 
         # Generate cache or return token count
         if generate_cache:
-            # Set the display name
-            if context_request == "specific":
-                display_name = context_request + ",".join(files_list)
-            else:
-                display_name = context_request
-
             # Set cache expiration time
             cache_ttl = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=Config.GEMINI_CACHE_TTL)).isoformat().replace("+00:00", "Z")
 
@@ -376,7 +370,7 @@ def create_gemini_context(
                 model=Config.GEMINI_MODEL,
                 config=types.CreateCachedContentConfig(
                     display_name=display_name,
-                    system_instruction=prompt_content,
+                    system_instruction=system_prompt,
                     expire_time=cache_ttl,
                     contents=content["parts"],
                 ),
@@ -385,7 +379,8 @@ def create_gemini_context(
             return cache.name
         else:
             # Return token count for testing
-            content["parts"].append({"text": prompt_content})
+            print(f"Conxtex display name: {display_name}")
+            content["parts"].append({"text": system_prompt})
             total_tokens = genai_client.models.count_tokens(model=Config.GEMINI_MODEL, contents=content["parts"])
             return total_tokens.total_tokens
 
@@ -627,7 +622,7 @@ def check_session():
         log_event(
             session_id=session["session_id"],
             app_version="0.2",
-            data_attributes="API v 0.2",
+            data_attributes=Config.API_VERSION,
             app_response="New session created",
         )
 
@@ -635,7 +630,7 @@ def check_session():
     g.log_entry = log_event(
         session_id=session["session_id"],
         app_version="0.2",
-        data_attributes="API v 0.2",
+        data_attributes=Config.API_VERSION,
         client_query=f"Request: [{request.method}] {request.url}",
     )
 
@@ -737,19 +732,24 @@ def route_chat():
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
 
-    context_request = request.args.get("context_request", "")
+    context_request = request.args.get("context_request", request.args.get("request", ""))
 
     data = request.get_json()
 
     # Extract chat data parameters
-    app_version = data.get("app_version", "")
     data_selected = data.get("data_selected", "")
     data_attributes = data.get("data_attributes", "")
     client_query = data.get("client_query", "")
     prompt_preamble = data.get("prompt_preamble", "")
 
     # data_selected, optional, list of files used when context_request==s
-    cache_name = create_gemini_context(context_request, data_selected, prompt_preamble)
+    cache_name = create_gemini_context(
+        context_request=context_request,
+        files=data_selected,
+        preamble=prompt_preamble,
+        generate_cache=True,
+        app_version=app_version,
+    )
 
     full_prompt = f"User question: {client_query}"
 
@@ -802,10 +802,10 @@ def route_chat_context():
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
 
-    context_request = request.args.get("context_request", "")
+    context_request = request.args.get("context_request", request.args.get("request", ""))
 
     if request.method == "GET":
-        # w/ specific context, return list of context caches
+        # return list of context caches if <request> is ""
         if not context_request:
             response = {cache.name: str(cache) for cache in genai_client.caches.list()}
             return jsonify(response)
@@ -817,6 +817,7 @@ def route_chat_context():
                 files="",
                 preamble="",
                 generate_cache=False,
+                app_version=app_version,
             )
 
             if isinstance(token_count, int):
@@ -832,15 +833,16 @@ def route_chat_context():
                 )  # Return an error response
     if request.method == "POST":
         # TODO: implement 'specific' context_request with list of files from datastore
-        # FOR NOW: assumes 'structured', 'unstructured', and 'all' for context_request
+        # FOR NOW: assumes 'structured', 'unstructured', 'all', 'experiment_5' context_request
+        # Context cache creation appends app_version so caches are versioned.
         if not context_request:
             return jsonify({"error": "Missing context_request parameter"}), 400
 
         context_option = request.args.get("option", "")
         if context_option == "clear":
-
+            # clear the cache, either by name or all existing caches
             for cache in genai_client.caches.list():
-                if cache.display_name == context_request or context_request == "all":
+                if context_request == cache.display_name or context_request == "all":
                     genai_client.caches.delete(name=cache.name)
 
             log_event(
@@ -856,7 +858,13 @@ def route_chat_context():
             data_selected = data.get("data_selected", "")
             prompt_preamble = data.get("prompt_preamble", "")
 
-            response = create_gemini_context(context_request, data_selected, prompt_preamble)
+            response = create_gemini_context(
+                context_request=context_request,
+                files=data_selected,
+                preamble=prompt_preamble,
+                generate_cache=True,
+                app_version=app_version,
+            )
 
             log_event(
                 session_id=session_id,
