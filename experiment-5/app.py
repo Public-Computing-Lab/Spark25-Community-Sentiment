@@ -19,14 +19,14 @@ load_dotenv()
 
 PORT = os.getenv("EXPERIMENT_5_PORT")
 DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_5_DASH_REQUESTS_PATHNAME")
-API_BASE_URL = os.getenv("API_BASE_URL")
-APP_VERSION = os.getenv("APP_VERSION", "5")
-
+APP_VERSION = os.getenv("EXPERIMETN_5_VERSION", "5")
+CACHE_DIR = os.getenv("EXPERIMETN_5_CACHE_DIR", "./cache")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8888")
 
 districts = {"B3": "rgba(255, 255, 0, 0.7)", "B2": "rgba(0, 255, 255, 0.7)", "C11": "rgba(0, 255, 0, 0.7)"}
 boston_url = "https://gisportal.boston.gov/ArcGIS/rest/services/PublicSafety/OpenData/MapServer/5/query"
 
-CACHE_DIR = "./cache"
+
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 
@@ -175,8 +175,29 @@ category_colors = {
 }
 
 
+# def chat_display_div(history):
+#     return [html.Div([html.Strong(who + ":", style={"color": "#ff69b4" if who == "You" else "#00ffff"}), html.Span(" " + msg, style={"marginLeft": "6px", "fontStyle": "italic"} if msg == "_typing_..." else {"marginLeft": "6px"})], style={"marginBottom": "10px"}) for who, msg in history]
+
+
 def chat_display_div(history):
-    return [html.Div([html.Strong(who + ":", style={"color": "#ff69b4" if who == "You" else "#00ffff"}), html.Span(" " + msg, style={"marginLeft": "6px", "fontStyle": "italic"} if msg == "_typing_..." else {"marginLeft": "6px"})], style={"marginBottom": "10px"}) for who, msg in history]
+    chat_components = []
+
+    for sender, message in history:
+        if sender == "You":
+            chat_components.append(html.Div([html.Strong(f"{sender}: "), html.Span(message)], className="user-message"))
+        else:
+            chat_components.append(
+                html.Div(
+                    [
+                        html.Strong(f"{sender}: "),
+                        # Use dcc.Markdown with dangerously_allow_html=True
+                        dcc.Markdown(message, dangerously_allow_html=True),
+                    ],
+                    className="assistant-message",
+                )
+            )
+
+    return html.Div(chat_components, className="chat-container")
 
 
 chat_history = [
@@ -226,9 +247,7 @@ app.layout = html.Div(
                             id="chat-loading",
                             type="circle",
                             color="#ff69b4",
-                            children=html.Div(
-                                chat_display_div(chat_history), id="chat-display", style={"height": "480px", "backgroundColor": "#1a1a1a", "color": "white", "border": "1px solid #444", "borderRadius": "8px", "padding": "10px", "overflowY": "auto", "marginBottom": "10px", "fontSize": "13px"}
-                            ),
+                            children=html.Div(chat_display_div(chat_history), id="chat-display", style={"height": "480px", "backgroundColor": "#1a1a1a", "color": "white", "border": "1px solid #444", "borderRadius": "8px", "padding": "10px", "overflowY": "auto", "marginBottom": "10px", "fontSize": "13px"}),
                         ),
                         dcc.Textarea(id="chat-input", placeholder="Type your question here...", style={"width": "100%", "height": "80px", "borderRadius": "8px", "backgroundColor": "#333", "color": "white", "border": "1px solid #555", "padding": "8px", "resize": "none", "fontSize": "13px"}),
                         html.Button("SEND", id="send-button", n_clicks=0, style={"marginTop": "8px", "width": "100%", "backgroundColor": "#ff69b4", "color": "white", "border": "none", "borderRadius": "6px", "padding": "10px", "fontWeight": "bold", "cursor": "pointer"}),
