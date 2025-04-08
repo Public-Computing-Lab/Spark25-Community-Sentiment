@@ -588,7 +588,7 @@ def build_911_query(data_request: str) -> str:
         WHERE {SQLConstants.BOS911_BASE_WHERE}
         AND latitude IS NOT NULL
         AND longitude IS NOT NULL
-        GROUP BY date, ballistics_evidence, latitude, longitude;
+        GROUP BY id, date, ballistics_evidence, latitude, longitude;
         """
     elif data_request == "911_homicides_and_shots_fired":
         return """
