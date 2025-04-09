@@ -85,4 +85,5 @@ api/datastore/*
 **/cache/.gitkeep
 **/data/.gitkeep
 !api/datastore/.gitkeep 
-!api/*.sqlexperiment-5/cache/
+!api/*.sql
+!setup/*.sql
