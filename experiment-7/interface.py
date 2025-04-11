@@ -206,73 +206,20 @@ def slider_value_to_date(value):
 app.index_string = """
 <!DOCTYPE html>
 <html>
-	<head>
-		{%metas%}
-		<title>Rethink AI - Boston Pilot</title>
-		{%favicon%}
-		{%css%}		
-	</head>
-	<body>
-		{%app_entry%}
-		<footer>
-			{%config%}
-			{%scripts%}
-			{%renderer%}
-			<script>
-				// Function to scroll the chat to the bottom
-				function scrollChatToBottom() {
-					const chatMessages = document.getElementById('chat-messages');
-					if (chatMessages) {
-						const chatWrapper = document.querySelector('.chat-messages-wrapper');
-						if (chatWrapper) {
-							chatWrapper.scrollTop = chatWrapper.scrollHeight;
-						}
-					}
-				}
-				
-				// Observer to watch for changes in the chat messages container and the spinner
-				function setupChatScrolling() {
-					// Create a mutation observer to watch for changes
-					const chatObserver = new MutationObserver(function(mutations) {
-						scrollChatToBottom();
-					});
-					
-					// Select both the chat messages and the spinner container to observe
-					const chatMessages = document.getElementById('chat-messages');
-					const spinnerContainer = document.querySelector('.spinner-container');
-					
-					// Start observing chat messages for changes in content
-					if (chatMessages) {
-						chatObserver.observe(chatMessages, { 
-							childList: true,  // Watch for added/removed messages
-							subtree: true,    // Watch for changes in child elements
-							attributes: true  // Watch for attribute changes
-						});
-					}
-					
-					// Also observe the spinner container for visibility changes
-					if (spinnerContainer) {
-						chatObserver.observe(spinnerContainer, {
-							childList: true,
-							subtree: true,
-							attributes: true
-						});
-					}
-					
-					// Initial scroll to bottom (helpful if there are messages on page load)
-					scrollChatToBottom();
-				}
-				
-				// Set up the observer when the DOM is fully loaded
-				document.addEventListener('DOMContentLoaded', function() {
-					setupChatScrolling();
-					
-					// Also scroll when the window resizes (helps with responsive layouts)
-					window.addEventListener('resize', scrollChatToBottom);
-				});
-			</script>
-		</footer>
-	</body>
+    <head>
+        {%metas%}
+        <title>Rethink AI - Boston Pilot</title>
+        {%favicon%}
+        {%css%}		
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
 </html>
 """
 app.layout = html.Div(
@@ -339,6 +286,8 @@ app.layout = html.Div(
             ],
             className="responsive-container",
         ),
+        # Simple div to trigger scrolling
+        html.Div(id="scroll-trigger", style={"display": "none"}),
     ],
     className="app-container",
 )
@@ -369,7 +318,6 @@ def handle_chat_message(n_clicks, n_submit, slider_value, input_value, current_m
     # Check if callback was triggered
     ctx = dash.callback_context
     if not ctx.triggered:
-        print("here")
         raise PreventUpdate
 
     # Don't do anything if the input is empty
@@ -381,11 +329,9 @@ def handle_chat_message(n_clicks, n_submit, slider_value, input_value, current_m
 
     # Add user message
     user_message = html.Div(f"User: {input_value}", className="user-message")
-
     year, month = slider_value_to_date(slider_value)
-    # Format as YYYY-MM
     selected_date = f"{year}-{month:02d}"
-    print(input_value.strip())
+
     prompt = (
         f"The user has selected a subset of the available 311 and 911 data. They are only looking at the data for {selected_date} in the Dorchester neighborhood.\n\n"
         f"Describe the conditions captured in the meeting transcripts and interviews and how those related to the trends seein the 911 and 311 CSV data for "
@@ -411,25 +357,25 @@ def handle_chat_message(n_clicks, n_submit, slider_value, input_value, current_m
         className="bot-message",
     )
 
-    # Scroll the chat window once content is live
-    app.clientside_callback(
-        """
-		function(children) {
-			if (window.scrollChatToBottom) {
-				setTimeout(window.scrollChatToBottom, 50);
-			}
-			return children;
-		}
-		""",
-        Output("loading-output", "children"),
-        Input("chat-messages", "children"),
-        prevent_initial_call=True,
-    )
-
     updated_messages = current_messages + [user_message, bot_response]
-
     # Clear input and return updated chat
     return updated_messages, "", dash.no_update
+
+
+# # Simple clientside callback to scroll chat to bottom
+# app.clientside_callback(
+#     """
+#     function(n) {
+#         const chatWrapper = document.querySelector('.chat-messages-wrapper');
+#         if (chatWrapper) {
+#             chatWrapper.scrollTop = chatWrapper.scrollHeight;
+#         }
+#         return '';
+#     }
+#     """,
+#     Output("loading-output", "children"),
+#     Input("scroll-trigger", "children")
+# )
 
 
 # Callback to hide overlay and focus on appropriate section
@@ -492,24 +438,9 @@ def handle_tell_me_prompt(prompt, current_messages):
         className="bot-message",
     )
 
-    # Scroll the chat window once content is live
-    app.clientside_callback(
-        """
-		function(children) {
-			if (window.scrollChatToBottom) {
-				setTimeout(window.scrollChatToBottom, 50);
-			}
-			return children;
-		}
-		""",
-        Output("loading-output", "children"),
-        Input("chat-messages", "children"),
-        prevent_initial_call=True,
-    )
-
     # Update chat with bot response only (no user message since system initiated)
     updated_messages = current_messages + [bot_response]
-
+    # timestamp = int(time.time())
     # Return updated chat
     return updated_messages, "", dash.no_update
 
