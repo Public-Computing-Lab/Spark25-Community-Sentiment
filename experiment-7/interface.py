@@ -247,25 +247,11 @@ app.layout = html.Div(
             className="overlay",
         ),
         # Header
-        html.Div([html.H1("This is what's going on...", className="app-header-title")], className="app-header"),
+        html.Div([html.H1("This is where we are...", className="app-header-title")], className="app-header"),
         # Main container that will handle responsive layout
         html.Div(
             [
                 # Left side - Map container
-                html.Div(
-                    [
-                        # Date slider (single selector for year-month)
-                        html.Div(
-                            [html.Div("Select Time Period:", className="selector-label"), dcc.Slider(id="date-slider", min=min_value, max=max_value, step=1, marks=generate_marks(), value=max_value, included=False), html.Div(id="date-display", className="date-text")],  # Default to last date (Jan 2018)  # No range, just a single point
-                            className="slider-container",
-                        ),
-                        # Map container - placeholder for your map implementation
-                        html.Div(id="map-container", className="map-div"),
-                    ],
-                    className="map-main-container",
-                    id="map-section",
-                ),
-                # Right side - Chat container
                 html.Div(
                     [
                         html.Div(
@@ -283,11 +269,26 @@ app.layout = html.Div(
                     className="chat-main-container",
                     id="chat-section",
                 ),
+                # Right side - Chat container
+                html.Div(
+                    [
+                        # Map container - placeholder for your map implementation
+                        html.Div(id="map-container", className="map-div"),
+                        # Date slider (single selector for year-month)
+                        html.Div(
+                            [html.Div(className="selector-label"), dcc.Slider(id="date-slider", min=min_value, max=max_value, step=1, marks=generate_marks(), value=max_value, included=False), html.Div(id="date-display", className="date-text")],  # Default to last date (Jan 2018)  # No range, just a single point
+                            className="slider-container",
+                        ),
+                    ],
+                    className="map-main-container",
+                    id="map-section",
+                ),
             ],
             className="responsive-container",
         ),
         # Simple div to trigger scrolling
         html.Div(id="scroll-trigger", style={"display": "none"}),
+        dcc.Store(id="user-message-store"),
     ],
     className="app-container",
 )
@@ -307,14 +308,14 @@ def update_map(slider_value):
     return f"Map showing data for: {date_formatted}"
 
 
-# Callback for chat functionality
+# Callback chain for chat functionality - Part 1: Handle user input and show loading
 @callback(
-    [Output("chat-messages", "children", allow_duplicate=True), Output("chat-input", "value", allow_duplicate=True), Output("loading-output", "children", allow_duplicate=True)],
-    [Input("send-button", "n_clicks"), Input("chat-input", "n_submit"), Input("date-slider", "value")],
+    [Output("chat-messages", "children", allow_duplicate=True), Output("chat-input", "value"), Output("scroll-trigger", "children"), Output("loading-spinner", "style"), Output("user-message-store", "data")],
+    [Input("send-button", "n_clicks"), Input("chat-input", "n_submit")],
     [State("chat-input", "value"), State("chat-messages", "children")],
     prevent_initial_call=True,
 )
-def handle_chat_message(n_clicks, n_submit, slider_value, input_value, current_messages):
+def handle_chat_input(n_clicks, n_submit, input_value, current_messages):
     # Check if callback was triggered
     ctx = dash.callback_context
     if not ctx.triggered:
@@ -328,17 +329,45 @@ def handle_chat_message(n_clicks, n_submit, slider_value, input_value, current_m
         current_messages = []
 
     # Add user message
-    user_message = html.Div(f"User: {input_value}", className="user-message")
+    user_message = html.Div(f"{input_value}", className="user-message")
+    updated_messages = current_messages + [user_message]
+
+    # Show loading spinner
+    spinner_style = {"display": "block"}
+
+    # Trigger scrolling by returning a timestamp
+    timestamp = int(time.time())
+
+    # Store user input for part 2
+    stored_input = input_value.strip()
+
+    # Clear input, update messages, show spinner
+    return updated_messages, "", timestamp, spinner_style, stored_input
+
+
+# Callback chain for chat functionality - Part 2: Process the request and display bot response
+@callback(
+    [Output("chat-messages", "children", allow_duplicate=True), Output("loading-spinner", "style", allow_duplicate=True)],
+    [Input("user-message-store", "data")],
+    [State("chat-messages", "children"), State("date-slider", "value")],
+    prevent_initial_call=True,
+)
+def handle_chat_response(stored_input, current_messages, slider_value):
+    if not stored_input:
+        raise PreventUpdate
+
+    # Get the date from the slider
     year, month = slider_value_to_date(slider_value)
     selected_date = f"{year}-{month:02d}"
 
+    # Construct the prompt
     prompt = (
         f"The user has selected a subset of the available 311 and 911 data. They are only looking at the data for {selected_date} in the Dorchester neighborhood.\n\n"
         f"Describe the conditions captured in the meeting transcripts and interviews and how those related to the trends seein the 911 and 311 CSV data for "
         f"the date {selected_date}.\n\n"
         f"Point out notable spikes, drops, or emerging patterns in the data for {selected_date}, and connect them to lived experiences and perceptions.\n\n"
         f"Use the grouped 311 categories and the 911 incident data together to provide a holistic, narrative-driven analysis."
-        f"Your neighbor's question: {input_value.strip()}"
+        f"Your neighbor's question: {stored_input}"
     )
 
     try:
@@ -348,34 +377,21 @@ def handle_chat_message(n_clicks, n_submit, slider_value, input_value, current_m
     except Exception as e:
         reply = f"[Error: {e}]"
 
+    # Create bot response
     bot_response = html.Div(
         [
-            html.Strong("Bot: "),
-            # Use dcc.Markdown with dangerously_allow_html=True
             dcc.Markdown(reply, dangerously_allow_html=True),
         ],
         className="bot-message",
     )
 
-    updated_messages = current_messages + [user_message, bot_response]
-    # Clear input and return updated chat
-    return updated_messages, "", dash.no_update
+    # Update messages with bot response
+    updated_messages = current_messages + [bot_response]
 
+    # Hide spinner
+    spinner_style = {"display": "none"}
 
-# # Simple clientside callback to scroll chat to bottom
-# app.clientside_callback(
-#     """
-#     function(n) {
-#         const chatWrapper = document.querySelector('.chat-messages-wrapper');
-#         if (chatWrapper) {
-#             chatWrapper.scrollTop = chatWrapper.scrollHeight;
-#         }
-#         return '';
-#     }
-#     """,
-#     Output("loading-output", "children"),
-#     Input("scroll-trigger", "children")
-# )
+    return updated_messages, spinner_style
 
 
 # Callback to hide overlay and focus on appropriate section
@@ -431,8 +447,7 @@ def handle_tell_me_prompt(prompt, current_messages):
     # Process the predefined message
     bot_response = html.Div(
         [
-            html.Strong("Bot: "),
-            # Use dcc.Markdown with dangerously_allow_html=True
+            html.Strong("And this is what's going on..."),
             dcc.Markdown(reply, dangerously_allow_html=True),
         ],
         className="bot-message",
