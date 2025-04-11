@@ -202,6 +202,79 @@ def slider_value_to_date(value):
 
 
 # Layout
+# CSS for auto-scrolling (limited solution)
+app.index_string = """
+<!DOCTYPE html>
+<html>
+	<head>
+		{%metas%}
+		<title>Rethink AI - Boston Pilot</title>
+		{%favicon%}
+		{%css%}		
+	</head>
+	<body>
+		{%app_entry%}
+		<footer>
+			{%config%}
+			{%scripts%}
+			{%renderer%}
+			<script>
+				// Function to scroll the chat to the bottom
+				function scrollChatToBottom() {
+					const chatMessages = document.getElementById('chat-messages');
+					if (chatMessages) {
+						const chatWrapper = document.querySelector('.chat-messages-wrapper');
+						if (chatWrapper) {
+							chatWrapper.scrollTop = chatWrapper.scrollHeight;
+						}
+					}
+				}
+				
+				// Observer to watch for changes in the chat messages container and the spinner
+				function setupChatScrolling() {
+					// Create a mutation observer to watch for changes
+					const chatObserver = new MutationObserver(function(mutations) {
+						scrollChatToBottom();
+					});
+					
+					// Select both the chat messages and the spinner container to observe
+					const chatMessages = document.getElementById('chat-messages');
+					const spinnerContainer = document.querySelector('.spinner-container');
+					
+					// Start observing chat messages for changes in content
+					if (chatMessages) {
+						chatObserver.observe(chatMessages, { 
+							childList: true,  // Watch for added/removed messages
+							subtree: true,    // Watch for changes in child elements
+							attributes: true  // Watch for attribute changes
+						});
+					}
+					
+					// Also observe the spinner container for visibility changes
+					if (spinnerContainer) {
+						chatObserver.observe(spinnerContainer, {
+							childList: true,
+							subtree: true,
+							attributes: true
+						});
+					}
+					
+					// Initial scroll to bottom (helpful if there are messages on page load)
+					scrollChatToBottom();
+				}
+				
+				// Set up the observer when the DOM is fully loaded
+				document.addEventListener('DOMContentLoaded', function() {
+					setupChatScrolling();
+					
+					// Also scroll when the window resizes (helps with responsive layouts)
+					window.addEventListener('resize', scrollChatToBottom);
+				});
+			</script>
+		</footer>
+	</body>
+</html>
+"""
 app.layout = html.Div(
     [
         # Full-screen overlay
@@ -248,10 +321,15 @@ app.layout = html.Div(
                 # Right side - Chat container
                 html.Div(
                     [
-                        # Chat messages area
-                        html.Div(id="chat-messages", className="chat-messages"),
-                        # Loading spinner
-                        html.Div(dcc.Loading(id="loading-spinner", type="circle", children=html.Div(id="loading-output", style={"display": "none"})), className="spinner-container"),
+                        html.Div(
+                            className="chat-messages-wrapper",
+                            children=[
+                                # Message container
+                                html.Div(id="chat-messages", className="chat-messages"),
+                                # Spinner positioned inside the messages area
+                                html.Div(dcc.Loading(id="loading-spinner", type="circle", children=html.Div(id="loading-output", style={"display": "none"})), className="spinner-container"),
+                            ],
+                        ),
                         # Chat input and send button
                         html.Div([dcc.Input(id="chat-input", type="text", placeholder="Type your message...", className="chat-input"), html.Button("Send", id="send-button", className="send-btn")], className="chat-input-container"),
                     ],
@@ -264,19 +342,6 @@ app.layout = html.Div(
     ],
     className="app-container",
 )
-
-
-# Callback to update the date display
-# @callback(Output("date-display", "children"), [Input("date-slider", "value")])
-# def update_date_text(slider_value):
-#     # Convert slider value to year and month
-#     year, month = slider_value_to_date(slider_value)
-#
-#     # Get month name
-#     month_names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-#     month_name = month_names[month - 1]  # This will now always be in range 0-11
-#
-#     return f"Selected: {month_name} {year}"
 
 
 # Callback to update the map based on selected date
@@ -346,57 +411,25 @@ def handle_chat_message(n_clicks, n_submit, slider_value, input_value, current_m
         className="bot-message",
     )
 
+    # Scroll the chat window once content is live
+    app.clientside_callback(
+        """
+		function(children) {
+			if (window.scrollChatToBottom) {
+				setTimeout(window.scrollChatToBottom, 50);
+			}
+			return children;
+		}
+		""",
+        Output("loading-output", "children"),
+        Input("chat-messages", "children"),
+        prevent_initial_call=True,
+    )
+
     updated_messages = current_messages + [user_message, bot_response]
 
     # Clear input and return updated chat
     return updated_messages, "", dash.no_update
-
-
-# # Separate callback to process chat after spinner is shown
-# @callback([Output("chat-messages", "children", allow_duplicate=True), Output("spinner-container", "style", allow_duplicate=True)], [Input("loading-output", "children")], [State("chat-input", "value"), State("chat-messages", "children"), Input("date-slider", "value")], prevent_initial_call=True)
-# def process_chat_message(_, input_value, current_messages, slider_value):
-#     if not current_messages:
-#         current_messages = []
-#
-#     # Add user message
-#     user_message = html.Div(f"User: {input_value.strip()}", className="user-message")
-#
-#     # Here you would process the user input and generate a response
-#     # For now, just echo it back
-#     # Get the current date
-#     year, month = slider_value_to_date(slider_value)
-#     # Format as YYYY-MM
-#     selected_date = f"{year}-{month:02d}"
-#     print(input_value.strip())
-#     prompt = (
-#         f"The user has selected a subset of the available 311 and 911 data. They are only looking at the data for {selected_date} in the Dorchester neighborhood.\n\n"
-#         f"Describe the conditions captured in the meeting transcripts and interviews and how those related to the trends seein the 911 and 311 CSV data for "
-#         f"the date {selected_date}.\n\n"
-#         f"Point out notable spikes, drops, or emerging patterns in the data for {selected_date}, and connect them to lived experiences and perceptions.\n\n"
-#         f"Use the grouped 311 categories and the 911 incident data together to provide a holistic, narrative-driven analysis."
-#         f"Your neighbor's question: {input_value.strip()}"
-#     )
-#
-#     try:
-#         response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_5&app_version={Config.APP_VERSION}", headers={"Content-Type": "application/json"}, json={"client_query": prompt})
-#         response.raise_for_status()
-#         reply = response.json().get("response", "[No reply received]")
-#     except Exception as e:
-#         reply = f"[Error: {e}]"
-#
-#     bot_response = html.Div(
-#         [
-#             html.Strong("Bot: "),
-#             # Use dcc.Markdown with dangerously_allow_html=True
-#             dcc.Markdown(reply, dangerously_allow_html=True),
-#         ],
-#         className="bot-message",
-#     )
-#
-#     updated_messages = current_messages + [user_message, bot_response]
-#
-#     # Hide the spinner
-#     return updated_messages, {"display": "none"}
 
 
 # Callback to hide overlay and focus on appropriate section
@@ -457,6 +490,21 @@ def handle_tell_me_prompt(prompt, current_messages):
             dcc.Markdown(reply, dangerously_allow_html=True),
         ],
         className="bot-message",
+    )
+
+    # Scroll the chat window once content is live
+    app.clientside_callback(
+        """
+		function(children) {
+			if (window.scrollChatToBottom) {
+				setTimeout(window.scrollChatToBottom, 50);
+			}
+			return children;
+		}
+		""",
+        Output("loading-output", "children"),
+        Input("chat-messages", "children"),
+        prevent_initial_call=True,
     )
 
     # Update chat with bot response only (no user message since system initiated)
