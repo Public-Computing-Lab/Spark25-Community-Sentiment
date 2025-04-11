@@ -20,7 +20,7 @@ class Config:
     HOST = os.getenv("EXPERIMENT_6_HOST", "127.0.0.1")
     PORT = os.getenv("EXPERIMENT_6_PORT", "8060")
     DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_6_DASH_REQUESTS_PATHNAME")
-    APP_VERSION = os.getenv("EXPERIMETN_6_VERSION", "test.x")
+    APP_VERSION = os.getenv("EXPERIMETN_6_VERSION", "0.6.x")
     CACHE_DIR = os.getenv("EXPERIMETN_6_CACHE_DIR", "./cache")
     API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8888")
 
@@ -209,7 +209,7 @@ app.layout = html.Div(
             [
                 html.Div(
                     [
-                        html.H2("Your neighbors are worried about public safety in the neighborhood, but they are working together to improve things and make it safer for everyone.", className="overlay-heading"),
+                        html.H2("Your neighbors are worried about rising violence in the neighborhood, but they are working together to improve things and make it safer for everyone.", className="overlay-heading"),
                         html.Div(
                             [
                                 html.Button("Show me", id="show-me-btn", className="overlay-btn"),
@@ -248,18 +248,15 @@ app.layout = html.Div(
                 # Right side - Chat container
                 html.Div(
                     [
-                        html.Div(
-                            [
-                                # This will contain all chat messages
-                                html.Div(id="chat-messages", className="chat-messages"),
-                                # Loading spinner that appears below the last message
-                                html.Div(dcc.Loading(id="loading-spinner", type="circle", children=html.Div(id="loading-output")), id="spinner-container", style={"display": "none"}),  # Hidden by default, shown when needed
-                            ],
-                            className="chat-messages-wrapper",
-                        ),
+                        # Chat messages area
+                        html.Div(id="chat-messages", className="chat-messages"),
+                        # Loading spinner
+                        html.Div(dcc.Loading(id="loading-spinner", type="circle", children=html.Div(id="loading-output", style={"display": "none"})), className="spinner-container"),
+                        # Chat input and send button
                         html.Div([dcc.Input(id="chat-input", type="text", placeholder="Type your message...", className="chat-input"), html.Button("Send", id="send-button", className="send-btn")], className="chat-input-container"),
                     ],
-                    className="chat-messages-wrapper",
+                    className="chat-main-container",
+                    id="chat-section",
                 ),
             ],
             className="responsive-container",
@@ -298,7 +295,7 @@ def update_map(slider_value):
 
 # Callback for chat functionality
 @callback(
-    [Output("chat-messages", "children", allow_duplicate=True), Output("chat-input", "value", allow_duplicate=True), Output("spinner-container", "style", allow_duplicate=True)],
+    [Output("chat-messages", "children", allow_duplicate=True), Output("chat-input", "value", allow_duplicate=True), Output("loading-output", "children", allow_duplicate=True)],
     [Input("send-button", "n_clicks"), Input("chat-input", "n_submit"), Input("date-slider", "value")],
     [State("chat-input", "value"), State("chat-messages", "children")],
     prevent_initial_call=True,
@@ -306,18 +303,53 @@ def update_map(slider_value):
 def handle_chat_message(n_clicks, n_submit, slider_value, input_value, current_messages):
     # Check if callback was triggered
     ctx = dash.callback_context
-    if not ctx.triggered or not input_value or input_value.strip() == "":
+    if not ctx.triggered:
+        print("here")
+        raise PreventUpdate
+
+    # Don't do anything if the input is empty
+    if not input_value or input_value.strip() == "":
         raise PreventUpdate
 
     if not current_messages:
         current_messages = []
 
     # Add user message
-    user_message = html.Div(f"{input_value}", className="user-message")
-    updated_messages = current_messages + [user_message]
+    user_message = html.Div(f"User: {input_value}", className="user-message")
 
-    # Return: show user message, clear input, show spinner
-    return updated_messages, "", {"display": "block"}
+    year, month = slider_value_to_date(slider_value)
+    # Format as YYYY-MM
+    selected_date = f"{year}-{month:02d}"
+    print(input_value.strip())
+    prompt = (
+        f"The user has selected a subset of the available 311 and 911 data. They are only looking at the data for {selected_date} in the Dorchester neighborhood.\n\n"
+        f"Describe the conditions captured in the meeting transcripts and interviews and how those related to the trends seein the 911 and 311 CSV data for "
+        f"the date {selected_date}.\n\n"
+        f"Point out notable spikes, drops, or emerging patterns in the data for {selected_date}, and connect them to lived experiences and perceptions.\n\n"
+        f"Use the grouped 311 categories and the 911 incident data together to provide a holistic, narrative-driven analysis."
+        f"Your neighbor's question: {input_value.strip()}"
+    )
+
+    try:
+        response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_5&app_version={Config.APP_VERSION}", headers={"Content-Type": "application/json"}, json={"client_query": prompt})
+        response.raise_for_status()
+        reply = response.json().get("response", "[No reply received]")
+    except Exception as e:
+        reply = f"[Error: {e}]"
+
+    bot_response = html.Div(
+        [
+            html.Strong("Bot: "),
+            # Use dcc.Markdown with dangerously_allow_html=True
+            dcc.Markdown(reply, dangerously_allow_html=True),
+        ],
+        className="bot-message",
+    )
+
+    updated_messages = current_messages + [user_message, bot_response]
+
+    # Clear input and return updated chat
+    return updated_messages, "", dash.no_update
 
 
 # # Separate callback to process chat after spinner is shown
@@ -402,7 +434,7 @@ def handle_overlay_buttons(show_clicks, tell_clicks, listen_clicks):
     return overlay_style, map_class, chat_class, auto_focus, tell_me_prompt
 
 
-@callback([Output("chat-messages", "children", allow_duplicate=True), Output("chat-input", "value", allow_duplicate=True), Output("spinner-container", "style", allow_duplicate=True)], [Input("tell-me-trigger", "children")], [State("chat-messages", "children")], prevent_initial_call=True)
+@callback([Output("chat-messages", "children", allow_duplicate=True), Output("chat-input", "value", allow_duplicate=True), Output("loading-output", "children", allow_duplicate=True)], [Input("tell-me-trigger", "children")], [State("chat-messages", "children")], prevent_initial_call=True)
 def handle_tell_me_prompt(prompt, current_messages):
     if not prompt:
         raise PreventUpdate
@@ -410,7 +442,6 @@ def handle_tell_me_prompt(prompt, current_messages):
     if not current_messages:
         current_messages = []
 
-    # Process the predefined message
     try:
         response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_5&app_version={Config.APP_VERSION}", headers={"Content-Type": "application/json"}, json={"client_query": prompt})
         response.raise_for_status()
@@ -418,9 +449,10 @@ def handle_tell_me_prompt(prompt, current_messages):
     except Exception as e:
         reply = f"[Error: {e}]"
 
+    # Process the predefined message
     bot_response = html.Div(
         [
-            html.Strong("This is what we're facing."),
+            html.Strong("Bot: "),
             # Use dcc.Markdown with dangerously_allow_html=True
             dcc.Markdown(reply, dangerously_allow_html=True),
         ],
@@ -431,65 +463,7 @@ def handle_tell_me_prompt(prompt, current_messages):
     updated_messages = current_messages + [bot_response]
 
     # Return updated chat
-    return updated_messages, "", {"display": "block"}
-
-
-# Callback to process the message and hide spinner
-@callback([Output("chat-messages", "children", allow_duplicate=True), Output("spinner-container", "style", allow_duplicate=True)], [Input("chat-input", "value"), Input("date-slider", "value")], [State("chat-messages", "children")], prevent_initial_call=True)  # Use this as a trigger after the first callback
-def process_chat_response(_, current_messages, slider_value):
-    # This callback runs after input is cleared by the previous callback
-
-    # If there are no messages yet, do nothing
-    if not current_messages:
-        raise PreventUpdate
-
-    # Simulate processing delay
-    import time
-
-    time.sleep(1)  # Remove in production
-
-    # Get the last message which should be the user's message
-    last_message = current_messages[-1] if current_messages else None
-
-    # Generate bot response (in real app, this would process the actual user input)
-    # bot_response = html.Div(f"Bot: I received your message", className="bot-message")
-    # Add user message
-    # user_message = html.Div(f"User: {input_value}", className="user-message")
-    print(slider_value)
-    year, month = slider_value_to_date(slider_value)
-    # Format as YYYY-MM
-    selected_date = f"{year}-{month:02d}"
-
-    prompt = (
-        f"The user has selected a subset of the available 311 and 911 data. They are only looking at the data for {selected_date} in the Dorchester neighborhood.\n\n"
-        f"Describe the conditions captured in the meeting transcripts and interviews and how those related to the trends seein the 911 and 311 CSV data for "
-        f"the date {selected_date}.\n\n"
-        f"Point out notable spikes, drops, or emerging patterns in the data for {selected_date}, and connect them to lived experiences and perceptions.\n\n"
-        f"Use the grouped 311 categories and the 911 incident data together to provide a holistic, narrative-driven analysis."
-        f"Your neighbor's question: {last_message}"
-    )
-
-    try:
-        response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_5&app_version={Config.APP_VERSION}", headers={"Content-Type": "application/json"}, json={"client_query": prompt})
-        response.raise_for_status()
-        reply = response.json().get("response", "[No reply received]")
-    except Exception as e:
-        reply = f"[Error: {e}]"
-
-    bot_response = html.Div(
-        [
-            html.Strong("Bot: "),
-            # Use dcc.Markdown with dangerously_allow_html=True
-            dcc.Markdown(reply, dangerously_allow_html=True),
-        ],
-        className="bot-message",
-    )
-
-    # Update messages with bot response
-    updated_messages = current_messages + [bot_response]
-
-    # Hide spinner after response is added
-    return updated_messages, {"display": "none"}
+    return updated_messages, "", dash.no_update
 
 
 ########################################
