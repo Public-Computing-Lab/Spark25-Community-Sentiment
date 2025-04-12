@@ -8,9 +8,12 @@ import dash
 from dash import html, dcc, Input, Output, State, callback
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-
-# from datetime import datetime
-# import json
+from datetime import datetime
+import plotly.graph_objects as go
+from plotly.figure_factory import create_hexbin_mapbox
+import plotly.express as px
+import numpy as np
+import h3
 
 # Configuration constants
 load_dotenv()
@@ -23,6 +26,7 @@ class Config:
     APP_VERSION = os.getenv("EXPERIMETN_6_VERSION", "0.6.x")
     CACHE_DIR = os.getenv("EXPERIMETN_6_CACHE_DIR", "./cache")
     API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8888")
+    MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
 
 
 os.makedirs(Config.CACHE_DIR, exist_ok=True)
@@ -164,11 +168,13 @@ df_311 = load_311_data()
 ########################################
 
 # Initialize the Dash app
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, "/assets/style.css"], meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}])
+app = dash.Dash(__name__, suppress_callback_exceptions=True, external_stylesheets=[dbc.themes.BOOTSTRAP, "/assets/style.css"], meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}])
 
 ########################################
 
 
+# Helper functions
+#
 # Generate marks for the slider (years with months as minor ticks)
 def generate_marks():
     marks = {}
@@ -178,7 +184,6 @@ def generate_marks():
             # This ensures values are consecutive integers
             value = (year - 2018) * 12 + month - 1
 
-            # Only add labels for January of each year
             if month == 1:
                 marks[value] = {"label": f"{year}", "style": {"font-weight": "bold"}}
             else:
@@ -201,6 +206,18 @@ def slider_value_to_date(value):
     return year, month
 
 
+# Get chat response from API
+def get_chat_response(prompt):
+    try:
+        response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_5&app_version={Config.APP_VERSION}", headers={"Content-Type": "application/json"}, json={"client_query": prompt})
+        response.raise_for_status()
+        reply = response.json().get("response", "[No reply received]")
+    except Exception as e:
+        reply = f"[Error: {e}]"
+
+    return reply
+
+
 # Layout
 # CSS for auto-scrolling (limited solution)
 app.index_string = """
@@ -210,7 +227,7 @@ app.index_string = """
         {%metas%}
         <title>Rethink AI - Boston Pilot</title>
         {%favicon%}
-        {%css%}		
+        {%css%}
     </head>
     <body>
         {%app_entry%}
@@ -229,11 +246,11 @@ app.layout = html.Div(
             [
                 html.Div(
                     [
-                        html.H2("Your neighbors are worried about rising violence in the neighborhood, but they are working together to improve things and make it safer for everyone.", className="overlay-heading"),
+                        html.H2("Your neighbors are worried about safety in the neighborhood, but they are working to improve things and make it safer for everyone.", className="overlay-heading"),
                         html.Div(
                             [
-                                html.Button("Show me", id="show-me-btn", className="overlay-btn"),
                                 html.Button("Tell me", id="tell-me-btn", className="overlay-btn"),
+                                html.Button("Show me", id="show-me-btn", className="overlay-btn"),
                                 html.Button("Listen to me", id="listen-to-me-btn", className="overlay-btn"),
                             ],
                             className="overlay-buttons",
@@ -251,7 +268,7 @@ app.layout = html.Div(
         # Main container that will handle responsive layout
         html.Div(
             [
-                # Left side - Map container
+                # Left side - Chat container
                 html.Div(
                     [
                         html.Div(
@@ -269,11 +286,20 @@ app.layout = html.Div(
                     className="chat-main-container",
                     id="chat-section",
                 ),
-                # Right side - Chat container
+                # Right side - Map container
                 html.Div(
                     [
                         # Map container - placeholder for your map implementation
-                        html.Div(id="map-container", className="map-div"),
+                        html.Div(
+                            [
+                                dcc.Graph(id="hexbin-map", figure={}, style={"height": "100%", "width": "100%"}),
+                                dcc.Store(id="hex-to-ids-store", data={}),
+                                # just for testing, remove later
+                                html.Div(id="click-info", style={"position": "absolute", "top": "10px", "right": "10px", "backgroundColor": "white", "padding": "10px", "borderRadius": "5px", "boxShadow": "0 0 10px rgba(0,0,0,0.1)", "zIndex": 1000, "maxHeight": "300px", "overflowY": "auto", "display": "none"}),
+                            ],
+                            id="map-container",
+                            className="map-div",
+                        ),
                         # Date slider (single selector for year-month)
                         html.Div(
                             [html.Div(className="selector-label"), dcc.Slider(id="date-slider", min=min_value, max=max_value, step=1, marks=generate_marks(), value=max_value, included=False), html.Div(id="date-display", className="date-text")],  # Default to last date (Jan 2018)  # No range, just a single point
@@ -295,17 +321,205 @@ app.layout = html.Div(
 
 
 # Callback to update the map based on selected date
-@callback(Output("map-container", "children"), [Input("date-slider", "value")])
+@callback(
+    [
+        Output("hexbin-map", "figure"),
+        Output("hex-to-ids-store", "data"),
+        Output("loading-spinner", "style", allow_duplicate=True),
+    ],
+    [Input("date-slider", "value")],
+    prevent_initial_call="initial_duplicate",
+)
 def update_map(slider_value):
     # Convert slider value to year and month
     year, month = slider_value_to_date(slider_value)
 
     # Format as YYYY-MM
-    date_formatted = f"{year}-{month:02d}"
+    month_str = f"{year}-{month:02d}"
+    selected_month = pd.Timestamp(month_str)
 
-    # Here you would update the map based on the selected date
-    # For placeholder purposes:
-    return f"Map showing data for: {date_formatted}"
+    df_month = df_311[df_311["date"].dt.to_period("M").dt.to_timestamp() == selected_month]
+    hex_to_ids_store = dcc.Store(id="hex-to-ids-store", data={})
+
+    # Create a div to display clicked hexagon data
+    click_info_div = html.Div(id="click-info", style={"position": "absolute", "top": "10px", "right": "10px", "backgroundColor": "white", "padding": "10px", "borderRadius": "5px", "boxShadow": "0 0 10px rgba(0,0,0,0.1)", "zIndex": 1000, "maxHeight": "300px", "overflowY": "auto", "display": "none"})  # Hidden initially
+    fig = go.Figure()
+    if df_month.empty:
+        fig.add_annotation(text=f"No data available for {month_str}", showarrow=False, font=dict(size=16))
+        map_graph = dcc.Graph(id="hexbin-map", figure=fig, style={"height": "100%", "width": "100%"}, config={"responsive": True, "displayModeBar": False})
+        spinner_style = {"display": "none"}
+        return html.Div([map_graph, hex_to_ids_store, click_info_div]), spinner_style
+    else:
+        # Prepare hexbin
+        id_field = "id"
+        df_month["count"] = 1
+        grouped = df_month.groupby(["latitude", "longitude", "category"]).size().reset_index(name="count")
+        pivot = grouped.pivot_table(index=["latitude", "longitude"], columns="category", values="count", fill_value=0).reset_index()
+        pivot["total_count"] = pivot.drop(columns=["latitude", "longitude"]).sum(axis=1)
+
+        # Generate hexagons and aggregate data
+        resolution = 10  # Adjust based on your needs
+        hexagons = {}  # For counts
+        hex_to_ids = {}  # Map hex_ids to original data point IDs
+
+        for idx, row in df_month.iterrows():
+            hex_id = h3.latlng_to_cell(row.latitude, row.longitude, resolution)
+
+            # Store count for choropleth coloring
+            if hex_id in hexagons:
+                hexagons[hex_id].append(1)  # Count of 1 for each point
+                hex_to_ids[hex_id].append(str(row[id_field]))  # Store ID of data point
+            else:
+                hexagons[hex_id] = [1]
+                hex_to_ids[hex_id] = [str(row[id_field])]
+
+        # Calculate sum for each hexagon
+        hex_values = {h: sum(vals) for h, vals in hexagons.items()}
+        hex_ids = list(hex_values.keys())
+
+        # Create GeoJSON features with proper IDs for choropleth
+        hex_polygons = []
+        hex_id_to_index = {}  # Map h3 hex_id to feature index
+
+        for i, h in enumerate(hex_ids):
+            # Store mapping from h3 hex_id to feature index (for click data lookup)
+            hex_id_to_index[h] = i
+
+            # Get boundary coordinates
+            boundary = h3.cell_to_boundary(h)
+            # Convert to [lon, lat] format for GeoJSON
+            boundary_geojson = [[lng, lat] for lat, lng in boundary]
+            # Add first point at the end to close the polygon
+            boundary_geojson = [boundary_geojson + [boundary_geojson[0]]]
+
+            # Create feature with ID that matches the index
+            hex_polygons.append({"type": "Feature", "id": i, "properties": {"value": hex_values[h], "hex_id": h}, "geometry": {"type": "Polygon", "coordinates": boundary_geojson}})  # Store the h3 hex_id for lookup later
+
+        # Create properly formatted GeoJSON collection
+        geojson = {"type": "FeatureCollection", "features": hex_polygons}
+
+        # Get z values and locations in matching order
+        z_values = [hex_values[hex_ids[i]] for i in range(len(hex_ids))]
+        locations = list(range(len(hex_ids)))
+
+        # Store hexagon IDs in the same order for customdata
+        customdata = hex_ids
+
+        # Add choropleth layer with hover disabled
+        fig.add_trace(
+            go.Choroplethmapbox(
+                geojson=geojson,
+                locations=locations,
+                z=z_values,
+                customdata=customdata,  # Store hex_ids for click callback
+                colorscale=px.colors.sequential.RdPu[::-1],
+                marker_opacity=0.7,
+                marker_line_width=1,
+                marker_line_color="rgba(255, 255, 255, 0.5)",
+                below="",  # This places hexbins BELOW all other layers including street labels
+                showscale=True,
+                colorbar=dict(
+                    title="Count",
+                    thickness=15,
+                    len=0.75,
+                    x=0.95,
+                ),
+                hoverinfo="none",  # Disable hover information
+            )
+        )
+
+        # Set up the mapbox layout with a style that includes street labels
+        fig.update_layout(
+            mapbox=dict(
+                style="mapbox://styles/mapbox/streets-v11",  # Style with street labels on top
+                center=dict(lon=-71.07, lat=42.297),  # Center on Boston
+                zoom=12.3,
+                accesstoken=Config.MAPBOX_TOKEN,
+            ),
+            margin={"r": 0, "t": 0, "l": 0, "b": 0},
+        )
+
+    #         fig = create_hexbin_mapbox(
+    #             data_frame=pivot,
+    #             lat="latitude",
+    #             lon="longitude",
+    #             nx_hexagon=30,
+    #             agg_func=np.sum,
+    #             color="total_count",
+    #             opacity=0.5,
+    #             color_continuous_scale=px.colors.sequential.RdPu[::-1],
+    #             mapbox_style="mapbox://styles/mapbox/light-v11",
+    #             center=dict(lat=42.297, lon=-71.07),
+    #             zoom=12.3,
+    #             min_count=1,
+    #         )
+    #
+    #         # Improve layout
+    #         fig.update_layout(
+    #             margin=dict(l=0, r=0, t=0, b=0),
+    #             mapbox_accesstoken=Config.MAPBOX_TOKEN,
+    #             hovermode=False,
+    #         )
+    #
+    #         fig.update_coloraxes(
+    #             colorbar=dict(
+    #                 title=dict(text="311 Requests", font=dict(size=12, color="grey")),
+    #                 orientation="v",
+    #                 x=0,
+    #                 y=0.75,
+    #                 xanchor="left",
+    #                 yanchor="middle",
+    #                 len=0.5,
+    #                 thickness=12,
+    #                 tickfont=dict(size=10, color="grey"),
+    #                 bgcolor="rgba(0,0,0,0)",
+    #             ),
+    #         )
+
+    # Make it responsive to container size
+    fig.update_layout(autosize=True, height=None, width=None)
+    map_graph = dcc.Graph(id="hexbin-map", figure=fig, style={"height": "100%", "width": "100%"}, config={"responsive": True, "displayModeBar": True})  # Let it take the height of the
+
+    spinner_style = {"display": "block"}
+    hex_to_ids_store = dcc.Store(id="hex-to-ids-store", data=hex_to_ids)
+
+    # return dcc.Graph(id="hexbin-map", figure=fig, style={"height": "100%", "width": "100%"}, config={"responsive": True, "displayModeBar": True}), spinner_style  # Hide the mode bar for cleaner look
+    # return html.Div([map_graph, hex_to_ids_store, click_info_div]), spinner_style
+    return fig, hex_to_ids, spinner_style
+
+
+# Add a callback to handle clicks on hexagons
+@callback(
+    [Output("click-info", "children"), Output("click-info", "style")],
+    [Input("hexbin-map", "clickData")],
+    [
+        State("hex-to-ids-store", "data"),
+        State("click-info", "style"),
+    ],
+)
+def display_click_data(click_data, hex_to_ids, current_style):
+    if not click_data:
+        return "Click on a hexagon to see data points", current_style
+
+    try:
+        # Extract the hexagon ID from the click data
+        hex_id = click_data["points"][0]["customdata"]
+        count = click_data["points"][0]["z"]
+
+        # Get the data point IDs for this hexagon
+        point_ids = hex_to_ids.get(hex_id, [])
+
+        # Create the content to display
+        content = [html.H4(f"Hexagon Info", style={"margin-top": "0"}), html.P(f"Total Points: {count}"), html.P("Data Point IDs:"), html.Div([html.Ul([html.Li(id_val) for id_val in point_ids], style={"margin": "0", "padding-left": "20px"})], style={"maxHeight": "200px", "overflowY": "auto"})]
+
+        # Show the info div
+        new_style = dict(current_style)
+        new_style["display"] = "block"
+
+        return content, new_style
+
+    except Exception as e:
+        return f"Error processing click data: {str(e)}", current_style
 
 
 # Callback chain for chat functionality - Part 1: Handle user input and show loading
@@ -348,34 +562,30 @@ def handle_chat_input(n_clicks, n_submit, input_value, current_messages):
 # Callback chain for chat functionality - Part 2: Process the request and display bot response
 @callback(
     [Output("chat-messages", "children", allow_duplicate=True), Output("loading-spinner", "style", allow_duplicate=True)],
-    [Input("user-message-store", "data")],
-    [State("chat-messages", "children"), State("date-slider", "value")],
+    [Input("user-message-store", "data"), Input("date-slider", "value")],
+    [State("chat-messages", "children")],
     prevent_initial_call=True,
 )
-def handle_chat_response(stored_input, current_messages, slider_value):
-    if not stored_input:
-        raise PreventUpdate
+def handle_chat_response(stored_input, slider_value, current_messages):
+    ctx = dash.callback_context
+    triggered_id = ctx.triggered_id
 
-    # Get the date from the slider
+    if not current_messages:
+        current_messages = []
+
     year, month = slider_value_to_date(slider_value)
     selected_date = f"{year}-{month:02d}"
 
-    # Construct the prompt
-    prompt = (
-        f"The user has selected a subset of the available 311 and 911 data. They are only looking at the data for {selected_date} in the Dorchester neighborhood.\n\n"
-        f"Describe the conditions captured in the meeting transcripts and interviews and how those related to the trends seein the 911 and 311 CSV data for "
-        f"the date {selected_date}.\n\n"
-        f"Point out notable spikes, drops, or emerging patterns in the data for {selected_date}, and connect them to lived experiences and perceptions.\n\n"
-        f"Use the grouped 311 categories and the 911 incident data together to provide a holistic, narrative-driven analysis."
-        f"Your neighbor's question: {stored_input}"
-    )
+    prompt = f"Your neighbor has selected the date {selected_date} and wants to understand how the situtation in your neighborhood of Dorchester on {selected_date} compares to the overall trends for safety and neighborhood conditionsin in the CSV data and meeting trasncripts.\n\n Give a very brief update – between 5 and 10 sentences - that describes the concerns and conditions in your neighborhood of Dorchester on {selected_date}. Use quotes from the meeting transcripts to illustrate how neighbors are thinking."
 
-    try:
-        response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_5&app_version={Config.APP_VERSION}", headers={"Content-Type": "application/json"}, json={"client_query": prompt})
-        response.raise_for_status()
-        reply = response.json().get("response", "[No reply received]")
-    except Exception as e:
-        reply = f"[Error: {e}]"
+    if triggered_id == "user-message-store":
+        if not stored_input:
+            raise PreventUpdate
+
+        # Get the date from the slider
+        prompt += f"When constructing your response, be sure to prioritize an answer to the following question your neighbor asked: {stored_input}."
+
+    reply = get_chat_response(prompt)
 
     # Create bot response
     bot_response = html.Div(
@@ -437,12 +647,7 @@ def handle_tell_me_prompt(prompt, current_messages):
     if not current_messages:
         current_messages = []
 
-    try:
-        response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_5&app_version={Config.APP_VERSION}", headers={"Content-Type": "application/json"}, json={"client_query": prompt})
-        response.raise_for_status()
-        reply = response.json().get("response", "[No reply received]")
-    except Exception as e:
-        reply = f"[Error: {e}]"
+    reply = get_chat_response(prompt)
 
     # Process the predefined message
     bot_response = html.Div(
