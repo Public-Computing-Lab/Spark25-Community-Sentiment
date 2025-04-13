@@ -1014,6 +1014,7 @@ def handle_tell_me_prompt(prompt, current_messages):
     return updated_messages, "", dash.no_update
 
 
+server = app.server
 # Run the app
 if __name__ == "__main__":
-    app.run(host=Config.HOST, port=Config.PORT, debug=True)
+    app.run(debug=True)
