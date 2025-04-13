@@ -189,7 +189,7 @@ df_shots, df_hom_shot_matched = get_shots_fired_data()
 df_311 = get_311_data()
 
 # Initialize the Dash app
-app = dash.Dash(__name__, suppress_callback_exceptions=True, external_stylesheets=[dbc.themes.BOOTSTRAP, "/assets/style.css"], meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}])
+app = dash.Dash(__name__, suppress_callback_exceptions=True, serve_locally=False, requests_pathname_prefix=Config.DASH_REQUESTS_PATHNAME, external_stylesheets=[dbc.themes.BOOTSTRAP, "/assets/css/style.css"], meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}])
 
 # Define hexbin position
 hexbin_position = {"top": 115, "right": 35, "width": Config.HEXBIN_WIDTH, "height": Config.HEXBIN_HEIGHT}
