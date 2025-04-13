@@ -648,7 +648,7 @@ def update_map(slider_value, selected_hexbins_data=None):
     # Set up the mapbox layout
     fig.update_layout(
         mapbox=dict(
-            style="mapbox://styles/mapbox/light-v11",
+            style="mapbox://styles/mapbox/streets-v12",
             center=Config.MAP_CENTER,
             zoom=Config.MAP_ZOOM,
             accesstoken=Config.MAPBOX_TOKEN,
