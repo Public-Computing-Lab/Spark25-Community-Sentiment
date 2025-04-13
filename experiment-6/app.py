@@ -491,6 +491,7 @@ app.clientside_callback(
         Output("hexbin-map", "figure", allow_duplicate=True),
         Output("hex-to-ids-store", "data"),
         Output("loading-spinner", "style", allow_duplicate=True),
+        Output("scroll-trigger", "children", allow_duplicate=True),
     ],
     [
         Input("date-slider", "value"),
@@ -657,8 +658,10 @@ def update_map(slider_value, selected_hexbins_data=None):
         autosize=True,
         legend=dict(yanchor="bottom", y=0.07, xanchor="left", x=0, bgcolor="rgba(0,0,0,0)", font=dict(size=12, color="grey")),  # Position at the bottom  # Position at the left
     )
+    # Trigger scrolling by returning a timestamp
+    timestamp = int(time.time())
 
-    return fig, hex_to_ids, {"display": "block"}
+    return fig, hex_to_ids, {"display": "block"}, timestamp
 
 
 @app.callback(Output("background-map", "figure"), [Input("hexbin-map", "relayoutData"), Input("hexbin-position", "data"), Input("window-dimensions", "data")], State("background-map", "figure"))
@@ -806,7 +809,7 @@ def handle_hexbin_click(click_data, hex_to_ids, current_style, selected_hexbins_
     [
         Output("chat-messages", "children", allow_duplicate=True),
         Output("chat-input", "value"),
-        Output("scroll-trigger", "children"),
+        Output("scroll-trigger", "children", allow_duplicate=True),
         Output("loading-spinner", "style"),
         Output("user-message-store", "data"),
     ],
