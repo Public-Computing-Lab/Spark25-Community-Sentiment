@@ -8,12 +8,16 @@ import dash
 from dash import html, dcc, Input, Output, State, callback
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-from datetime import datetime
+
+# from datetime import datetime
 import plotly.graph_objects as go
-from plotly.figure_factory import create_hexbin_mapbox
+
+# from plotly.figure_factory import create_hexbin_mapbox
 import plotly.express as px
-import numpy as np
+
+# import numpy as np
 import h3
+import json
 
 # Configuration constants
 load_dotenv()
@@ -218,6 +222,73 @@ def get_chat_response(prompt):
     return reply
 
 
+# Define map center and zoom level
+initial_center = dict(lon=-71.07, lat=42.297)
+initial_zoom = 12
+
+hexbin_width = 500
+hexbin_height = 500
+hexbin_position = {"top": 115, "right": 35, "width": hexbin_width, "height": hexbin_height}
+
+
+# Function to calculate longitude offset based on zoom level and window width
+def calculate_offset(zoom_level, window_width=1200, window_height=800, panel_width=300, panel_height=300, panel_position=None):
+
+    degrees_per_pixel_lon = 360 / (256 * (2**zoom_level))
+
+    degrees_per_pixel_lat = 170 / (256 * (2**zoom_level))
+
+    if panel_position:
+        # Calculate horizontal offset
+        if "right" in panel_position and "left" not in panel_position:
+            left = window_width - panel_position.get("right", 0) - panel_width
+        else:
+            left = panel_position.get("left", window_width - panel_width - 100)
+
+        # Calculate horizontal offset
+        window_center_x = window_width / 2
+        panel_center_x = left + (panel_width / 2)
+        pixel_offset_x = panel_center_x - window_center_x - 190
+
+        # Calculate vertical offset
+        if "bottom" in panel_position and "top" not in panel_position:
+            top = window_height - panel_position.get("bottom", 0) - panel_height
+        else:
+            top = panel_position.get("top", 100)
+
+        # Calculate vertical offset
+        window_center_y = window_height / 2
+        panel_center_y = top + (panel_height / 2)
+        pixel_offset_y = panel_center_y - window_center_y
+
+        # Convert pixel offsets to degrees
+        lon_offset = degrees_per_pixel_lon * pixel_offset_x
+        lat_offset = degrees_per_pixel_lat * pixel_offset_y
+
+        # Latitude increases northward, but y-coordinates increase downward
+        lat_offset = -lat_offset
+    else:
+        # Default offset calculation when panel position is not available
+        pixel_offset_x = (window_width / 2) + 10
+        pixel_offset_y = 0
+
+        lon_offset = degrees_per_pixel_lon * pixel_offset_x
+        lat_offset = degrees_per_pixel_lat * pixel_offset_y
+
+    return {"lon": lon_offset, "lat": lat_offset, "pixel_x": pixel_offset_x, "pixel_y": pixel_offset_y}
+
+
+# Use a reasonable default window width for initial load
+# Calculate initial offset with reasonable default values for window width
+initial_window_width = 1200
+initial_window_height = 800
+initial_offset_data = calculate_offset(initial_zoom, initial_window_width, initial_window_height, hexbin_width, hexbin_height, hexbin_position)
+
+
+# Apply the offset to the initial background map center
+initial_bg_center = {"lat": initial_center["lat"] - initial_offset_data["lat"], "lon": initial_center["lon"] - initial_offset_data["lon"]}
+
+
 # Layout
 # CSS for auto-scrolling (limited solution)
 app.index_string = """
@@ -262,6 +333,44 @@ app.layout = html.Div(
             ],
             id="overlay",
             className="overlay",
+        ),
+        # Map underlay
+        html.Div(
+            [
+                dcc.Graph(
+                    id="background-map",
+                    figure={
+                        "data": [
+                            # Adding an empty scattermapbox trace to ensure the map renders
+                            go.Scattermapbox(lat=[], lon=[], mode="markers", marker={"size": 1}, showlegend=False)
+                        ],
+                        "layout": {
+                            "mapbox": {
+                                "accesstoken": Config.MAPBOX_TOKEN,
+                                "style": "mapbox://styles/mapbox/light-v11",
+                                "center": initial_bg_center,  # Use the offset center
+                                "zoom": initial_zoom,
+                            },
+                            "margin": {"l": 0, "r": 0, "t": 0, "b": 0},
+                            "uirevision": "no_ui",
+                            "dragmode": False,
+                            "showlegend": False,
+                            "hoverdistance": -1,  # Disable hover
+                            "clickmode": "",  # Disable clicking
+                        },
+                    },
+                    config={
+                        "displayModeBar": False,
+                        "scrollZoom": False,
+                        "doubleClick": False,
+                        "showTips": False,
+                        "responsive": True,
+                        "staticPlot": True,  # Makes the plot non-interactive
+                    },
+                    style={"width": "100%", "height": "100vh"},
+                )
+            ],
+            style={"position": "absolute", "width": "100%", "height": "100vh", "zIndex": -1, "pointerEvents": "none"},
         ),
         # Header
         html.Div([html.H1("This is where we are...", className="app-header-title")], className="app-header"),
@@ -315,8 +424,52 @@ app.layout = html.Div(
         # Simple div to trigger scrolling
         html.Div(id="scroll-trigger", style={"display": "none"}),
         dcc.Store(id="user-message-store"),
+        dcc.Store(id="map-state", data=json.dumps({"center": dict(lon=-71.07, lat=42.297), "zoom": 12.3})),
+        # Store component to track window dimensions
+        dcc.Store(id="window-dimensions", data=json.dumps({"width": 1200, "height": 800})),
+        dcc.Store(id="hexbin-position", data=json.dumps(hexbin_position)),
+        # Hidden div to track window resize events
+        html.Div(id="window-resize-trigger", style={"display": "none"}),
+        html.Script(src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"),
     ],
     className="app-container",
+)
+
+app.clientside_callback(
+    """
+    function(trigger) {
+        // Get window dimensions
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        
+        // Get hexbin glass element and its dimensions
+        const hexbin_map = document.getElementById('hexbin-map');
+        if (!hexbin_map) {
+            return [
+                JSON.stringify({width: windowWidth, height: windowHeight}),
+                JSON.stringify({top: 100, right: 100})
+            ];
+        }
+        
+        // Calculate position based on its fixed position
+        const rect = hexbin_map.getBoundingClientRect();
+        const position = {
+            top: rect.top,
+            left: rect.left,
+            right: windowWidth - rect.right,
+            bottom: windowHeight - rect.bottom,
+            width: rect.width,
+            height: rect.height
+        };
+        
+        return [
+            JSON.stringify({width: windowWidth, height: windowHeight}),
+            JSON.stringify(position)
+        ];
+    }
+    """,
+    [Output("window-dimensions", "data"), Output("hexbin-position", "data")],
+    Input("window-resize-trigger", "n_clicks"),
 )
 
 
@@ -431,7 +584,7 @@ def update_map(slider_value):
         # Set up the mapbox layout with a style that includes street labels
         fig.update_layout(
             mapbox=dict(
-                style="mapbox://styles/mapbox/streets-v11",  # Style with street labels on top
+                style="mapbox://styles/mapbox/light-v11",  # Style with street labels on top
                 center=dict(lon=-71.07, lat=42.297),  # Center on Boston
                 zoom=12.3,
                 accesstoken=Config.MAPBOX_TOKEN,
@@ -439,42 +592,20 @@ def update_map(slider_value):
             margin={"r": 0, "t": 0, "l": 0, "b": 0},
         )
 
-    #         fig = create_hexbin_mapbox(
-    #             data_frame=pivot,
-    #             lat="latitude",
-    #             lon="longitude",
-    #             nx_hexagon=30,
-    #             agg_func=np.sum,
-    #             color="total_count",
-    #             opacity=0.5,
-    #             color_continuous_scale=px.colors.sequential.RdPu[::-1],
-    #             mapbox_style="mapbox://styles/mapbox/light-v11",
-    #             center=dict(lat=42.297, lon=-71.07),
-    #             zoom=12.3,
-    #             min_count=1,
-    #         )
-    #
-    #         # Improve layout
-    #         fig.update_layout(
-    #             margin=dict(l=0, r=0, t=0, b=0),
-    #             mapbox_accesstoken=Config.MAPBOX_TOKEN,
-    #             hovermode=False,
-    #         )
-    #
-    #         fig.update_coloraxes(
-    #             colorbar=dict(
-    #                 title=dict(text="311 Requests", font=dict(size=12, color="grey")),
-    #                 orientation="v",
-    #                 x=0,
-    #                 y=0.75,
-    #                 xanchor="left",
-    #                 yanchor="middle",
-    #                 len=0.5,
-    #                 thickness=12,
-    #                 tickfont=dict(size=10, color="grey"),
-    #                 bgcolor="rgba(0,0,0,0)",
-    #             ),
-    #         )
+        fig.update_coloraxes(
+            colorbar=dict(
+                title=dict(text="311 Requests", font=dict(size=12, color="grey")),
+                orientation="v",
+                x=0,
+                y=0.75,
+                xanchor="left",
+                yanchor="middle",
+                len=0.5,
+                thickness=12,
+                tickfont=dict(size=10, color="grey"),
+                bgcolor="rgba(0,0,0,0)",
+            ),
+        )
 
     # Make it responsive to container size
     fig.update_layout(autosize=True, height=None, width=None)
@@ -483,9 +614,75 @@ def update_map(slider_value):
     spinner_style = {"display": "block"}
     hex_to_ids_store = dcc.Store(id="hex-to-ids-store", data=hex_to_ids)
 
-    # return dcc.Graph(id="hexbin-map", figure=fig, style={"height": "100%", "width": "100%"}, config={"responsive": True, "displayModeBar": True}), spinner_style  # Hide the mode bar for cleaner look
-    # return html.Div([map_graph, hex_to_ids_store, click_info_div]), spinner_style
     return fig, hex_to_ids, spinner_style
+
+
+@app.callback(Output("background-map", "figure"), [Input("hexbin-map", "relayoutData"), Input("hexbin-position", "data"), Input("window-dimensions", "data")], State("background-map", "figure"))
+def update_background_map(relayoutData, hexbin_position_json, window_dimensions_json, current_figure):
+    # Parse window dimensions and hexbin glass position
+    try:
+        window_dimensions = json.loads(window_dimensions_json) if window_dimensions_json else {"width": 1200, "height": 800}
+        hexbin_position = json.loads(hexbin_position_json) if hexbin_position_json else {"top": 100, "left": 100}
+
+        window_width = window_dimensions.get("width", 1200)
+        window_height = window_dimensions.get("height", 800)
+
+        # If position has right but not left, calculate left
+        # if "right" in hexbin_position and "left" not in hexbin_position:
+        #     hexbin_position["left"] = window_width - hexbin_position.get("right", 0) - hexbin_position.get("width", 300)
+
+        panel_width = hexbin_position.get("width", hexbin_width)
+        panel_height = hexbin_position.get("height", hexbin_height)
+    except Exception as e:
+        print(f"Error parsing dimensions: {e}")
+        window_width = initial_window_width
+        window_height = 800
+        hexbin_position = hexbin_position
+        panel_width = hexbin_width
+        panel_height = hexbin_height
+
+    # Create a copy of the current figure to modify
+    new_figure = dict(current_figure)
+
+    # Handle center updates if relayoutData is available
+    if relayoutData and "mapbox.center" in relayoutData:
+        try:
+            # The format can vary, so we need to handle different cases
+            center_data = relayoutData["mapbox.center"]
+
+            # Check if it's a list/tuple with at least 2 elements
+            if isinstance(center_data, (list, tuple)) and len(center_data) >= 2:
+                hexbin_center = {"lat": center_data[0], "lon": center_data[1]}
+            # If it's already a dict with lat/lon
+            elif isinstance(center_data, dict) and "lat" in center_data and "lon" in center_data:
+                hexbin_center = center_data
+            else:
+                # Skip if format is unexpected
+                hexbin_center = None
+
+            if hexbin_center:
+                # Get current zoom level
+                current_zoom = new_figure["layout"]["mapbox"]["zoom"]
+
+                # Use the calculation function with window dimensions and magnifying glass position
+                offset_data = calculate_offset(current_zoom, window_width, window_height, panel_width, panel_height, hexbin_position)
+
+                # Apply the offset to center the background map appropriately
+                bg_center = {"lat": hexbin_center["lat"] - offset_data["lat"], "lon": hexbin_center["lon"] - offset_data["lon"]}
+
+                new_figure["layout"]["mapbox"]["center"] = bg_center
+                print(f"Window: {window_width}x{window_height}, Pixel Offset: ({offset_data['pixel_x']}, {offset_data['pixel_y']})")
+                print(f"Degree Offset: (lon: {offset_data['lon']}, lat: {offset_data['lat']})")
+                print(f"Magnifying center: {hexbin_center}, Background center: {bg_center}")
+        except Exception as e:
+            print(f"Error processing center: {e}")
+
+    # Handle zoom updates
+    if relayoutData and "mapbox.zoom" in relayoutData:
+        new_zoom = max(relayoutData["mapbox.zoom"], 0)
+        new_figure["layout"]["mapbox"]["zoom"] = new_zoom
+
+    return new_figure
 
 
 # Add a callback to handle clicks on hexagons
