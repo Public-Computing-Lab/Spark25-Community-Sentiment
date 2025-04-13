@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).parent
 
 # Configuration constants
 class Config:
-    API_VERSION = "API v 0.2.1"
+    API_VERSION = "API v 0.3"
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL")
     GEMINI_CACHE_TTL = int(os.getenv("GEMINI_CACHE_TTL", "7"))
@@ -222,99 +222,18 @@ def create_gemini_context(context_request: str, files: str = "", preamble: str =
 
         if context_request == "structured":
             files_list = get_files("csv")
-            preamble_file = "structured_data_prompt.txt"
         elif context_request == "unstructured":
             files_list = get_files("txt")
-            preamble_file = "unstructured_data_prompt.txt"
         elif context_request == "all":
             files_list = get_files()
-            preamble_file = "all_data_prompt.txt"
         elif context_request == "specific":
             if not files:
                 return False
             specific_files = [f.strip() for f in files.split(",")]
             files_list = get_files(specific_files=specific_files)
-        elif context_request == "experiment_5":
+        elif context_request == "experiment_5" or context_request == "experiment_6":
             files_list = get_files("txt")
-            query = f"""
-            WITH incident_data AS (
-            SELECT
-                year,
-                '911 Shot Fired Confirmed' AS incident_type,
-                quarter,
-                month
-            FROM shots_fired_data
-            WHERE
-            {SQLConstants.BOS911_BASE_WHERE}
-            AND ballistics_evidence = 1
-            UNION ALL
-            SELECT
-                year,
-                '911 Shot Fired Unconfirmed' AS incident_type,
-                quarter,
-                month
-            FROM shots_fired_data
-            WHERE
-            {SQLConstants.BOS911_BASE_WHERE}
-            AND ballistics_evidence = 0
-            UNION ALL
-            SELECT
-                year,
-                '911 Homicides' AS incident_type,
-                quarter,
-                month
-            FROM homicide_data
-            WHERE
-            {SQLConstants.BOS911_BASE_WHERE}
-            UNION ALL
-            SELECT
-                YEAR(open_dt) AS year,
-                '311 Trash/Dumping Issues' AS incident_type,
-                QUARTER(open_dt) AS quarter,
-                MONTH(open_dt) AS month
-            FROM bos311_data
-            WHERE
-            type IN ({SQLConstants.CATEGORY_TYPES['trash']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
-            UNION ALL
-            SELECT
-                YEAR(open_dt) AS year,
-                '311 Living Condition Issues' AS incident_type,
-                QUARTER(open_dt) AS quarter,
-                MONTH(open_dt) AS month
-            FROM bos311_data
-            WHERE
-            type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
-            UNION ALL
-            SELECT
-                YEAR(open_dt) AS year,
-                '311 Streets Issues' AS incident_type,
-                QUARTER(open_dt) AS quarter,
-                MONTH(open_dt) AS month
-            FROM bos311_data
-            WHERE
-            type IN ({SQLConstants.CATEGORY_TYPES['streets']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
-            UNION ALL
-            SELECT
-                YEAR(open_dt) AS year,
-                '311 Parking Issues' AS incident_type,
-                QUARTER(open_dt) AS quarter,
-                MONTH(open_dt) AS month
-            FROM bos311_data
-            WHERE
-            type IN ({SQLConstants.CATEGORY_TYPES['parking']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
-            )
-            SELECT
-                year,
-                incident_type,
-                {SQLConstants.BOS911_TIME_BREAKDOWN}
-            FROM incident_data
-            GROUP BY year, incident_type
-            ORDER BY year, incident_type
-            """
+            query = build_summary_query()
 
             try:
                 conn = get_db_connection()
@@ -341,8 +260,7 @@ def create_gemini_context(context_request: str, files: str = "", preamble: str =
                     cursor.close()
                     conn.close()
 
-            preamble_file = "experiment_5.txt"
-
+        preamble_file = context_request + ".txt"
         # Read contents of found files
         for file in files_list:
             file_content = get_file_content(file)
@@ -547,6 +465,7 @@ def build_311_query(
     request_options: str = "",
     request_date: str = "",
     request_zipcode: str = "",
+    event_ids: str = "",
 ) -> str:
     if data_request == "311_by_geo":
         query = f"""
@@ -570,6 +489,45 @@ def build_311_query(
         """
         if request_date:
             query += f"""AND DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'"""
+        return query
+    elif data_request == "311_summary_by_id":
+        query = f"""
+        SELECT
+            CASE
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+            END AS reported_issue,
+            COUNT(*) AS total
+        FROM
+            bos311_data
+        WHERE
+            id IN ({event_ids})
+            AND type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+        GROUP BY reported_issue
+        """
+        print(query)
+        return query
+    elif data_request == "311_summary_by_date":
+        query = f"""
+        SELECT
+            CASE
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+            END AS reported_issue,
+            COUNT(*) AS total
+        FROM
+            bos311_data
+        WHERE
+            DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
+            AND type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+        GROUP BY reported_issue
+        """
         return query
     else:
         return ""
@@ -614,6 +572,88 @@ def build_911_query(data_request: str) -> str:
     return ""
 
 
+def build_summary_query():
+    return f"""
+    WITH incident_data AS (
+    SELECT
+        year,
+        '911 Shot Fired Confirmed' AS incident_type,
+        quarter,
+        month
+    FROM shots_fired_data
+    WHERE
+    {SQLConstants.BOS911_BASE_WHERE}
+    AND ballistics_evidence = 1
+    UNION ALL
+    SELECT
+        year,
+        '911 Shot Fired Unconfirmed' AS incident_type,
+        quarter,
+        month
+    FROM shots_fired_data
+    WHERE
+    {SQLConstants.BOS911_BASE_WHERE}
+    AND ballistics_evidence = 0
+    UNION ALL
+    SELECT
+        year,
+        '911 Homicides' AS incident_type,
+        quarter,
+        month
+    FROM homicide_data
+    WHERE
+    {SQLConstants.BOS911_BASE_WHERE}
+    UNION ALL
+    SELECT
+        YEAR(open_dt) AS year,
+        '311 Trash/Dumping Issues' AS incident_type,
+        QUARTER(open_dt) AS quarter,
+        MONTH(open_dt) AS month
+    FROM bos311_data
+    WHERE
+    type IN ({SQLConstants.CATEGORY_TYPES['trash']})
+    AND {SQLConstants.BOS311_BASE_WHERE}
+    UNION ALL
+    SELECT
+        YEAR(open_dt) AS year,
+        '311 Living Condition Issues' AS incident_type,
+        QUARTER(open_dt) AS quarter,
+        MONTH(open_dt) AS month
+    FROM bos311_data
+    WHERE
+    type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']})
+    AND {SQLConstants.BOS311_BASE_WHERE}
+    UNION ALL
+    SELECT
+        YEAR(open_dt) AS year,
+        '311 Streets Issues' AS incident_type,
+        QUARTER(open_dt) AS quarter,
+        MONTH(open_dt) AS month
+    FROM bos311_data
+    WHERE
+    type IN ({SQLConstants.CATEGORY_TYPES['streets']})
+    AND {SQLConstants.BOS311_BASE_WHERE}
+    UNION ALL
+    SELECT
+        YEAR(open_dt) AS year,
+        '311 Parking Issues' AS incident_type,
+        QUARTER(open_dt) AS quarter,
+        MONTH(open_dt) AS month
+    FROM bos311_data
+    WHERE
+    type IN ({SQLConstants.CATEGORY_TYPES['parking']})
+    AND {SQLConstants.BOS311_BASE_WHERE}
+    )
+    SELECT
+        year,
+        incident_type,
+        {SQLConstants.BOS911_TIME_BREAKDOWN}
+    FROM incident_data
+    GROUP BY year, incident_type
+    ORDER BY year, incident_type
+    """
+
+
 #
 # Middleware to check session and create if needed
 #
@@ -648,6 +688,8 @@ def route_data_query():
     app_version = request.args.get("app_version", "0")
     stream_result = request.args.get("stream", "False")
     request_zipcode = request.args.get("zipcode", "")
+    event_ids = request.args.get("event_ids", "")
+    request_date = request.args.get("date", "")
 
     try:
         # Get and validate request parameters
@@ -662,7 +704,6 @@ def route_data_query():
                 400,
             )
 
-        request_date = request.args.get("date", "")
         if data_request.startswith("311_on_date") and not request_date:
             return (
                 jsonify({"error": "Missing required options parameter for 311 request"}),
@@ -680,6 +721,7 @@ def route_data_query():
                 request_options=request_options,
                 request_date=request_date,
                 request_zipcode=request_zipcode,
+                event_ids=event_ids,
             )
 
         elif data_request.startswith("911"):
