@@ -504,8 +504,6 @@ def build_311_query(
             bos311_data
         WHERE
             id IN ({event_ids})
-            AND type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
         GROUP BY reported_issue
         """
         print(query)
