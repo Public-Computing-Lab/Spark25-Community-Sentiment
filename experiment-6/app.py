@@ -581,7 +581,7 @@ def update_map(slider_value, selected_hexbins_data=None):
 
     for h in hex_ids:
         if h in current_selected:
-            line_colors.append("rgba(252, 148, 30, 1)")
+            line_colors.append("rgba(37, 94, 229, .9)")
             line_widths.append(5)
         else:
             line_colors.append("rgba(255, 255, 255, 0.5)")
@@ -786,15 +786,12 @@ def handle_hexbin_click(click_data, hex_to_ids, current_style, selected_hexbins_
                 for feature in features:
                     hex_feature_id = feature.get("properties", {}).get("hex_id")
                     if hex_feature_id in current_selected:
-                        # Selected hexbins get red outlines and thicker lines
-                        line_colors.append("rgba(252, 148, 30, 1)")
+                        line_colors.append("rgba(37, 94, 229, .9)")
                         line_widths.append(5)
                     else:
-                        # Unselected hexbins keep original styling
                         line_colors.append("rgba(255, 255, 255, 0.5)")
                         line_widths.append(1)
 
-                # Update the marker line properties in the trace
                 new_figure["data"][trace_idx]["marker"]["line"]["color"] = line_colors
                 new_figure["data"][trace_idx]["marker"]["line"]["width"] = line_widths
 
