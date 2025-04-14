@@ -4,6 +4,8 @@ This project is a **Flask-based REST-ish API** supporting the RethinkAI experime
 
 ##  Endpoints
 
+### /chat/data/query \[ GET \] 
+---
 #### **GET crime and 311 data as geoJson objects***
 ```
 GET /data/query?request=<request_type>&category=<311_category>&date=%Y-%m&zipcode=<zipcode>&stream&app_version=<0.0>=<True/False>
@@ -13,7 +15,7 @@ GET /data/query?request=<request_type>&category=<311_category>&date=%Y-%m&zipcod
 ```category={living_conditions | trash | streets | parking | all}```  
 ```date=%Y-%m``` is date in format 2020-04  
 ```stream=<True/False>``` toggles streamed data on query, important for queries that return large sets  
-```request=<request_type>``` is one of:   
+```request=<request_type>``` is one of:  311_by_geo, 311_summary, 311_summary 
 
 **Required**:
 Set 'category=\<category_name\>' 
@@ -38,7 +40,7 @@ When 'zipcode' is set, response is limited to that (or those) zipcodes
 {"type": "Parking Enforcement", "date": "2019-02-01T03:42:00", "latitude": 42.30033128015117, "longitude": -71.05554981087488, "normalized_type": "Parking"},
 ...]
 ```  
-
+---
 ```GET /data/query?request=311_by_geo&app_version=5.5&category=all&stream=True```
   
 *Response*: 
@@ -49,7 +51,7 @@ When 'zipcode' is set, response is limited to that (or those) zipcodes
 {"type": "Poor Conditions of Property", "date": "2018-01-01T07:14:03", "latitude": 42.31125956241783, "longitude": -71.08671061589506, "normalized_type": "Living Conditions"},
 ...]
 ```  
-
+---
 ```GET /data/query?request=911_shots_fired&app_version=5.5&stream=True```
 
 *Response*: 
@@ -60,7 +62,7 @@ When 'zipcode' is set, response is limited to that (or those) zipcodes
 {"date": "2018-11-30T23:44:00", "ballistics_evidence": 1, "latitude": 42.30312067, "longitude": -71.06066511},
 ...]
 ```  
-
+---
 ```GET /data/query?request=911_homicides_and_shots_fired&app_version=5.5&stream=True```
 
 *Response*: 
@@ -71,7 +73,36 @@ When 'zipcode' is set, response is limited to that (or those) zipcodes
 {"date": "2020-02-05T23:28:42", "latitude": 42.31372767, "longitude": -71.07216273},
 ...]
 ```
-
+---
+```GET /data/query?request=311_summary&app_version=${APP_VERSION}&category=all&stream=True```  
+311 summary for all data in base filter  
+*Response*:
+```
+{"reported_issue": "Trash, Recycling, And Waste", "total": 20395},
+{"reported_issue": "Parking", "total": 43266},
+{"reported_issue": "Living Conditions", "total": 22542},
+{"reported_issue": "Streets, Sidewalks, And Parks", "total": 50003}
+```
+---
+```GET /data/query?request=311_summary&app_version=${APP_VERSION}&category=all&devent_ids=<list of 311 ids>&stream=True```  
+311 summary from listed ids  
+*Response*:
+```
+{"reported_issue": "Streets, Sidewalks, And Parks", "total": 1},
+{"reported_issue": "Trash, Recycling, And Waste", "total": 1},
+{"reported_issue": "Living Conditions", "total": 1}
+```
+---
+```GET /data/query?request=311_summary&app_version=${APP_VERSION}&category=all&date=<YYYY-MM>&stream=True```  
+311 summary for stated date  
+NOTE: if event_ids and data are both given, will only return summary by id  
+*Response*:
+```
+{"reported_issue": "Trash, Recycling, And Waste", "total": 117},
+{"reported_issue": "Parking", "total": 380},
+{"reported_issue": "Living Conditions", "total": 139},
+{"reported_issue": "Streets, Sidewalks, And Parks", "total": 667}
+```
 
 ### /chat \[ POST \]
 ---
