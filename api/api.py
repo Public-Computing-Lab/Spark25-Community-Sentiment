@@ -297,7 +297,7 @@ def create_gemini_context(context_request: str, files: str = "", preamble: str =
             return cache.name
         else:
             # Return token count for testing
-            print(f"Conxtex display name: {display_name}")
+            # print(f"Conxtex display name: {display_name}")
             content["parts"].append({"text": system_prompt})
             total_tokens = genai_client.models.count_tokens(model=Config.GEMINI_MODEL, contents=content["parts"])
             return total_tokens.total_tokens
@@ -506,7 +506,6 @@ def build_311_query(
             id IN ({event_ids})
         GROUP BY reported_issue
         """
-        print(query)
         return query
     elif data_request == "311_summary" and request_date:
         query = f"""
@@ -539,7 +538,7 @@ def build_311_query(
             COUNT(*) AS total
         FROM
             bos311_data
-        WHERE            
+        WHERE
             type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
             AND {SQLConstants.BOS311_BASE_WHERE}
         GROUP BY reported_issue
@@ -855,6 +854,9 @@ def route_chat():
             app_response=f"ERROR: {str(e)}",
         )
         print(f"❌ Exception in /chat: {e}")
+        print(f"❌ context_request: {context_request}")
+        print(f"❌ preamble: {prompt_preamble}")
+        print(f"❌ app_version: {app_version}")
         return jsonify({"error": f"Internal server error: {e}"}), 500
 
 
