@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).parent
 
 # Configuration constants
 class Config:
-    API_VERSION = "API v 0.3"
+    API_VERSION = "API v 0.3.1"
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL")
     GEMINI_CACHE_TTL = int(os.getenv("GEMINI_CACHE_TTL", "7"))
@@ -490,7 +490,7 @@ def build_311_query(
         if request_date:
             query += f"""AND DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'"""
         return query
-    elif data_request == "311_summary_by_id":
+    elif data_request == "311_summary" and event_ids:
         query = f"""
         SELECT
             CASE
@@ -510,7 +510,7 @@ def build_311_query(
         """
         print(query)
         return query
-    elif data_request == "311_summary_by_date":
+    elif data_request == "311_summary" and request_date:
         query = f"""
         SELECT
             CASE
@@ -525,6 +525,24 @@ def build_311_query(
         WHERE
             DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
             AND type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+        GROUP BY reported_issue
+        """
+        return query
+    elif data_request == "311_summary" and not request_date and not event_ids:
+        query = f"""
+        SELECT
+            CASE
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+            END AS reported_issue,
+            COUNT(*) AS total
+        FROM
+            bos311_data
+        WHERE            
+            type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
             AND {SQLConstants.BOS311_BASE_WHERE}
         GROUP BY reported_issue
         """

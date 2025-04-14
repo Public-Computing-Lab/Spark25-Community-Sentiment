@@ -140,9 +140,9 @@ def get_311_data(force_refresh=False):
 def get_select_311_data(event_ids="", event_date=""):
 
     if event_ids:
-        url = f"{Config.API_BASE_URL}/data/query?request=311_summary_by_id&category=all&stream=True&app_version={Config.APP_VERSION}&event_ids={event_ids}"
+        url = f"{Config.API_BASE_URL}/data/query?request=311_summary&category=all&stream=True&app_version={Config.APP_VERSION}&event_ids={event_ids}"
     elif event_date:
-        url = f"{Config.API_BASE_URL}/data/query?request=311_summary_by_date&category=all&stream=True&app_version={Config.APP_VERSION}&date={event_date}"
+        url = f"{Config.API_BASE_URL}/data/query?request=311_summary&category=all&stream=True&app_version={Config.APP_VERSION}&date={event_date}"
 
     response_df = stream_to_dataframe(url)
     reply = response_df.to_csv(index=False)
