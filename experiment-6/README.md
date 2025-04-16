@@ -4,6 +4,10 @@
 
 This project is a **Flask-based chatbot** that interacts with **Google Gemini API** to provide intelligent responses. It processes user questions dynamically using a dataset stored in memory and allows users to provide feedback on responses.
 
+### Requires
+
+Requires RethinkAI/api.
+
 ###  Features
 
 - **Data Dashboard** from BPD Data Hub, and Boston 311 datasets
