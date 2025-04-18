@@ -413,7 +413,10 @@ app.layout = html.Div(
                                 dcc.Graph(id="hexbin-map", figure={}, style={"height": "100%", "width": "100%"}),
                                 dcc.Store(id="hex-to-ids-store", data={}),
                                 # Test element - can be removed in production
-                                html.Div(id="click-info", style={"position": "absolute", "top": "10px", "right": "10px", "backgroundColor": "white", "padding": "10px", "borderRadius": "5px", "boxShadow": "0 0 10px rgba(0,0,0,0.1)", "zIndex": 1000, "maxHeight": "300px", "overflowY": "auto", "display": "none"}),
+                                html.Div(
+                                    id="click-info",
+                                    style={"position": "absolute", "top": "10px", "right": "10px", "backgroundColor": "white", "padding": "10px", "borderRadius": "5px", "boxShadow": "0 0 10px rgba(0,0,0,0.1)", "zIndex": 1000, "maxHeight": "300px", "overflowY": "auto", "display": "none"},
+                                ),
                             ],
                             id="map-container",
                             className="map-div",
@@ -746,7 +749,7 @@ def update_background_map(relayoutData, hexbin_position_json, window_dimensions_
 )
 def handle_hexbin_click(click_data, hex_to_ids, current_style, selected_hexbins_data, current_figure):
     if not click_data:
-        return "Click on a hexagon to see data points", current_style, selected_hexbins_data, current_figure
+        return selected_hexbins_data, current_figure
 
     try:
         # Extract the hexagon ID from the click data
@@ -756,6 +759,9 @@ def handle_hexbin_click(click_data, hex_to_ids, current_style, selected_hexbins_
         # Get current selection state
         current_selected = selected_hexbins_data.get("selected_hexbins", [])
         current_selected_ids = selected_hexbins_data.get("selected_ids", [])
+
+        # Filter out any null hexbins from the current selection
+        current_selected = [h for h in current_selected if h is not None]
 
         # Toggle selection state for the clicked hexbin
         if hex_id in current_selected:
@@ -786,7 +792,6 @@ def handle_hexbin_click(click_data, hex_to_ids, current_style, selected_hexbins_
 
                 # Get geojson features and match with hexbin IDs
                 features = trace.get("geojson", {}).get("features", [])
-
                 for feature in features:
                     hex_feature_id = feature.get("properties", {}).get("hex_id")
                     if hex_feature_id in current_selected:
@@ -802,7 +807,8 @@ def handle_hexbin_click(click_data, hex_to_ids, current_style, selected_hexbins_
         return updated_hexbins_data, new_figure
 
     except Exception as e:
-        return f"Error processing click data: {str(e)}", current_style, selected_hexbins_data, current_figure
+        print(f"Error processing click data: {str(e)}")
+        return selected_hexbins_data, current_figure
 
 
 # Callback chain for chat functionality - Part 1: Handle user input and show loading
