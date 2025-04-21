@@ -726,7 +726,7 @@ def check_session():
     app_version = request.args.get("app_version", "")
 
     if not rethinkai_api_client_key or rethinkai_api_client_key not in Config.RETHINKAI_API_KEYS:
-        return jsonify({"Error": "Invalide or missing API key"}), 401
+        return jsonify({"Error": "Invalid or missing API key"}), 401
 
     if "session_id" not in session:
         session.permanent = True  # Make the session persistent
