@@ -1,28 +1,33 @@
-import io, os, time, json, requests
+import io
+import os
+import time
+import json
+import requests
 import pandas as pd
 import h3
 import dash
-from dash import html, dcc, Input, Output, State, callback, Dash
+from dash import html, dcc, Input, Output, State, callback
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-import plotly.express as px
-import dash_daq as daq
+
+# import plotly.express as px
+# import dash_daq as daq
 from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class Config:
-    HOST = os.getenv("EXPERIMENT_6_HOST", "127.0.0.1")
-    PORT = os.getenv("EXPERIMENT_6_PORT", "8060")
-    DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_6_DASH_REQUESTS_PATHNAME")
-    APP_VERSION = os.getenv("EXPERIMENT_6_VERSION", "0.6")
+    APP_VERSION = "0.7.0"
     CACHE_DIR = os.getenv("EXPERIMENT_6_CACHE_DIR", "./cache")
     API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8888")
     MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
+    RETHINKAI_API_KEY = os.getenv("RETHINKAI_API_CLIENT_KEY")
     MAP_CENTER = {"lon": -71.07601, "lat": 42.28988}
     MAP_ZOOM = 13
     HEXBIN_WIDTH = 500
     HEXBIN_HEIGHT = 500
+
 
 # Create cache directory if it doesn't exist
 os.makedirs(Config.CACHE_DIR, exist_ok=True)
@@ -35,7 +40,10 @@ def cache_stale(path, max_age_minutes=30):
 
 def stream_to_dataframe(url: str) -> pd.DataFrame:
     """Stream JSON data from API and convert to DataFrame"""
-    with requests.get(url, stream=True) as response:
+    headers = {
+        "RethinkAI-API-Key": Config.RETHINKAI_API_KEY,
+    }
+    with requests.get(url, headers=headers, stream=True) as response:
         if response.status_code != 200:
             raise Exception(f"Error: {response.status_code} - {response.text}")
 
@@ -92,7 +100,7 @@ def stream_to_dataframe(url: str) -> pd.DataFrame:
                     return pd.read_json(io.StringIO(json_str), orient="records")
                 except Exception:
                     pass
-            
+
             raise
 
 
@@ -177,24 +185,17 @@ def get_shots_fired_data(force_refresh=False):
     return df, df_matched
 
 
-
 df_shots, df_hom_shot_matched = get_shots_fired_data()
 df_311 = get_311_data()
 
-latest = df_311["date"].max()                                
-max_value = (latest.year - 2018) * 12 + (latest.month - 1)   
+latest = df_311["date"].max()
+max_value = (latest.year - 2018) * 12 + (latest.month - 1)
 
 app = dash.Dash(
     __name__,
-    external_stylesheets=[
-        dbc.themes.BOOTSTRAP,
-        "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"
-    ],
-    external_scripts=[
-        "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"
-    ],
+    external_stylesheets=[dbc.themes.BOOTSTRAP, "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"],
+    external_scripts=["https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"],
 )
-
 
 
 app.index_string = f"""
@@ -234,6 +235,7 @@ def generate_marks():
                 marks[value] = {"label": ""}
     return marks
 
+
 def slider_value_to_date(value):
     iv = int(value)
     year = 2018 + (iv // 12)
@@ -247,7 +249,11 @@ min_value = 0
 def get_chat_response(prompt):
     """Get chat response from API"""
     try:
-        response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_6&app_version={Config.APP_VERSION}", headers={"Content-Type": "application/json"}, json={"client_query": prompt})
+        headers = {
+            "Content-Type": "application/json",
+            "RethinkAI-API-Key": Config.RETHINKAI_API_KEY,
+        }
+        response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_6&app_version={Config.APP_VERSION}", headers=headers, json={"client_query": prompt})
         response.raise_for_status()
         reply = response.json().get("response", "[No reply received]")
     except Exception as e:
@@ -255,85 +261,70 @@ def get_chat_response(prompt):
 
     return reply
 
+
 # App layout
 app.layout = html.Div(
     [
-        
         html.Div(
             [
                 html.Div(
                     [
-                        html.H2(
-                            "Your neighbors are worried about safety in the neighborhood, but they are working to improve things to make it safer for everyone.",
-                            className="overlay-heading"
-                        ),
+                        html.H2("Your neighbors are worried about safety in the neighborhood, but they are working to improve things to make it safer for everyone.", className="overlay-heading"),
                         html.Div(
                             [
-                                html.Button("Tell me",       id="tell-me-btn",    className="overlay-btn"),
-                                html.Button("Show me",       id="show-me-btn",    className="overlay-btn"),
-                                html.Button("Listen to me",  id="listen-to-me-btn", className="overlay-btn", style={"display": "none"}),
+                                html.Button("Tell me", id="tell-me-btn", className="overlay-btn"),
+                                html.Button("Show me", id="show-me-btn", className="overlay-btn"),
+                                html.Button("Listen to me", id="listen-to-me-btn", className="overlay-btn", style={"display": "none"}),
                             ],
                             className="overlay-buttons",
                         ),
                     ],
                     className="overlay-content",
                 ),
-                
                 html.Div(id="tell-me-trigger", style={"display": "none"}),
             ],
             id="overlay",
             className="overlay",
         ),
-        
         html.Div(
             [
-                
                 html.Div(id="before-map", className="map"),
-
                 html.Div(
                     id="background-filter",
                     style={
                         "position": "absolute",
-                        "top": 0, "left": 0,
-                        "width": "100%", "height": "100%",
+                        "top": 0,
+                        "left": 0,
+                        "width": "100%",
+                        "height": "100%",
                         "backgroundColor": "rgba(255,255,255,0.6)",
                         "pointerEvents": "none",
                     },
                 ),
-                
                 html.Div(className="shadow"),
             ],
             id="background-container",
         ),
-        
-        html.Div(
-            [ html.H1("Rethink our situation", className="app-header-title") ],
-            className="app-header"
-        ),
-
+        html.Div([html.H1("Rethink our situation", className="app-header-title")], className="app-header"),
         html.Div(
             [
-                
                 html.Div(
                     [
-                        html.Div(className="chat-messages-wrapper", children=[
-                            dcc.Loading(
-                                id="loading-spinner",
-                                type="circle",
-                                color="#701238",
-                                children=html.Div(id="chat-messages", className="chat-messages"),
-                            ),
-                            
-                            html.Div(id="loading-output", style={"display":"none"}),
-                        ]),
+                        html.Div(
+                            className="chat-messages-wrapper",
+                            children=[
+                                dcc.Loading(
+                                    id="loading-spinner",
+                                    type="circle",
+                                    color="#701238",
+                                    children=html.Div(id="chat-messages", className="chat-messages"),
+                                ),
+                                html.Div(id="loading-output", style={"display": "none"}),
+                            ],
+                        ),
                         html.Div(
                             [
-                                dcc.Input(
-                                    id="chat-input", type="text",
-                                    placeholder="What are you trying to understand?",
-                                    className="chat-input"
-                                ),
-                                
+                                dcc.Input(id="chat-input", type="text", placeholder="What are you trying to understand?", className="chat-input"),
                             ],
                             className="chat-input-container",
                         ),
@@ -341,63 +332,52 @@ app.layout = html.Div(
                     className="chat-main-container",
                     id="chat-section",
                 ),
-                
                 html.Div(
                     [
                         html.Div(
                             [
-                                
                                 html.Div(id="after-map", className="map"),
-
                                 dcc.Store(id="hexbin-data-store"),
                                 dcc.Store(id="shots-data-store"),
                                 dcc.Store(id="homicides-data-store"),
                                 dcc.Store(id="selected-hexbins-store", data={"selected_hexbins": [], "selected_ids": []}),
-
                                 html.Div(
                                     id="date-display",
                                     style={
-                                        "position":"absolute",
-                                        "bottom":"10px",
-                                        "width":"100%",
-                                        "textAlign":"center",
-                                        "fontWeight":"600",
+                                        "position": "absolute",
+                                        "bottom": "10px",
+                                        "width": "100%",
+                                        "textAlign": "center",
+                                        "fontWeight": "600",
                                     },
                                 ),
-
-                                html.Div(id="dummy-output", style={"display":"none"}),
-                                html.Button(
-                                    id="map-move-btn",
-                                    style={"display":"none"},
-                                    **{"data-hexids": "", "data-ids": ""}
-                                ),
+                                html.Div(id="dummy-output", style={"display": "none"}),
+                                html.Button(id="map-move-btn", style={"display": "none"}, **{"data-hexids": "", "data-ids": ""}),
                             ],
                             id="magnifier-container",
                             className="circle-container",
                             style={
-                                "position":"relative",
+                                "position": "relative",
                                 "width": f"{Config.HEXBIN_WIDTH+100}px",
-                                "height":f"{Config.HEXBIN_HEIGHT+100}px",
-                                "borderRadius":"50%",
-                                "overflow":"hidden",
-                                "background":"none",         
-                                "pointerEvents":"none",      
-                                "margin":"0 auto",
-                                "zIndex":10,
+                                "height": f"{Config.HEXBIN_HEIGHT+100}px",
+                                "borderRadius": "50%",
+                                "overflow": "hidden",
+                                "background": "none",
+                                "pointerEvents": "none",
+                                "margin": "0 auto",
+                                "zIndex": 10,
                             },
                         )
                     ],
                     id="map-section",
                     style={
-                        "display":"flex",
-                        "justifyContent":"center",
-                        "alignItems":"center",
-                        "height":"80vh",
-                        "minHeight":"400px",
+                        "display": "flex",
+                        "justifyContent": "center",
+                        "alignItems": "center",
+                        "height": "80vh",
+                        "minHeight": "400px",
                     },
                 ),
-                
-
                 html.Div(
                     [
                         html.Div(
@@ -413,11 +393,7 @@ app.layout = html.Div(
                         ),
                         html.Div(
                             [
-                                dcc.Input(
-                                    id="chat-input-right", type="text",
-                                    placeholder="What are you trying to understand?",
-                                    className="chat-input"
-                                ),
+                                dcc.Input(id="chat-input-right", type="text", placeholder="What are you trying to understand?", className="chat-input"),
                                 html.Button("Tell me more", id="send-button-right", className="send-btn"),
                             ],
                             className="chat-input-container",
@@ -429,36 +405,24 @@ app.layout = html.Div(
             ],
             className="responsive-container",
         ),
-
         html.Div(
-            dcc.Slider(
-                id="radial-slider",
-                min=min_value,
-                max=max_value,
-                value=max_value,
-                marks=generate_marks(),
-                step=1,
-                updatemode="drag",
-                tooltip={"always_visible": False, "placement": "bottom"}
-            ),
+            dcc.Slider(id="radial-slider", min=min_value, max=max_value, value=max_value, marks=generate_marks(), step=1, updatemode="drag", tooltip={"always_visible": False, "placement": "bottom"}),
             style={
                 "width": "85%",
                 "margin": "20px auto 40px auto",
                 "padding": "0 20px",
                 "zIndex": 999,
-            }
+            },
         ),
-
-
-        html.Div(id="scroll-trigger", style={"display":"none"}),
-        html.Div(id="hide-overlay-value", style={"display":"none"}),
+        html.Div(id="scroll-trigger", style={"display": "none"}),
+        html.Div(id="hide-overlay-value", style={"display": "none"}),
         dcc.Interval(id="hide-overlay-trigger", interval=1300, n_intervals=0, max_intervals=0),
         dcc.Store(id="user-message-store"),
         dcc.Store(id="user-message-store-right"),
-        dcc.Store(id="window-dimensions", data=json.dumps({"width":1200,"height":800})),
-        dcc.Store(id="hexbin-position",   data=json.dumps({"top":115,"right":35,"width":Config.HEXBIN_WIDTH,"height":Config.HEXBIN_HEIGHT})),
-        html.Div(id="window-resize-trigger", style={"display":"none"}),
-        html.Button(id="refresh-chat-btn", style={"display":"none"}),
+        dcc.Store(id="window-dimensions", data=json.dumps({"width": 1200, "height": 800})),
+        dcc.Store(id="hexbin-position", data=json.dumps({"top": 115, "right": 35, "width": Config.HEXBIN_WIDTH, "height": Config.HEXBIN_HEIGHT})),
+        html.Div(id="window-resize-trigger", style={"display": "none"}),
+        html.Button(id="refresh-chat-btn", style={"display": "none"}),
     ],
     className="app-container",
 )
@@ -492,10 +456,10 @@ app.clientside_callback(
         return '';
     }
     """,
-    Output('dummy-output', 'children'),
-    Input('hexbin-data-store', 'data'),
-    Input('shots-data-store', 'data'),
-    Input('homicides-data-store', 'data')
+    Output("dummy-output", "children"),
+    Input("hexbin-data-store", "data"),
+    Input("shots-data-store", "data"),
+    Input("homicides-data-store", "data"),
 )
 
 
@@ -519,9 +483,10 @@ app.clientside_callback(
       return window.latestSelection;
     }
     """,
-    Output('selected-hexbins-store', 'data'),
-    Input('map-move-btn', 'n_clicks'),
+    Output("selected-hexbins-store", "data"),
+    Input("map-move-btn", "n_clicks"),
 )
+
 
 @callback(Output("date-display", "children"), Input("radial-slider", "value"))
 def update_date_display(value):
@@ -529,12 +494,7 @@ def update_date_display(value):
     return f"{year}-{month:02d}"
 
 
-@callback(
-    Output("hexbin-data-store", "data"),
-    Output("shots-data-store", "data"),
-    Output("homicides-data-store", "data"),
-    Input("radial-slider", "value")
-)
+@callback(Output("hexbin-data-store", "data"), Output("shots-data-store", "data"), Output("homicides-data-store", "data"), Input("radial-slider", "value"))
 def update_map_data(slider_value):
     year, month = slider_value_to_date(slider_value)
     selected_month = pd.Timestamp(f"{year}-{month:02d}")
@@ -546,7 +506,6 @@ def update_map_data(slider_value):
     if df_month.empty:
         return {"type": "FeatureCollection", "features": []}, None, None
 
-
     resolution = 10
     hex_to_points = {}
     for _, row in df_month.iterrows():
@@ -555,74 +514,41 @@ def update_map_data(slider_value):
 
     hex_features = []
     for hex_id, point_ids in hex_to_points.items():
-        boundary = h3.cell_to_boundary(hex_id)  
+        boundary = h3.cell_to_boundary(hex_id)
         coords = [[lng, lat] for lat, lng in boundary] + [[boundary[0][1], boundary[0][0]]]
         lat_center, lon_center = h3.cell_to_latlng(hex_id)
-        hex_features.append({
-            "type": "Feature",
-            "properties": {
-                "hex_id": hex_id,
-                "value": len(point_ids),      
-                "lat": lat_center, "lon": lon_center,
-                "ids": point_ids              
-            },
-            "geometry": {"type": "Polygon", "coordinates": [coords]}
-        })
+        hex_features.append({"type": "Feature", "properties": {"hex_id": hex_id, "value": len(point_ids), "lat": lat_center, "lon": lon_center, "ids": point_ids}, "geometry": {"type": "Polygon", "coordinates": [coords]}})
     hex_data = {"type": "FeatureCollection", "features": hex_features}
 
     shots_features = []
     for _, row in shots_month.iterrows():
-        shots_features.append({
-            "type": "Feature",
-            "properties": {"id": str(row["id"]) if "id" in row else None},
-            "geometry": {"type": "Point", "coordinates": [row["longitude"], row["latitude"]]}
-        })
+        shots_features.append({"type": "Feature", "properties": {"id": str(row["id"]) if "id" in row else None}, "geometry": {"type": "Point", "coordinates": [row["longitude"], row["latitude"]]}})
     hom_features = []
     for _, row in homicides_month.iterrows():
-        hom_features.append({
-            "type": "Feature",
-            "properties": {"id": str(row["id"]) if "id" in row else None},
-            "geometry": {"type": "Point", "coordinates": [row["longitude"], row["latitude"]]}
-        })
+        hom_features.append({"type": "Feature", "properties": {"id": str(row["id"]) if "id" in row else None}, "geometry": {"type": "Point", "coordinates": [row["longitude"], row["latitude"]]}})
     shots_data = {"type": "FeatureCollection", "features": shots_features}
     homicides_data = {"type": "FeatureCollection", "features": hom_features}
 
     return hex_data, shots_data, homicides_data
 
 
-@callback(
-    Output("loading-spinner", "style", allow_duplicate=True),
-    Input("radial-slider", "value"),
-    prevent_initial_call=True
-)
+@callback(Output("loading-spinner", "style", allow_duplicate=True), Input("radial-slider", "value"), prevent_initial_call=True)
 def show_left_spinner_on_slider_change(slider_value):
     return {"display": "block"}
 
 
-@callback(
-    Output("chat-messages", "children", allow_duplicate=True),
-    Output("loading-spinner", "style", allow_duplicate=True),
-    Input("user-message-store", "data"),
-    Input("radial-slider", "value"),
-    State("chat-messages", "children"),
-    State("selected-hexbins-store", "data"),
-    prevent_initial_call=True
-)
+@callback(Output("chat-messages", "children", allow_duplicate=True), Output("loading-spinner", "style", allow_duplicate=True), Input("user-message-store", "data"), Input("radial-slider", "value"), State("chat-messages", "children"), State("selected-hexbins-store", "data"), prevent_initial_call=True)
 def handle_chat_response(stored_input, slider_value, current_messages, selected_hexbins_data):
-    
+
     current_messages = current_messages or []
     year, month = slider_value_to_date(slider_value)
     selected_date = f"{year}-{month:02d}"
-    prompt = (f"Your neighbor has selected the date {selected_date} and wants to understand how the situation "
-              f"in your neighborhood of Dorchester on {selected_date} compares to overall trends...")
+    prompt = f"Your neighbor has selected the date {selected_date} and wants to understand how the situation " f"in your neighborhood of Dorchester on {selected_date} compares to overall trends..."
     if selected_hexbins_data.get("selected_ids"):
         event_ids = ",".join(selected_hexbins_data["selected_ids"])
         event_id_data = get_select_311_data(event_ids=event_ids)
         event_date_data = get_select_311_data(event_date=selected_date)
-        prompt += (f"\n\nYour neighbor has specifically selected an area within Dorchester to examine. "
-                   f"The overall neighborhood 311 data on {selected_date} are: {event_date_data}. "
-                   f"The specific area 311 data are: {event_id_data}. Compare the local area data, the neighborhood-wide data, "
-                   f"and the overall trends in the original 311 data.")
+        prompt += f"\n\nYour neighbor has specifically selected an area within Dorchester to examine. " f"The overall neighborhood 311 data on {selected_date} are: {event_date_data}. " f"The specific area 311 data are: {event_id_data}. Compare the local area data, the neighborhood-wide data, " f"and the overall trends in the original 311 data."
     if stored_input:
         prompt += f"\n\nThe neighbor asks: {stored_input}"
     reply = get_chat_response(prompt)
@@ -630,10 +556,11 @@ def handle_chat_response(stored_input, slider_value, current_messages, selected_
     updated_messages = current_messages + [bot_response]
     return updated_messages, {"display": "none"}
 
+
 @callback(
     [
-        Output("chat-messages-right",   "children", allow_duplicate=True),
-        Output("chat-input-right",      "value"),
+        Output("chat-messages-right", "children", allow_duplicate=True),
+        Output("chat-input-right", "value"),
         Output("loading-spinner-right", "style", allow_duplicate=True),
         Output("user-message-store-right", "data"),
     ],
@@ -642,8 +569,8 @@ def handle_chat_response(stored_input, slider_value, current_messages, selected_
         Input("chat-input-right", "n_submit"),
     ],
     [
-        State("chat-input-right",      "value"),
-        State("chat-messages-right",   "children"),
+        State("chat-input-right", "value"),
+        State("chat-messages-right", "children"),
     ],
     prevent_initial_call=True,
 )
@@ -655,6 +582,7 @@ def handle_chat_input_right(n_clicks, n_submit, input_value, msgs):
     msgs.append(html.Div(input_value, className="user-message"))
     return msgs, "", {"display": "block"}, input_value.strip()
 
+
 @callback(
     Output("loading-spinner-right", "style", allow_duplicate=True),
     Input("radial-slider", "value"),
@@ -663,13 +591,11 @@ def handle_chat_input_right(n_clicks, n_submit, input_value, msgs):
 def show_right_spinner_on_slider_change(slider_value):
     return {"display": "block"}
 
+
 @callback(
-    [Output("chat-messages-right","children", allow_duplicate=True),
-     Output("loading-spinner-right","style", allow_duplicate=True)],
-    [Input("user-message-store-right","data"),
-     Input("radial-slider","value")],
-    [State("chat-messages-right","children"),
-     State("selected-hexbins-store","data")],
+    [Output("chat-messages-right", "children", allow_duplicate=True), Output("loading-spinner-right", "style", allow_duplicate=True)],
+    [Input("user-message-store-right", "data"), Input("radial-slider", "value")],
+    [State("chat-messages-right", "children"), State("selected-hexbins-store", "data")],
     prevent_initial_call=True,
 )
 def handle_chat_response_right(stored_input, slider_value, msgs, selected):
@@ -686,12 +612,10 @@ def handle_chat_response_right(stored_input, slider_value, msgs, selected):
 
     reply = get_chat_response(prompt)
 
-    msgs.append(html.Div(
-        dcc.Markdown(reply, dangerously_allow_html=True),
-        className="bot-message"
-    ))
+    msgs.append(html.Div(dcc.Markdown(reply, dangerously_allow_html=True), className="bot-message"))
 
     return msgs, {"display": "none"}
+
 
 @callback(
     [
@@ -748,6 +672,7 @@ def complete_overlay_transition(n_intervals):
         return {"display": "none"}, 0
     return dash.no_update, dash.no_update
 
+
 @callback(
     [
         Output("chat-messages", "children", allow_duplicate=True),
@@ -780,11 +705,10 @@ def handle_tell_me_prompt(prompt, current_messages):
 
     return updated_messages, "", dash.no_update
 
+
 @callback(
-    [Output("chat-messages", "children", allow_duplicate=True),
-     Output("chat-messages-right", "children", allow_duplicate=True)],
-    [Input("tell-me-btn", "n_clicks"),
-     Input("selected-hexbins-store", "data")],
+    [Output("chat-messages", "children", allow_duplicate=True), Output("chat-messages-right", "children", allow_duplicate=True)],
+    [Input("tell-me-btn", "n_clicks"), Input("selected-hexbins-store", "data")],
     [State("radial-slider", "value")],
     prevent_initial_call=True,
 )
@@ -805,35 +729,18 @@ def handle_initial_prompts(n_clicks, selected, slider_value):
         evt_csv = get_select_311_data(event_ids=",".join(limited_ids))
         date_csv = get_select_311_data(event_date=selected_date)
 
-        area_context = (
-            f"\n\nSpecific area 311 data (subset of {LIMIT} records shown):\n{evt_csv}"
-            f"\n\nNeighborhood 311 data for {selected_date}:\n{date_csv}"
-        )
+        area_context = f"\n\nSpecific area 311 data (subset of {LIMIT} records shown):\n{evt_csv}" f"\n\nNeighborhood 311 data for {selected_date}:\n{date_csv}"
 
         if len(ids) > LIMIT:
             area_context += f"\n\nNote: This area had {len(ids)} events, but only {LIMIT} are analyzed due to system limits."
 
-    stats_prompt = (
-        f"Statistical overview for Dorchester on {selected_date}:{area_context} "
-        "Your neighbor has selected this specific area to focus on. You don't have to compare the statistics but just analyze the data and give the statistics along with insights. Focus on counts of 311, shots fired, etc."
-    )
+    stats_prompt = f"Statistical overview for Dorchester on {selected_date}:{area_context} " "Your neighbor has selected this specific area to focus on. You don't have to compare the statistics but just analyze the data and give the statistics along with insights. Focus on counts of 311, shots fired, etc."
     stats_reply = get_chat_response(stats_prompt)
-    stats_message = html.Div(
-        [html.Strong("Statistical overview for your neighborhood:"),
-         dcc.Markdown(stats_reply, dangerously_allow_html=True)],
-        className="bot-message"
-    )
+    stats_message = html.Div([html.Strong("Statistical overview for your neighborhood:"), dcc.Markdown(stats_reply, dangerously_allow_html=True)], className="bot-message")
 
-    community_prompt = (
-        f"Community meeting summary for {selected_date}:{area_context} "
-        "Your neighbor has selected this specific area to focus on. Share neighbor quotes and concerns."
-    )
+    community_prompt = f"Community meeting summary for {selected_date}:{area_context} " "Your neighbor has selected this specific area to focus on. Share neighbor quotes and concerns."
     community_reply = get_chat_response(community_prompt)
-    community_message = html.Div(
-        [html.Strong("From recent community meetings:"),
-         dcc.Markdown(community_reply, dangerously_allow_html=True)],
-        className="bot-message"
-    )
+    community_message = html.Div([html.Strong("From recent community meetings:"), dcc.Markdown(community_reply, dangerously_allow_html=True)], className="bot-message")
 
     return [stats_message], [community_message]
 
