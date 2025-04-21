@@ -21,7 +21,7 @@ class Config:
     HOST = os.getenv("EXPERIMENT_6_HOST", "127.0.0.1")
     PORT = os.getenv("EXPERIMENT_6_PORT", "8060")
     DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_6_DASH_REQUESTS_PATHNAME")
-    APP_VERSION = os.getenv("EXPERIMENT_6_VERSION", "0.6")  # Fixed typo
+    APP_VERSION = os.getenv("EXPERIMENT_6_VERSION", "0.6.2")  # Fixed typo
     CACHE_DIR = os.getenv("EXPERIMENT_6_CACHE_DIR", "./cache")
     API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8888")
     RETHINKAI_API_KEY = os.getenv("RETHINKAI_API_CLIENT_KEY")
