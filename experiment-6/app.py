@@ -24,6 +24,7 @@ class Config:
     APP_VERSION = os.getenv("EXPERIMENT_6_VERSION", "0.6")  # Fixed typo
     CACHE_DIR = os.getenv("EXPERIMENT_6_CACHE_DIR", "./cache")
     API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8888")
+    RETHINKAI_API_KEY = os.getenv("RETHINKAI_API_CLIENT_KEY")
     MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
     # MAP_CENTER = dict(lon=-71.07, lat=42.297)
     MAP_CENTER = dict(lon=-71.07601, lat=42.28988)
@@ -43,7 +44,10 @@ def cache_stale(path, max_age_minutes=30):
 
 def stream_to_dataframe(url: str) -> pd.DataFrame:
     """Stream JSON data from API and convert to DataFrame"""
-    with requests.get(url, stream=True) as response:
+    headers = {
+        "RethinkAI-API-Key": Config.RETHINKAI_API_KEY,
+    }
+    with requests.get(url, headers=headers, stream=True) as response:
         if response.status_code != 200:
             raise Exception(f"Error: {response.status_code} - {response.text}")
 
@@ -232,7 +236,11 @@ max_value = (2024 - 2018) * 12 + 11  # Dec 2024
 def get_chat_response(prompt):
     """Get chat response from API"""
     try:
-        response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_6&app_version={Config.APP_VERSION}", headers={"Content-Type": "application/json"}, json={"client_query": prompt})
+        headers = {
+            "RethinkAI-API-Key": Config.RETHINKAI_API_KEY,
+            "Content-Type": "application/json",
+        }
+        response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_6&app_version={Config.APP_VERSION}", headers=headers, json={"client_query": prompt})
         response.raise_for_status()
         reply = response.json().get("response", "[No reply received]")
     except Exception as e:
