@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from pathlib import Path
-from typing import List, Dict, Union, Optional, Any, Generator
+from typing import List, Union, Optional, Generator
 import mysql.connector
 from mysql.connector.pooling import MySQLConnectionPool
 import datetime
@@ -24,7 +24,8 @@ BASE_DIR = Path(__file__).parent
 
 # Configuration constants
 class Config:
-    API_VERSION = "API v 0.3.1"
+    API_VERSION = "API v 0.4"
+    RETHINKAI_API_KEYS = os.getenv("RETHINKAI_API_KEYS").split(",")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL")
     GEMINI_CACHE_TTL = int(os.getenv("GEMINI_CACHE_TTL", "7"))
@@ -44,6 +45,29 @@ class Config:
         "password": os.getenv("DB_PASSWORD"),
         "database": os.getenv("DB_NAME"),
     }
+
+
+class Font_Colors:
+    PASS = "\033[92m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+
+
+# Initialize GenAI client
+genai_client = genai.Client(api_key=Config.GEMINI_API_KEY)
+
+# Create connection pool
+db_pool = MySQLConnectionPool(**Config.DB_CONFIG)
+
+# Initialize Flask app
+app = Flask(__name__)
+app.config.update(
+    SECRET_KEY=Config.FLASK_SECRET_KEY,
+    PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=7),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=Config.FLASK_SESSION_COOKIE_SECURE,
+)
 
 
 #
@@ -117,20 +141,218 @@ class SQLConstants:
     BOS911_BASE_WHERE = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
 
 
-# Initialize GenAI client
-genai_client = genai.Client(api_key=Config.GEMINI_API_KEY)
+#
+# Query Builders
+#
+def build_311_query(
+    data_request: str,
+    request_options: str = "",
+    request_date: str = "",
+    request_zipcode: str = "",
+    event_ids: str = "",
+) -> str:
+    if data_request == "311_by_geo" and request_options:
+        query = f"""
+        SELECT
+            id,
+            type,
+            open_dt AS date,
+            latitude,
+            longitude,
+            CASE
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+            END AS normalized_type
+        FROM
+            bos311_data
+        WHERE
+            type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+        """
+        if request_date:
+            query += f"""AND DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'"""
 
-# Create connection pool
-db_pool = MySQLConnectionPool(**Config.DB_CONFIG)
+        return query
+    elif data_request == "311_summary_context":
+        query = f"""
+        WITH incident_data AS (
+        SELECT
+            year,
+            '911 Shot Fired Confirmed' AS incident_type,
+            quarter,
+            month
+        FROM shots_fired_data
+        WHERE
+        {SQLConstants.BOS911_BASE_WHERE}
+        AND ballistics_evidence = 1
+        UNION ALL
+        SELECT
+            year,
+            '911 Shot Fired Unconfirmed' AS incident_type,
+            quarter,
+            month
+        FROM shots_fired_data
+        WHERE
+        {SQLConstants.BOS911_BASE_WHERE}
+        AND ballistics_evidence = 0
+        UNION ALL
+        SELECT
+            year,
+            '911 Homicides' AS incident_type,
+            quarter,
+            month
+        FROM homicide_data
+        WHERE
+        {SQLConstants.BOS911_BASE_WHERE}
+        UNION ALL
+        SELECT
+            YEAR(open_dt) AS year,
+            '311 Trash/Dumping Issues' AS incident_type,
+            QUARTER(open_dt) AS quarter,
+            MONTH(open_dt) AS month
+        FROM bos311_data
+        WHERE
+        type IN ({SQLConstants.CATEGORY_TYPES['trash']})
+        AND {SQLConstants.BOS311_BASE_WHERE}
+        UNION ALL
+        SELECT
+            YEAR(open_dt) AS year,
+            '311 Living Condition Issues' AS incident_type,
+            QUARTER(open_dt) AS quarter,
+            MONTH(open_dt) AS month
+        FROM bos311_data
+        WHERE
+        type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']})
+        AND {SQLConstants.BOS311_BASE_WHERE}
+        UNION ALL
+        SELECT
+            YEAR(open_dt) AS year,
+            '311 Streets Issues' AS incident_type,
+            QUARTER(open_dt) AS quarter,
+            MONTH(open_dt) AS month
+        FROM bos311_data
+        WHERE
+        type IN ({SQLConstants.CATEGORY_TYPES['streets']})
+        AND {SQLConstants.BOS311_BASE_WHERE}
+        UNION ALL
+        SELECT
+            YEAR(open_dt) AS year,
+            '311 Parking Issues' AS incident_type,
+            QUARTER(open_dt) AS quarter,
+            MONTH(open_dt) AS month
+        FROM bos311_data
+        WHERE
+        type IN ({SQLConstants.CATEGORY_TYPES['parking']})
+        AND {SQLConstants.BOS311_BASE_WHERE}
+        )
+        SELECT
+            year,
+            incident_type,
+            {SQLConstants.BOS911_TIME_BREAKDOWN}
+        FROM incident_data
+        GROUP BY year, incident_type
+        ORDER BY year, incident_type
+        """
+        return query
+    elif data_request == "311_summary" and event_ids:
+        query = f"""
+        SELECT
+            CASE
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+            END AS reported_issue,
+            COUNT(*) AS total
+        FROM
+            bos311_data
+        WHERE
+            id IN ({event_ids})
+        GROUP BY reported_issue
+        """
+        return query
+    elif data_request == "311_summary" and request_date and request_options:
+        query = f"""
+        SELECT
+            CASE
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+            END AS reported_issue,
+            COUNT(*) AS total
+        FROM
+            bos311_data
+        WHERE
+            DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
+            AND type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+        GROUP BY reported_issue
+        """
+        return query
+    elif data_request == "311_summary" and not request_date and not event_ids and request_options:
+        query = f"""
+        SELECT
+            CASE
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+            END AS reported_issue,
+            COUNT(*) AS total
+        FROM
+            bos311_data
+        WHERE
+            type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+        GROUP BY reported_issue
+        """
+        return query
+    else:
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating query:{Font_Colors.ENDC}: check query args")
+        return ""
 
-# Initialize Flask app
-app = Flask(__name__)
-app.config.update(
-    SECRET_KEY=Config.FLASK_SECRET_KEY,
-    PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=7),
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SECURE=Config.FLASK_SESSION_COOKIE_SECURE,
-)
+
+def build_911_query(data_request: str) -> str:
+    if data_request == "911_shots_fired":
+        return f"""
+        SELECT
+            id,
+            incident_date_time AS date,
+            ballistics_evidence,
+            latitude,
+            longitude
+        FROM shots_fired_data
+        WHERE {SQLConstants.BOS911_BASE_WHERE}
+        AND latitude IS NOT NULL
+        AND longitude IS NOT NULL
+        GROUP BY id, date, ballistics_evidence, latitude, longitude;
+        """
+    elif data_request == "911_homicides_and_shots_fired":
+        return """
+        SELECT
+            s.id as id,
+            h.homicide_date as date,
+            s.latitude as latitude,
+            s.longitude as longitude
+        FROM
+            shots_fired_data s
+        INNER JOIN
+            homicide_data h
+        ON
+            DATE(s.incident_date_time) = DATE(h.homicide_date)
+            AND s.district = h.district
+        WHERE
+            s.ballistics_evidence = 1
+            AND h.district IN ('B3', 'C11', 'B2')
+            AND h.neighborhood = 'Dorchester'
+            AND s.year >= 2018
+            AND s.year < 2025
+        """
+    return ""
+
 
 #
 # Helper functions
@@ -166,7 +388,7 @@ def get_files(file_type: Optional[str] = None, specific_files: Optional[List[str
         return [f.name for f in Config.DATASTORE_PATH.iterdir() if f.is_file() and not f.name.startswith(".")]
 
     except Exception as e:
-        print(f"Error getting files: {e}")
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error getting files:{Font_Colors.ENDC} {e}")
         return []
 
 
@@ -180,7 +402,7 @@ def get_file_content(filename: str) -> Optional[str]:
         return file_path.read_text(encoding="utf-8")
 
     except Exception as e:
-        print(f"Error reading file {filename}: {e}")
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error reading file {filename}:{Font_Colors.ENDC} {e}")
         return None
 
 
@@ -188,6 +410,103 @@ def get_file_content(filename: str) -> Optional[str]:
 def get_db_connection():
     # return mysql.connector.connect(**Config.DB_CONFIG)
     return db_pool.get_connection()
+
+
+def json_query_results(query: str) -> Optional[Response]:
+    """Execute a database query and return results as JSON."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(query)
+        result = cursor.fetchall()
+        return jsonify(result) if result else None
+    except mysql.connector.Error as err:
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection:{Font_Colors.ENDC} {str(err)}")
+        return None
+    finally:
+        if "cursor" in locals() and cursor:
+            cursor.close()
+        if "conn" in locals() and conn:
+            conn.close()
+
+
+def stream_query_results(query: str) -> Generator[str, None, None]:
+    """Execute a database query and stream results as JSON."""
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(query)
+
+        yield "[\n"
+        first_row = True
+        for row in cursor:
+            if not first_row:
+                yield ",\n"
+            else:
+                first_row = False
+
+            # Convert mysql objects to something json-friendly
+            processed_row = {}
+            for key, value in row.items():
+                if hasattr(value, "isoformat"):
+                    processed_row[key] = value.isoformat()
+                elif isinstance(value, decimal.Decimal):
+                    processed_row[key] = float(value)
+                else:
+                    processed_row[key] = value
+            yield json.dumps(processed_row)
+
+        # Close the JSON structure
+        yield "\n]"
+    except mysql.connector.Error as err:
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection:{Font_Colors.ENDC} {str(err)}")
+        yield "[]\n"  # Return empty array on error
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def csv_query_results(query: str) -> Optional[io.StringIO]:
+    """Execute a database query and return results as CSV in a StringIO object."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(query)
+
+        fieldnames = [desc[0] for desc in cursor.description]
+        result = io.StringIO()
+        writer = csv.DictWriter(result, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in cursor:
+            writer.writerow(row)
+        return result
+    except mysql.connector.Error as err:
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection:{Font_Colors.ENDC} {str(err)}")
+        return None
+    finally:
+        if "cursor" in locals() and cursor:
+            cursor.close()
+        if "conn" in locals() and conn:
+            conn.close()
+
+
+def get_query_results(query: str, output_type: str = ""):
+    """
+    Factory function that returns the appropriate query result function
+    based on the output_type.
+    """
+    if output_type == "stream":
+        return stream_query_results(query)
+    elif output_type == "csv":
+        return csv_query_results(query)
+    elif output_type == "json" or output_type == "":
+        return json_query_results(query)
+    else:
+        raise ValueError(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error getting query results:{Font_Colors.ENDC} Invalid output_type: {output_type}")
 
 
 # Send prompt to Gemini
@@ -202,14 +521,12 @@ async def get_gemini_response(prompt: str, cache_name: str) -> str:
                 config=types.GenerateContentConfig(cached_content=cache_name),
             )
         )
-        # print(f"\n✅ Gemini Response: {response.text}")
         return response.text
     except Exception as e:
-        print(f"❌ Error generating response: {e}")
-        return f"❌ Error generating response: {e}"
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}")
+        return f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}"
 
 
-# TODO: Unsure if this should be async as well
 def create_gemini_context(context_request: str, files: str = "", preamble: str = "", generate_cache: bool = True, app_version: str = "") -> Union[str, int, bool]:
     # test if cache exists
     if generate_cache:
@@ -217,50 +534,57 @@ def create_gemini_context(context_request: str, files: str = "", preamble: str =
             if cache.display_name == context_request + "_" + app_version:
                 return cache.name
 
+    files_list = []
     try:
         content = {"parts": []}
 
         if context_request == "structured":
             files_list = get_files("csv")
+            preamble_file = context_request + ".txt"
+
         elif context_request == "unstructured":
             files_list = get_files("txt")
+            preamble_file = context_request + ".txt"
+
         elif context_request == "all":
             files_list = get_files()
+            preamble_file = context_request + ".txt"
+
         elif context_request == "specific":
             if not files:
                 return False
             specific_files = [f.strip() for f in files.split(",")]
             files_list = get_files(specific_files=specific_files)
+            preamble_file = context_request + ".txt"
+
         elif context_request == "experiment_5" or context_request == "experiment_6":
             files_list = get_files("txt")
-            query = build_summary_query()
+            # query = build_summary_query()
+            query = build_311_query(data_request="311_summary_context")
+            response = get_query_results(query=query, output_type="csv")
 
-            try:
-                conn = get_db_connection()
-                with conn.cursor(dictionary=True) as cursor:
+            content["parts"].append({"text": response.getvalue()})
 
-                    cursor.execute(query)
-                    fieldnames = [desc[0] for desc in cursor.description]
+            preamble_file = context_request + ".txt"
 
-                    output = io.StringIO()
-                    writer = csv.DictWriter(output, fieldnames=fieldnames)
-                    writer.writeheader()
+        elif context_request == "experiment_7_structured":
+            # Provides the context only for the base 311 data in for analytic response
+            # TODO this isn't large enough to warrant caching, move to chat in some way
+            # First get the summary table
+            query = build_311_query(data_request="311_summary_context")
+            results = get_query_results(query=query, output_type="csv")
+            content["parts"].append({"text": results.getvalue()})
+            # Now get the full 311 data dump... for testing
+            query = build_311_query(data_request="311_by_geo", request_options="all")
+            results = get_query_results(query=query, output_type="csv")
+            content["parts"].append({"text": results.getvalue()})
+            preamble_file = context_request + ".txt"
 
-                    for row in cursor:
-                        writer.writerow(row)
+        elif context_request == "experiment_7_unstructured":
+            # Provides the context for the sentiment/perception response
+            files_list = get_files("txt")
+            preamble_file = context_request + ".txt"
 
-                    content["parts"].append({"text": output.getvalue()})
-
-            except mysql.connector.Error as err:
-                print(f"Database error: {str(err)}")
-                return None
-
-            finally:
-                if "conn" in locals():
-                    cursor.close()
-                    conn.close()
-
-        preamble_file = context_request + ".txt"
         # Read contents of found files
         for file in files_list:
             file_content = get_file_content(file)
@@ -271,7 +595,7 @@ def create_gemini_context(context_request: str, files: str = "", preamble: str =
         if context_request != "specific":
             path = Config.PROMPTS_PATH / preamble_file
             if not path.is_file():
-                raise FileNotFoundError(f"File not found: {path}")
+                raise FileNotFoundError(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error: File not found:{Font_Colors.ENDC} {path}")
             system_prompt = path.read_text(encoding="utf-8")
         else:
             system_prompt = preamble
@@ -303,8 +627,8 @@ def create_gemini_context(context_request: str, files: str = "", preamble: str =
             return total_tokens.total_tokens
 
     except Exception as e:
-        print(f"❌ Error generating context: {e}")
-        return f"❌ Error generating context: {e}"
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating context:{Font_Colors.ENDC} {e}")
+        return f"✖ Error generating context: {e}"
 
 
 # Log events
@@ -384,7 +708,7 @@ def log_event(
         return app_response_id
 
     except mysql.connector.Error as err:
-        print(f"Database error: {str(err)}")
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection:{Font_Colors.ENDC} {str(err)}")
         return False
 
     finally:
@@ -393,293 +717,23 @@ def log_event(
             conn.close()
 
 
-# DB Query
-def return_query_results(query: str) -> Optional[List[Dict[str, Any]]]:
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-
-        cursor.execute(query)
-        result = cursor.fetchall()
-
-        return result if result else None
-
-    except mysql.connector.Error as err:
-        print(f"Database error: {str(err)}")
-        return None
-
-    finally:
-        if "conn" in locals():
-            cursor.close()
-            conn.close()
-
-
-def stream_query_results(query: str) -> Generator[str]:
-    conn = None
-    cursor = None
-
-    try:
-        conn = get_db_connection()
-
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute(query)
-        # Stream the results
-        yield "[\n"
-        first_row = True
-        for row in cursor:
-            if not first_row:
-                yield ",\n"
-            else:
-                first_row = False
-
-            # Convert mysql objects to something json-friendly
-            processed_row = {}
-            for key, value in row.items():
-                if hasattr(value, "isoformat"):  # Check if it has isoformat method (datetime objects do)
-                    processed_row[key] = value.isoformat()
-                elif isinstance(value, decimal.Decimal):  # Handle Decimal objects
-                    processed_row[key] = float(value)
-                else:
-                    processed_row[key] = value
-
-            yield json.dumps(processed_row)
-
-        # Close the JSON structure
-        yield "\n]"
-
-    except mysql.connector.Error as err:
-        # Handle database errors
-        yield json.dumps({"error": f"Database error: {str(err)}"})
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-
-#
-# Query Builders
-#
-def build_311_query(
-    data_request: str,
-    request_options: str = "",
-    request_date: str = "",
-    request_zipcode: str = "",
-    event_ids: str = "",
-) -> str:
-    if data_request == "311_by_geo":
-        query = f"""
-        SELECT
-            id,
-            type,
-            open_dt AS date,
-            latitude,
-            longitude,
-            CASE
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
-            END AS normalized_type
-        FROM
-            bos311_data
-        WHERE
-            type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
-        """
-        if request_date:
-            query += f"""AND DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'"""
-        return query
-    elif data_request == "311_summary" and event_ids:
-        query = f"""
-        SELECT
-            CASE
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
-            END AS reported_issue,
-            COUNT(*) AS total
-        FROM
-            bos311_data
-        WHERE
-            id IN ({event_ids})
-        GROUP BY reported_issue
-        """
-        return query
-    elif data_request == "311_summary" and request_date:
-        query = f"""
-        SELECT
-            CASE
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
-            END AS reported_issue,
-            COUNT(*) AS total
-        FROM
-            bos311_data
-        WHERE
-            DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
-            AND type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
-        GROUP BY reported_issue
-        """
-        return query
-    elif data_request == "311_summary" and not request_date and not event_ids:
-        query = f"""
-        SELECT
-            CASE
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
-            END AS reported_issue,
-            COUNT(*) AS total
-        FROM
-            bos311_data
-        WHERE
-            type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
-        GROUP BY reported_issue
-        """
-        return query
-    else:
-        return ""
-
-
-def build_911_query(data_request: str) -> str:
-    if data_request == "911_shots_fired":
-        return f"""
-        SELECT
-            id,
-            incident_date_time AS date,
-            ballistics_evidence,
-            latitude,
-            longitude
-        FROM shots_fired_data
-        WHERE {SQLConstants.BOS911_BASE_WHERE}
-        AND latitude IS NOT NULL
-        AND longitude IS NOT NULL
-        GROUP BY id, date, ballistics_evidence, latitude, longitude;
-        """
-    elif data_request == "911_homicides_and_shots_fired":
-        return """
-        SELECT
-            s.id as id,
-            h.homicide_date as date,
-            s.latitude as latitude,
-            s.longitude as longitude
-        FROM
-            shots_fired_data s
-        INNER JOIN
-            homicide_data h
-        ON
-            DATE(s.incident_date_time) = DATE(h.homicide_date)
-            AND s.district = h.district
-        WHERE
-            s.ballistics_evidence = 1
-            AND h.district IN ('B3', 'C11', 'B2')
-            AND h.neighborhood = 'Dorchester'
-            AND s.year >= 2018
-            AND s.year < 2025
-        """
-    return ""
-
-
-def build_summary_query():
-    return f"""
-    WITH incident_data AS (
-    SELECT
-        year,
-        '911 Shot Fired Confirmed' AS incident_type,
-        quarter,
-        month
-    FROM shots_fired_data
-    WHERE
-    {SQLConstants.BOS911_BASE_WHERE}
-    AND ballistics_evidence = 1
-    UNION ALL
-    SELECT
-        year,
-        '911 Shot Fired Unconfirmed' AS incident_type,
-        quarter,
-        month
-    FROM shots_fired_data
-    WHERE
-    {SQLConstants.BOS911_BASE_WHERE}
-    AND ballistics_evidence = 0
-    UNION ALL
-    SELECT
-        year,
-        '911 Homicides' AS incident_type,
-        quarter,
-        month
-    FROM homicide_data
-    WHERE
-    {SQLConstants.BOS911_BASE_WHERE}
-    UNION ALL
-    SELECT
-        YEAR(open_dt) AS year,
-        '311 Trash/Dumping Issues' AS incident_type,
-        QUARTER(open_dt) AS quarter,
-        MONTH(open_dt) AS month
-    FROM bos311_data
-    WHERE
-    type IN ({SQLConstants.CATEGORY_TYPES['trash']})
-    AND {SQLConstants.BOS311_BASE_WHERE}
-    UNION ALL
-    SELECT
-        YEAR(open_dt) AS year,
-        '311 Living Condition Issues' AS incident_type,
-        QUARTER(open_dt) AS quarter,
-        MONTH(open_dt) AS month
-    FROM bos311_data
-    WHERE
-    type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']})
-    AND {SQLConstants.BOS311_BASE_WHERE}
-    UNION ALL
-    SELECT
-        YEAR(open_dt) AS year,
-        '311 Streets Issues' AS incident_type,
-        QUARTER(open_dt) AS quarter,
-        MONTH(open_dt) AS month
-    FROM bos311_data
-    WHERE
-    type IN ({SQLConstants.CATEGORY_TYPES['streets']})
-    AND {SQLConstants.BOS311_BASE_WHERE}
-    UNION ALL
-    SELECT
-        YEAR(open_dt) AS year,
-        '311 Parking Issues' AS incident_type,
-        QUARTER(open_dt) AS quarter,
-        MONTH(open_dt) AS month
-    FROM bos311_data
-    WHERE
-    type IN ({SQLConstants.CATEGORY_TYPES['parking']})
-    AND {SQLConstants.BOS311_BASE_WHERE}
-    )
-    SELECT
-        year,
-        incident_type,
-        {SQLConstants.BOS911_TIME_BREAKDOWN}
-    FROM incident_data
-    GROUP BY year, incident_type
-    ORDER BY year, incident_type
-    """
-
-
 #
 # Middleware to check session and create if needed
 #
 @app.before_request
 def check_session():
+    rethinkai_api_client_key = request.headers.get("RethinkAI-API-Key")
+    app_version = request.args.get("app_version", "")
+
+    if not rethinkai_api_client_key or rethinkai_api_client_key not in Config.RETHINKAI_API_KEYS:
+        return jsonify({"Error": "Invalide or missing API key"}), 401
+
     if "session_id" not in session:
         session.permanent = True  # Make the session persistent
         session["session_id"] = str(uuid.uuid4())
         log_event(
             session_id=session["session_id"],
-            app_version="0.2",
+            app_version=app_version,
             data_attributes=Config.API_VERSION,
             app_response="New session created",
         )
@@ -687,7 +741,7 @@ def check_session():
     # Log the request
     g.log_entry = log_event(
         session_id=session["session_id"],
-        app_version="0.2",
+        app_version=app_version,
         data_attributes=Config.API_VERSION,
         client_query=f"Request: [{request.method}] {request.url}",
     )
@@ -705,29 +759,29 @@ def route_data_query():
     request_zipcode = request.args.get("zipcode", "")
     event_ids = request.args.get("event_ids", "")
     request_date = request.args.get("date", "")
+    data_request = request.args.get("request", "")
+    output_type = request.args.get("output_type", "")
 
-    try:
-        # Get and validate request parameters
-        data_request = request.args.get("request", "")
-        if not data_request:
-            return jsonify({"error": "Missing data_request parameter"}), 400
+    if not data_request:
+        return jsonify({"✖ Error": "Missing data_request parameter"}), 400
 
+    try:  # Get and validate request parameters
         request_options = request.args.get("category", "")
         if data_request.startswith("311_by") and not request_options:
             return (
-                jsonify({"error": "Missing required options parameter for 311 request"}),
+                jsonify({"✖ Error": "Missing required options parameter for 311 request"}),
                 400,
             )
 
         if data_request.startswith("311_on_date") and not request_date:
             return (
-                jsonify({"error": "Missing required options parameter for 311 request"}),
+                jsonify({"✖ Error": "Missing required options parameter for 311 request"}),
                 400,
             )
 
         # Validate date format for date-specific queries
         if data_request.startswith("311_on_date") and not check_date_format(request_date):
-            return jsonify({"error": 'Incorrect date format. Expects "YYYY-MM"'}), 400
+            return jsonify({"✖ Error": 'Incorrect date format. Expects "YYYY-MM"'}), 400
 
         # Build query using the appropriate query builder
         if data_request.startswith("311"):
@@ -757,25 +811,24 @@ def route_data_query():
             WHERE zipcode IN ({request_zipcode})
             """
         else:
-            return jsonify({"error": "Invalid data_request parameter"}), 400
+            return jsonify({"✖ Error": "Invalid data_request parameter"}), 400
 
         if not query:
-            return jsonify({"error": "Failed to build query"}), 500
+            return jsonify({"✖ Error": "Failed to build query"}), 500
 
         # Return w/ streaming
         if stream_result == "True":
-            return Response(stream_with_context(stream_query_results(query=query)), mimetype="application/json")
-        # Return bulk result
+            # return Response(stream_with_context(stream_query_results(query=query)), mimetype="application/json")
+            return Response(stream_with_context(get_query_results(query=query, output_type="stream")), mimetype="application/json")
+        # Return non-streaming
         else:
-            result = return_query_results(query=query)
-
             log_event(
                 session_id=session_id,
                 app_version=app_version,
                 log_id=g.log_entry,
                 app_response="SUCCESS",
             )
-            return jsonify(result)
+            return get_query_results(query=query, output_type=output_type)
 
     except Exception as e:
         log_event(
@@ -784,7 +837,7 @@ def route_data_query():
             log_id=g.log_entry,
             app_response=f"ERROR: {str(e)}",
         )
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"✖ Error": str(e)}), 500
 
 
 @app.route("/chat", methods=["POST"])
@@ -818,9 +871,9 @@ def route_chat():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         app_response = loop.run_until_complete(get_gemini_response(full_prompt, cache_name))
-        if "❌ Error" in app_response:
-            print(f"❌ ERROR from Gemini API: {app_response}")
-            return jsonify({"error": app_response}), 500
+        if "Error" in app_response:
+            print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ ERROR from Gemini API:{Font_Colors.ENDC} {app_response}")
+            return jsonify({"Error": app_response}), 500
 
         # Log the interaction
         log_id = log_event(
@@ -853,11 +906,11 @@ def route_chat():
             log_id=g.log_entry,
             app_response=f"ERROR: {str(e)}",
         )
-        print(f"❌ Exception in /chat: {e}")
-        print(f"❌ context_request: {context_request}")
-        print(f"❌ preamble: {prompt_preamble}")
-        print(f"❌ app_version: {app_version}")
-        return jsonify({"error": f"Internal server error: {e}"}), 500
+        print(f"✖ Exception in /chat: {e}")
+        print(f"✖ context_request: {context_request}")
+        print(f"✖ preamble: {prompt_preamble}")
+        print(f"✖ app_version: {app_version}")
+        return jsonify({"Error": f"Internal server error: {e}"}), 500
 
 
 @app.route("/chat/context", methods=["GET", "POST"])
@@ -889,7 +942,7 @@ def route_chat_context():
                 return jsonify({"token_count": token_count.total_tokens})
             else:
                 # Handle the error appropriately, e.g., log the error and return an error response
-                print(f"Error getting token count: {token_count}")  # Log the error
+                print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error getting token count:{Font_Colors.ENDC} {token_count}")  # Log the error
                 return (
                     jsonify({"error": "Failed to get token count"}),
                     500,
@@ -899,7 +952,7 @@ def route_chat_context():
         # FOR NOW: assumes 'structured', 'unstructured', 'all', 'experiment_5' context_request
         # Context cache creation appends app_version so caches are versioned.
         if not context_request:
-            return jsonify({"error": "Missing context_request parameter"}), 400
+            return jsonify({"Error": "Missing context_request parameter"}), 400
 
         context_option = request.args.get("option", "")
         if context_option == "clear":
@@ -976,10 +1029,10 @@ def route_log():
                 log_id=g.log_entry,
                 app_response="ERROR: Log entry not created",
             )
-            return jsonify({"error": "Failed to create log entry"}), 500
+            return jsonify({"Error": "Failed to create log entry"}), 500
     if request.method == "PUT":
         if not data.get("log_id", ""):
-            return jsonify({"error": "Missing log_id to update"}), 500
+            return jsonify({"Error": "Missing log_id to update"}), 500
 
         log_id = log_event(
             session_id=session_id,
@@ -1010,7 +1063,7 @@ def route_log():
                 log_id=g.log_entry,
                 app_response="ERROR: Log entry not updated",
             )
-            return jsonify({"error": "Failed to update log entry"}), 500
+            return jsonify({"Error": "Failed to update log entry"}), 500
 
 
 @app.route("/llm_summaries", methods=["GET"])
@@ -1020,7 +1073,7 @@ def route_llm_summary():
     month = request.args.get("month", request.args.get("date", ""))
 
     if not month:
-        return jsonify({"error"}), 400
+        return jsonify({"Error"}), 400
 
     try:
         conn = get_db_connection()
@@ -1052,7 +1105,7 @@ def route_llm_summary():
             log_id=g.log_entry,
             app_response=f"ERROR: {str(e)}",
         )
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"Error": str(e)}), 500
 
     finally:
         if "conn" in locals():
@@ -1087,7 +1140,7 @@ def route_all_llm_summaries():
             log_id=g.log_entry,
             app_response=f"ERROR: {str(e)}",
         )
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"Error": str(e)}), 500
 
     finally:
         if "conn" in locals():
