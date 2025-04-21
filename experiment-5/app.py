@@ -19,9 +19,10 @@ load_dotenv()
 
 PORT = os.getenv("EXPERIMENT_5_PORT")
 DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_5_DASH_REQUESTS_PATHNAME")
-APP_VERSION = os.getenv("EXPERIMETN_5_VERSION", "5")
+APP_VERSION = "0.5.1"
 CACHE_DIR = os.getenv("EXPERIMETN_5_CACHE_DIR", "./cache")
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8888")
+RETHINKAI_API_KEY = os.getenv("RETHINKAI_API_CLIENT_KEY")
 
 districts = {"B3": "rgba(255, 255, 0, 0.7)", "B2": "rgba(0, 255, 255, 0.7)", "C11": "rgba(0, 255, 0, 0.7)"}
 boston_url = "https://gisportal.boston.gov/ArcGIS/rest/services/PublicSafety/OpenData/MapServer/5/query"
@@ -36,7 +37,10 @@ def cache_stale(path, max_age_minutes=30):
 
 def stream_to_dataframe(url: str) -> pd.DataFrame:
 
-    with requests.get(url, stream=True) as response:
+    headers = {
+        "RethinkAI-API-Key": RETHINKAI_API_KEY,
+    }
+    with requests.get(url, headers=headers, stream=True) as response:
         if response.status_code != 200:
             raise Exception(f"Error: {response.status_code} - {response.text}")
 
@@ -319,8 +323,16 @@ def update_hexbin_map(month_index):
 
     for district_code, color in districts.items():
         try:
-            params = {"where": f"DISTRICT='{district_code}'", "outFields": "DISTRICT", "f": "geojson", "outSR": "4326"}
-            resp = requests.get(boston_url, params=params)
+            params = {
+                "where": f"DISTRICT='{district_code}'",
+                "outFields": "DISTRICT",
+                "f": "geojson",
+                "outSR": "4326",
+            }
+            headers = {
+                "RethinkAI-API-Key": RETHINKAI_API_KEY,
+            }
+            resp = requests.get(boston_url, headers=headers, params=params)
             geojson = resp.json()
             coords = geojson["features"][0]["geometry"]["coordinates"]
             poly_list = coords if isinstance(coords[0][0][0], float) else [p[0] for p in coords]
@@ -336,8 +348,10 @@ def update_hexbin_map(month_index):
     params = {"where": "name='Dorchester'", "outFields": "*", "f": "geojson", "outSR": "4326"}
 
     try:
-
-        resp = requests.get(dorchester_url, params=params)
+        headers = {
+            "RethinkAI-API-Key": RETHINKAI_API_KEY,
+        }
+        resp = requests.get(dorchester_url, headers=headers, params=params)
 
         if resp.status_code != 200:
 
@@ -412,7 +426,10 @@ def handle_chat_simple(n_clicks, slider_val, user_input, history):
     if triggered_id == "hexbin-slider":
         history = []
         try:
-            response = requests.get(f"{API_BASE_URL}/llm_summaries?date={selected_month_str}&app_version={APP_VERSION}")
+            headers = {
+                "RethinkAI-API-Key": RETHINKAI_API_KEY,
+            }
+            response = requests.get(f"{API_BASE_URL}/llm_summaries?date={selected_month_str}&app_version={APP_VERSION}", headers=headers)
             response.raise_for_status()
             reply = response.json().get("summary", "[No summary available]")
         except Exception as e:
@@ -453,7 +470,11 @@ def handle_chat_simple(n_clicks, slider_val, user_input, history):
         )
 
         try:
-            response = requests.post(f"{API_BASE_URL}/chat?request=experiment_5&app_version={APP_VERSION}", headers={"Content-Type": "application/json"}, json={"client_query": prompt})
+            headers = {
+                "RethinkAI-API-Key": RETHINKAI_API_KEY,
+                "Content-Type": "application/json",
+            }
+            response = requests.post(f"{API_BASE_URL}/chat?request=experiment_5&app_version={APP_VERSION}", headers=headers, json={"client_query": prompt})
             response.raise_for_status()
             reply = response.json().get("response", "[No reply received]")
         except Exception as e:
