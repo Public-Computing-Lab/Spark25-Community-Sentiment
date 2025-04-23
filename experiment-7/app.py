@@ -6,7 +6,7 @@ import requests
 import pandas as pd
 import h3
 import dash
-from dash import html, dcc, Input, Output, State, callback
+from dash import html, dcc, Input, Output, State, callback, ClientsideFunction
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
@@ -224,26 +224,37 @@ app.index_string = f"""
 """
 
 
-def generate_marks():
-    marks = {}
-    for year in range(2018, 2025):
-        for month in range(1, 13):
-            value = (year - 2018) * 12 + (month - 1)
-            if month == 1:
-                marks[value] = {"label": f"{year}", "style": {"font-weight": "bold"}}
-            else:
-                marks[value] = {"label": ""}
-    return marks
+# def generate_marks():
+#     marks = {}
+#     for year in range(2018, 2025):
+#         for month in range(1, 13):
+#             value = (year - 2018) * 12 + (month - 1)
+#             if month == 1:
+#                 marks[value] = {"label": f"{year}", "style": {"font-weight": "bold"}}
+#             else:
+#                 marks[value] = {"label": ""}
+#     return marks
+#
+#
+# def slider_value_to_date(value):
+#     iv = int(value)
+#     year = 2018 + (iv // 12)
+#     month = (iv % 12) + 1
+#     return year, month
+#
+#
+# min_value = 0
 
 
-def slider_value_to_date(value):
-    iv = int(value)
-    year = 2018 + (iv // 12)
-    month = (iv % 12) + 1
-    return year, month
+def date_string_to_year_month(date_string):
+    from datetime import datetime
 
-
-min_value = 0
+    try:
+        date_obj = datetime.strptime(date_string, "%B %Y")
+        return date_obj.year, date_obj.month
+    except Exception as e:
+        print(f"Error parsing date string '{date_string}': {e}")
+        return 2024, 12
 
 
 def get_chat_response(prompt):
@@ -269,7 +280,7 @@ app.layout = html.Div(
             [
                 html.Div(
                     [
-                        html.H2("Your neighbors are worried about safety in the neighborhood, but they are working to improve things to make it safer for everyone.", className="overlay-heading"),
+                        html.H2("Your neighbors are worried about safety in the neighborhood, but they are working to improve things for everyone.", className="overlay-heading"),
                         html.Div(
                             [
                                 html.Button("Tell me", id="tell-me-btn", className="overlay-btn"),
@@ -289,19 +300,6 @@ app.layout = html.Div(
         html.Div(
             [
                 html.Div(id="before-map", className="map"),
-                html.Div(
-                    id="background-filter",
-                    style={
-                        "position": "absolute",
-                        "top": 0,
-                        "left": 0,
-                        "width": "100%",
-                        "height": "100%",
-                        "backgroundColor": "rgba(255,255,255,0.6)",
-                        "pointerEvents": "none",
-                    },
-                ),
-                html.Div(className="shadow"),
             ],
             id="background-container",
         ),
@@ -330,53 +328,41 @@ app.layout = html.Div(
                         ),
                     ],
                     className="chat-main-container",
-                    id="chat-section",
+                    id="chat-section-left",
                 ),
                 html.Div(
                     [
                         html.Div(
                             [
-                                html.Div(id="after-map", className="map"),
-                                dcc.Store(id="hexbin-data-store"),
-                                dcc.Store(id="shots-data-store"),
-                                dcc.Store(id="homicides-data-store"),
-                                dcc.Store(id="selected-hexbins-store", data={"selected_hexbins": [], "selected_ids": []}),
                                 html.Div(
-                                    id="date-display",
+                                    [
+                                        html.Div(id="after-map", className="map"),
+                                        dcc.Store(id="hexbin-data-store"),
+                                        dcc.Store(id="shots-data-store"),
+                                        dcc.Store(id="homicides-data-store"),
+                                        dcc.Store(id="selected-hexbins-store", data={"selected_hexbins": [], "selected_ids": []}),
+                                        html.Div(
+                                            id="date-display",
+                                            style={"display": "none"},
+                                        ),
+                                        html.Div(id="dummy-output", style={"display": "none"}),
+                                        html.Button(id="map-move-btn", style={"display": "none"}, **{"data-hexids": "", "data-ids": ""}),
+                                    ],
+                                    id="magnifier-container",
+                                    className="map-container",
                                     style={
-                                        "position": "absolute",
-                                        "bottom": "10px",
-                                        "width": "100%",
-                                        "textAlign": "center",
-                                        "fontWeight": "600",
+                                        # "width": f"{Config.HEXBIN_WIDTH+100}px",
+                                        # "height": f"{Config.HEXBIN_HEIGHT+100}px",
                                     },
                                 ),
-                                html.Div(id="dummy-output", style={"display": "none"}),
-                                html.Button(id="map-move-btn", style={"display": "none"}, **{"data-hexids": "", "data-ids": ""}),
+                                html.Div([html.Div(id="slider")], className="slider-container"),
+                                html.Div([html.Div(id="slider-shadow")], className="slider-container-shadow"),
                             ],
-                            id="magnifier-container",
-                            className="circle-container",
-                            style={
-                                "position": "relative",
-                                "width": f"{Config.HEXBIN_WIDTH+100}px",
-                                "height": f"{Config.HEXBIN_HEIGHT+100}px",
-                                "borderRadius": "50%",
-                                "overflow": "hidden",
-                                "background": "none",
-                                "pointerEvents": "none",
-                                "margin": "0 auto",
-                                "zIndex": 10,
-                            },
-                        )
+                            className="map-controls",
+                        ),
                     ],
                     id="map-section",
-                    style={
-                        "display": "flex",
-                        "justifyContent": "center",
-                        "alignItems": "center",
-                        "height": "80vh",
-                        "minHeight": "400px",
-                    },
+                    className="map-section-container",
                 ),
                 html.Div(
                     [
@@ -403,16 +389,7 @@ app.layout = html.Div(
                     id="chat-section-right",
                 ),
             ],
-            className="responsive-container",
-        ),
-        html.Div(
-            dcc.Slider(id="radial-slider", min=min_value, max=max_value, value=max_value, marks=generate_marks(), step=1, updatemode="drag", tooltip={"always_visible": False, "placement": "bottom"}),
-            style={
-                "width": "85%",
-                "margin": "20px auto 40px auto",
-                "padding": "0 20px",
-                "zIndex": 999,
-            },
+            id="responsive-container",
         ),
         html.Div(id="scroll-trigger", style={"display": "none"}),
         html.Div(id="hide-overlay-value", style={"display": "none"}),
@@ -421,12 +398,65 @@ app.layout = html.Div(
         dcc.Store(id="user-message-store-right"),
         dcc.Store(id="window-dimensions", data=json.dumps({"width": 1200, "height": 800})),
         dcc.Store(id="hexbin-position", data=json.dumps({"top": 115, "right": 35, "width": Config.HEXBIN_WIDTH, "height": Config.HEXBIN_HEIGHT})),
-        html.Div(id="window-resize-trigger", style={"display": "none"}),
+        dcc.Store(id="date-slider-value", data="December 2024"),
+        html.Div(id="slider-value-display", className="current-date", style={"display": "none"}),
+        dcc.Interval(id="initialization-interval", interval=100, max_intervals=1),
         html.Button(id="refresh-chat-btn", style={"display": "none"}),
     ],
     className="app-container",
 )
 
+# Initialize the slider when the page loads
+app.clientside_callback(
+    ClientsideFunction(namespace="clientside", function_name="initializeSlider"),
+    Output("slider", "children"),
+    Input("initialization-interval", "n_intervals"),
+)
+
+# Add the custom JavaScript to initialize the slider
+# app.clientside_callback(
+#     """
+#     function(n_clicks) {
+#         const container = document.getElementById('slider-container-div');
+#         if (!container) return;
+#
+#         container.innerHTML = `
+#             <svg width="600" height="600" id="slider-svg">
+#                 <!-- Background circle (inactive part) -->
+#                 <circle cx="300" cy="300" r="200" class="inactive-circle"></circle>
+#
+#                 <!-- Active arc (bottom third) -->
+#                 <path id="active-arc" class="active-arc"></path>
+#
+#                 <!-- Month ticks and year labels will be added dynamically -->
+#                 <g id="tick-marks"></g>
+#                 <g id="year-labels"></g>
+#
+#                 <!-- Slider handle -->
+#                 <circle id="handle" cx="300" cy="300" r="16" class="handle"></circle>
+#
+#                 <!-- Center point -->
+#                 <circle cx="300" cy="300" r="4" class="center-point"></circle>
+#
+#                 <!-- Date labels -->
+#                 <text id="start-label" class="date-label"></text>
+#                 <text x="300" y="550" text-anchor="middle" class="date-label"></text>
+#                 <text id="end-label" class="date-label"></text>
+#             </svg>
+#         `;
+#
+#         // Initialize the slider here or call your initCircularSlider function
+#         if (typeof initCircularSlider === 'function') {
+#             initCircularSlider();
+#         }
+#
+#         return '';
+#     }
+#     """,
+#     Output("slider-container-div", "children"),
+#     Input("init-slider-btn", "n_clicks"),
+#     prevent_initial_call=False,
+# )
 
 app.clientside_callback(
     """
@@ -487,16 +517,68 @@ app.clientside_callback(
     Input("map-move-btn", "n_clicks"),
 )
 
+# slider date callbacks
 
-@callback(Output("date-display", "children"), Input("radial-slider", "value"))
+
+# Display the value from the store
+@app.callback(Output("slider-value-display", "children"), Input("date-slider-value", "data"))
+def update_slider_display(date_value):
+    return date_value
+
+
+# You can use the slider value in other callbacks
+# @app.callback(
+#     Output('some-output-component', 'children'),  # Replace with your actual component
+#     Input('date-slider-value', 'data')
+# )
+# def use_slider_value(date_value):
+#     # Process the date value here
+#     return f"Selected date: {date_value}"
+
+
+# For using the value in other callbacks
+# @app.callback(
+#     Output("some-output-component", "children"),
+#     [
+#         Input("date-slider-value", "data"),
+#         Input("some-other-input", "value"),
+#     ],
+# )
+# def process_data(date_value, other_input):
+#     # Parse the date string if needed
+#     from datetime import datetime
+#
+#     try:
+#         # Convert from "Month Year" format to a datetime object
+#         date_obj = datetime.strptime(date_value, "%B %Y")
+#         # Do something with the date
+#         # ...
+#     except:
+#         # Handle parsing errors
+#         pass
+#
+#     return f"Processing data for {date_value}"
+
+
+@callback(
+    Output("date-display", "children"),
+    Input("date-slider-value", "data"),
+)
 def update_date_display(value):
-    year, month = slider_value_to_date(value)
+    year, month = date_string_to_year_month(value)
     return f"{year}-{month:02d}"
 
 
-@callback(Output("hexbin-data-store", "data"), Output("shots-data-store", "data"), Output("homicides-data-store", "data"), Input("radial-slider", "value"))
+@callback(
+    [
+        Output("hexbin-data-store", "data"),
+        Output("shots-data-store", "data"),
+        Output("homicides-data-store", "data"),
+    ],
+    Input("date-slider-value", "data"),
+)
 def update_map_data(slider_value):
-    year, month = slider_value_to_date(slider_value)
+    year, month = date_string_to_year_month(slider_value)
     selected_month = pd.Timestamp(f"{year}-{month:02d}")
     df_month = df_311[df_311["month"] == selected_month]
 
@@ -532,16 +614,34 @@ def update_map_data(slider_value):
     return hex_data, shots_data, homicides_data
 
 
-@callback(Output("loading-spinner", "style", allow_duplicate=True), Input("radial-slider", "value"), prevent_initial_call=True)
+@callback(
+    Output("loading-spinner", "style", allow_duplicate=True),
+    Input("date-slider-value", "data"),
+    prevent_initial_call=True,
+)
 def show_left_spinner_on_slider_change(slider_value):
     return {"display": "block"}
 
 
-@callback(Output("chat-messages", "children", allow_duplicate=True), Output("loading-spinner", "style", allow_duplicate=True), Input("user-message-store", "data"), Input("radial-slider", "value"), State("chat-messages", "children"), State("selected-hexbins-store", "data"), prevent_initial_call=True)
+@callback(
+    [
+        Output("chat-messages", "children", allow_duplicate=True),
+        Output("loading-spinner", "style", allow_duplicate=True),
+    ],
+    [
+        Input("user-message-store", "data"),
+        Input("date-slider-value", "data"),
+    ],
+    [
+        State("chat-messages", "children"),
+        State("selected-hexbins-store", "data"),
+    ],
+    prevent_initial_call=True,
+)
 def handle_chat_response(stored_input, slider_value, current_messages, selected_hexbins_data):
 
     current_messages = current_messages or []
-    year, month = slider_value_to_date(slider_value)
+    year, month = date_string_to_year_month(slider_value)
     selected_date = f"{year}-{month:02d}"
     prompt = f"Your neighbor has selected the date {selected_date} and wants to understand how the situation " f"in your neighborhood of Dorchester on {selected_date} compares to overall trends..."
     if selected_hexbins_data.get("selected_ids"):
@@ -585,7 +685,7 @@ def handle_chat_input_right(n_clicks, n_submit, input_value, msgs):
 
 @callback(
     Output("loading-spinner-right", "style", allow_duplicate=True),
-    Input("radial-slider", "value"),
+    Input("date-slider-value", "data"),
     prevent_initial_call=True,
 )
 def show_right_spinner_on_slider_change(slider_value):
@@ -594,14 +694,14 @@ def show_right_spinner_on_slider_change(slider_value):
 
 @callback(
     [Output("chat-messages-right", "children", allow_duplicate=True), Output("loading-spinner-right", "style", allow_duplicate=True)],
-    [Input("user-message-store-right", "data"), Input("radial-slider", "value")],
+    [Input("user-message-store-right", "data"), Input("date-slider-value", "data")],
     [State("chat-messages-right", "children"), State("selected-hexbins-store", "data")],
     prevent_initial_call=True,
 )
 def handle_chat_response_right(stored_input, slider_value, msgs, selected):
     msgs = msgs or []
 
-    year, month = slider_value_to_date(slider_value)
+    year, month = date_string_to_year_month(slider_value)
     selected_date = f"{year}-{month:02d}"
     if stored_input:
         question = stored_input
@@ -621,7 +721,7 @@ def handle_chat_response_right(stored_input, slider_value, msgs, selected):
     [
         Output("overlay", "style", allow_duplicate=True),
         Output("map-section", "className"),
-        Output("chat-section", "className"),
+        Output("chat-section-left", "className"),
         Output("chat-input", "autoFocus"),
         Output("tell-me-trigger", "children"),
         Output("hide-overlay-trigger", "max_intervals", allow_duplicate=True),
@@ -709,7 +809,7 @@ def handle_tell_me_prompt(prompt, current_messages):
 @callback(
     [Output("chat-messages", "children", allow_duplicate=True), Output("chat-messages-right", "children", allow_duplicate=True)],
     [Input("tell-me-btn", "n_clicks"), Input("selected-hexbins-store", "data")],
-    [State("radial-slider", "value")],
+    [State("date-slider-value", "data")],
     prevent_initial_call=True,
 )
 def handle_initial_prompts(n_clicks, selected, slider_value):
@@ -717,7 +817,7 @@ def handle_initial_prompts(n_clicks, selected, slider_value):
     if not n_clicks:
         raise PreventUpdate
 
-    year, month = slider_value_to_date(slider_value)
+    year, month = date_string_to_year_month(slider_value)
     selected_date = f"{year}-{month:02d}"
 
     area_context = ""
