@@ -116,7 +116,7 @@ def process_dataframe(df, location_columns=True, date_column=True):
 
         # Only after all conversions, filter once
         mask = (df["latitude"] > 40) & (df["latitude"] < 43) & (df["longitude"] > -72) & (df["longitude"] < -70)
-        df = df.loc[mask]
+        df = df.loc[mask].copy()
 
     if date_column:
         # Use .loc to avoid the warning while modifying
