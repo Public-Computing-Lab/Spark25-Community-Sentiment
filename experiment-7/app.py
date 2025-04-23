@@ -9,9 +9,6 @@ import dash
 from dash import html, dcc, Input, Output, State, callback, ClientsideFunction
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-
-# import plotly.express as px
-# import dash_daq as daq
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -224,28 +221,6 @@ app.index_string = f"""
 """
 
 
-# def generate_marks():
-#     marks = {}
-#     for year in range(2018, 2025):
-#         for month in range(1, 13):
-#             value = (year - 2018) * 12 + (month - 1)
-#             if month == 1:
-#                 marks[value] = {"label": f"{year}", "style": {"font-weight": "bold"}}
-#             else:
-#                 marks[value] = {"label": ""}
-#     return marks
-#
-#
-# def slider_value_to_date(value):
-#     iv = int(value)
-#     year = 2018 + (iv // 12)
-#     month = (iv % 12) + 1
-#     return year, month
-#
-#
-# min_value = 0
-
-
 def date_string_to_year_month(date_string):
     from datetime import datetime
 
@@ -413,51 +388,6 @@ app.clientside_callback(
     Input("initialization-interval", "n_intervals"),
 )
 
-# Add the custom JavaScript to initialize the slider
-# app.clientside_callback(
-#     """
-#     function(n_clicks) {
-#         const container = document.getElementById('slider-container-div');
-#         if (!container) return;
-#
-#         container.innerHTML = `
-#             <svg width="600" height="600" id="slider-svg">
-#                 <!-- Background circle (inactive part) -->
-#                 <circle cx="300" cy="300" r="200" class="inactive-circle"></circle>
-#
-#                 <!-- Active arc (bottom third) -->
-#                 <path id="active-arc" class="active-arc"></path>
-#
-#                 <!-- Month ticks and year labels will be added dynamically -->
-#                 <g id="tick-marks"></g>
-#                 <g id="year-labels"></g>
-#
-#                 <!-- Slider handle -->
-#                 <circle id="handle" cx="300" cy="300" r="16" class="handle"></circle>
-#
-#                 <!-- Center point -->
-#                 <circle cx="300" cy="300" r="4" class="center-point"></circle>
-#
-#                 <!-- Date labels -->
-#                 <text id="start-label" class="date-label"></text>
-#                 <text x="300" y="550" text-anchor="middle" class="date-label"></text>
-#                 <text id="end-label" class="date-label"></text>
-#             </svg>
-#         `;
-#
-#         // Initialize the slider here or call your initCircularSlider function
-#         if (typeof initCircularSlider === 'function') {
-#             initCircularSlider();
-#         }
-#
-#         return '';
-#     }
-#     """,
-#     Output("slider-container-div", "children"),
-#     Input("init-slider-btn", "n_clicks"),
-#     prevent_initial_call=False,
-# )
-
 app.clientside_callback(
     """
     function(hexData, shotsData, homData) {
@@ -524,40 +454,6 @@ app.clientside_callback(
 @app.callback(Output("slider-value-display", "children"), Input("date-slider-value", "data"))
 def update_slider_display(date_value):
     return date_value
-
-
-# You can use the slider value in other callbacks
-# @app.callback(
-#     Output('some-output-component', 'children'),  # Replace with your actual component
-#     Input('date-slider-value', 'data')
-# )
-# def use_slider_value(date_value):
-#     # Process the date value here
-#     return f"Selected date: {date_value}"
-
-
-# For using the value in other callbacks
-# @app.callback(
-#     Output("some-output-component", "children"),
-#     [
-#         Input("date-slider-value", "data"),
-#         Input("some-other-input", "value"),
-#     ],
-# )
-# def process_data(date_value, other_input):
-#     # Parse the date string if needed
-#     from datetime import datetime
-#
-#     try:
-#         # Convert from "Month Year" format to a datetime object
-#         date_obj = datetime.strptime(date_value, "%B %Y")
-#         # Do something with the date
-#         # ...
-#     except:
-#         # Handle parsing errors
-#         pass
-#
-#     return f"Processing data for {date_value}"
 
 
 @callback(
