@@ -461,6 +461,18 @@ app.layout = html.Div(
 )
 
 
+# Add the middleware to standardize headers
+@app.server.after_request
+def standardize_headers(response):
+    # Remove any existing Connection header
+    if "Connection" in response.headers:
+        del response.headers["Connection"]
+
+    # Set single consistent header
+    response.headers["Connection"] = "keep-alive"
+    return response
+
+
 # Clientside callback to track window dimensions
 app.clientside_callback(
     """
