@@ -102,16 +102,19 @@ def stream_to_dataframe(url: str) -> pd.DataFrame:
 
 
 def process_dataframe(df, location_columns=True, date_column=True):
-    """Common processing for dataframes with location and date data"""
-    df = df.copy()
     if location_columns:
-        df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
-        df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
-        df = df[(df["latitude"] > 40) & (df["latitude"] < 43) & (df["longitude"] > -72) & (df["longitude"] < -70)]
+        # Convert in-place
+        df.loc[:, "latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
+        df.loc[:, "longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
+
+        # Only after all conversions, filter once
+        mask = (df["latitude"] > 40) & (df["latitude"] < 43) & (df["longitude"] > -72) & (df["longitude"] < -70)
+        df = df.loc[mask].copy()
 
     if date_column:
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        df["month"] = df["date"].dt.to_period("M").dt.to_timestamp()
+        # Use .loc to avoid the warning while modifying
+        df.loc[:, "date"] = pd.to_datetime(df["date"], errors="coerce")
+        df.loc[:, "month"] = df["date"].dt.to_period("M").dt.to_timestamp()
 
     return df
 
