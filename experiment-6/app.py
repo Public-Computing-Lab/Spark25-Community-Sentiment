@@ -21,9 +21,10 @@ class Config:
     HOST = os.getenv("EXPERIMENT_6_HOST", "127.0.0.1")
     PORT = os.getenv("EXPERIMENT_6_PORT", "8060")
     DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_6_DASH_REQUESTS_PATHNAME")
-    APP_VERSION = os.getenv("EXPERIMENT_6_VERSION", "0.6")  # Fixed typo
+    APP_VERSION = os.getenv("EXPERIMENT_6_VERSION", "0.6.2")  # Fixed typo
     CACHE_DIR = os.getenv("EXPERIMENT_6_CACHE_DIR", "./cache")
     API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8888")
+    RETHINKAI_API_KEY = os.getenv("RETHINKAI_API_CLIENT_KEY")
     MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
     # MAP_CENTER = dict(lon=-71.07, lat=42.297)
     MAP_CENTER = dict(lon=-71.07601, lat=42.28988)
@@ -43,7 +44,10 @@ def cache_stale(path, max_age_minutes=30):
 
 def stream_to_dataframe(url: str) -> pd.DataFrame:
     """Stream JSON data from API and convert to DataFrame"""
-    with requests.get(url, stream=True) as response:
+    headers = {
+        "RethinkAI-API-Key": Config.RETHINKAI_API_KEY,
+    }
+    with requests.get(url, headers=headers, stream=True) as response:
         if response.status_code != 200:
             raise Exception(f"Error: {response.status_code} - {response.text}")
 
@@ -105,15 +109,19 @@ def stream_to_dataframe(url: str) -> pd.DataFrame:
 
 
 def process_dataframe(df, location_columns=True, date_column=True):
-    """Common processing for dataframes with location and date data"""
     if location_columns:
-        df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
-        df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
-        df = df[(df["latitude"] > 40) & (df["latitude"] < 43) & (df["longitude"] > -72) & (df["longitude"] < -70)]
+        # Convert in-place
+        df.loc[:, "latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
+        df.loc[:, "longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
+
+        # Only after all conversions, filter once
+        mask = (df["latitude"] > 40) & (df["latitude"] < 43) & (df["longitude"] > -72) & (df["longitude"] < -70)
+        df = df.loc[mask].copy()
 
     if date_column:
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        df["month"] = df["date"].dt.to_period("M").dt.to_timestamp()
+        # Use .loc to avoid the warning while modifying
+        df.loc[:, "date"] = pd.to_datetime(df["date"], errors="coerce")
+        df.loc[:, "month"] = df["date"].dt.to_period("M").dt.to_timestamp()
 
     return df
 
@@ -228,7 +236,11 @@ max_value = (2024 - 2018) * 12 + 11  # Dec 2024
 def get_chat_response(prompt):
     """Get chat response from API"""
     try:
-        response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_6&app_version={Config.APP_VERSION}", headers={"Content-Type": "application/json"}, json={"client_query": prompt})
+        headers = {
+            "RethinkAI-API-Key": Config.RETHINKAI_API_KEY,
+            "Content-Type": "application/json",
+        }
+        response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_6&app_version={Config.APP_VERSION}", headers=headers, json={"client_query": prompt})
         response.raise_for_status()
         reply = response.json().get("response", "[No reply received]")
     except Exception as e:
@@ -409,7 +421,10 @@ app.layout = html.Div(
                                 dcc.Graph(id="hexbin-map", figure={}, style={"height": "100%", "width": "100%"}),
                                 dcc.Store(id="hex-to-ids-store", data={}),
                                 # Test element - can be removed in production
-                                html.Div(id="click-info", style={"position": "absolute", "top": "10px", "right": "10px", "backgroundColor": "white", "padding": "10px", "borderRadius": "5px", "boxShadow": "0 0 10px rgba(0,0,0,0.1)", "zIndex": 1000, "maxHeight": "300px", "overflowY": "auto", "display": "none"}),
+                                html.Div(
+                                    id="click-info",
+                                    style={"position": "absolute", "top": "10px", "right": "10px", "backgroundColor": "white", "padding": "10px", "borderRadius": "5px", "boxShadow": "0 0 10px rgba(0,0,0,0.1)", "zIndex": 1000, "maxHeight": "300px", "overflowY": "auto", "display": "none"},
+                                ),
                             ],
                             id="map-container",
                             className="map-div",
@@ -742,7 +757,7 @@ def update_background_map(relayoutData, hexbin_position_json, window_dimensions_
 )
 def handle_hexbin_click(click_data, hex_to_ids, current_style, selected_hexbins_data, current_figure):
     if not click_data:
-        return "Click on a hexagon to see data points", current_style, selected_hexbins_data, current_figure
+        return selected_hexbins_data, current_figure
 
     try:
         # Extract the hexagon ID from the click data
@@ -752,6 +767,9 @@ def handle_hexbin_click(click_data, hex_to_ids, current_style, selected_hexbins_
         # Get current selection state
         current_selected = selected_hexbins_data.get("selected_hexbins", [])
         current_selected_ids = selected_hexbins_data.get("selected_ids", [])
+
+        # Filter out any null hexbins from the current selection
+        current_selected = [h for h in current_selected if h is not None]
 
         # Toggle selection state for the clicked hexbin
         if hex_id in current_selected:
@@ -782,7 +800,6 @@ def handle_hexbin_click(click_data, hex_to_ids, current_style, selected_hexbins_
 
                 # Get geojson features and match with hexbin IDs
                 features = trace.get("geojson", {}).get("features", [])
-
                 for feature in features:
                     hex_feature_id = feature.get("properties", {}).get("hex_id")
                     if hex_feature_id in current_selected:
@@ -798,7 +815,8 @@ def handle_hexbin_click(click_data, hex_to_ids, current_style, selected_hexbins_
         return updated_hexbins_data, new_figure
 
     except Exception as e:
-        return f"Error processing click data: {str(e)}", current_style, selected_hexbins_data, current_figure
+        print(f"Error processing click data: {str(e)}")
+        return selected_hexbins_data, current_figure
 
 
 # Callback chain for chat functionality - Part 1: Handle user input and show loading

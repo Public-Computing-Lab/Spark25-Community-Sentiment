@@ -8,14 +8,15 @@ This project is a **Flask-based REST-ish API** supporting the RethinkAI experime
 ---
 #### **GET crime and 311 data as geoJson objects***
 ```
-GET /data/query?request=<request_type>&category=<311_category>&date=%Y-%m&zipcode=<zipcode>&stream&app_version=<0.0>=<True/False>
+GET /data/query?request=<request_type>&category=<311_category>&date=%Y-%m&zipcode=<zipcode>&app_version=<0.0>&output_type=<type>
 ```
 ##### Query arguments:
 ```app_version=<n.n>```    
 ```category={living_conditions | trash | streets | parking | all}```  
 ```date=%Y-%m``` is date in format 2020-04  
-```stream=<True/False>``` toggles streamed data on query, important for queries that return large sets  
-```request=<request_type>``` is one of:  311_by_geo, 311_summary, 311_summary 
+```stream={True | False}``` toggles streamed data on query. DEPRECATED  
+```output_type=<csv | json | stream}``` sets how data is returned, defaults to json  
+```request=<311_by_geo | 311_summary | 311_summary | 911_shots_fired | 911_homicides_and_shots_fired>``` set data to get   
 
 **Required**:
 Set 'category=\<category_name\>' 
@@ -298,8 +299,11 @@ nano .env
 
 ```sh
 GEMINI_API_KEY=<google_gemini_api_key>
-GEMINI_MODEL=<models/gemini-1.5-pro-{revision}>
-API_PORT=<port>
+GEMINI_MODEL=<models/gemini-1.5-pro-{revision}>  
+API_PORT=<port>  
+#client apps will need to have a matching api key  
+#supports a list of keys  
+RETHINKAI_API_KEYS=<key,key,key>  
 
 # Database config
 DB_HOST=<hostname>

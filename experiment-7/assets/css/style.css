@@ -1,0 +1,417 @@
+:root {
+  /* Colors */
+  --button-color: rgba(105, 135, 196, 1);
+  --button-hover: rgba(67, 82, 112, 1);
+  --button-active: rgba(168, 192, 240, 1);
+  --highlight: rgba(112, 39, 69, 0.4);
+  --chat-user: rgba(53, 59, 70, 1);
+  --chat-bot: rgba(229, 232, 237, 1);
+  --background-base: rgba(248, 248, 248, 1);
+  --title: rgba(18, 46, 111, 1);
+  --text-color: rgba(35, 46, 51, 1);
+  --chat-user-message: rgba(119, 118, 118, 0.6);
+  --chat-bot-message: rgba(241, 241, 241, .6);
+
+  --shadow-light: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-medium: 0 0 15px rgba(70, 11, 38, 0.2);
+  --shadow-inner: 0 0 15px inset rgba(70, 11, 38, 0.2);
+  --shadow-inner-dark: 0 0 30px inset rgba(70, 11, 38, 0.4);
+
+  --border-radius-small: 4px;
+  --border-radius-medium: 8px;
+  --border-radius-circle: 50%;
+
+  --spacing-small: 10px;
+  --spacing-medium: 15px;
+  --spacing-large: 20px;
+}
+
+/* ===============================
+   Base Styles
+   =============================== */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background-color: var(--background-base);
+  font-family: Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+/* ===============================
+   Overlay & Welcome Screen
+   =============================== */
+#overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: url("../images/boston-map.png") center/cover no-repeat;
+  background-color: rgba(255, 255, 255, 0.4);
+  background-blend-mode: lighten;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay-content {
+  z-index: 1001;
+  text-align: center;
+  max-width: 60%;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: var(--border-radius-medium);
+}
+
+.overlay-buttons {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-large);
+  flex-wrap: wrap;
+}
+
+.overlay-btn {
+  padding: 15px 30px;
+  font-size: 1.2rem;
+  border: none;
+  border-radius: var(--border-radius-medium);
+  background-color: var(--button-color);
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-light);
+}
+
+.overlay-btn:hover {
+  background-color: var(--button-hover);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+.overlay-btn:active {
+  background-color: var(--button-active);
+  transform: translateY(0);
+}
+
+/* ===============================
+ Header Style
+ =============================== */
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 50;
+  /* Higher than the responsive-container z-index */
+  background-color: rgba(255, 255, 255, 0.8);
+  /* Semi-transparent background */
+  padding: 10px 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* ===============================
+   Map Elements
+   =============================== */
+#background-container {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+#before-map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#after-map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  margin-top: calc(-100vh / 2 + 300px);
+  margin-left: calc(-100vw / 2 + 300px);
+  background: transparent !important;
+}
+
+#after-map .mapboxgl-viewport,
+#after-map canvas.mapboxgl-canvas {
+  background: transparent !important;
+}
+
+/* ===============================
+   Layout & Responsive Containers
+   =============================== */
+#responsive-container {
+  display: flex;
+  margin: 90px auto;
+  flex-direction: column;
+  gap: var(--spacing-large);
+  padding: 0 var(--spacing-large);
+  align-items: center;
+  justify-content: center;
+  max-width: 1500px;
+  z-index: 2;
+}
+
+#chat-section-left,
+#chat-section-right {
+  min-height: 200px;
+  max-height: 600px;
+}
+
+#map-section {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+@media screen and (min-width: 768px) {
+  #responsive-container {
+    margin: 0 auto;
+    flex-direction: row;
+    height: 100vh;
+  }
+
+  #chat-section-right,
+  #chat-section-left {
+    width: 30%;
+    height: 80vh;
+    overflow-y: auto;
+    flex-direction: column;
+  }
+
+  #map-section {
+    width: 50%;
+    height: 80vh;
+  }
+}
+
+/* ===============================
+   Chat Interface
+   =============================== */
+.chat-main-container {
+  position: relative;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 0 0 15px;
+  height: 40vh;
+  width: 100%;
+  border-radius: var(--border-radius-medium);
+  border: 1px solid var(--highlight);
+  box-shadow: var(--shadow-inner);
+}
+
+.chat-messages-wrapper {
+  height: calc(100% - 50px);
+  overflow-y: scroll;
+}
+
+.chat-messages-wrapper .chat-messages {
+  padding-bottom: 1rem;
+}
+
+.chat-messages .user-message {
+  background-color: var(--chat-user-message);
+  border-radius: var(--border-radius-small);
+  padding: 0.5rem 0.75rem;
+  margin: 0.75rem;
+  font-weight: 600;
+}
+
+.chat-messages .bot-message {
+  background-color: var(--chat-bot-message);
+  border-radius: var(--border-radius-small);
+  padding: 0.5rem 0.75rem;
+  margin: 0.75rem;
+  width: 94%;
+}
+
+#chat-section-left .chat-input-container {
+  display: none !important;
+}
+
+#chat-section-right .chat-input-container {
+  display: flex;
+  gap: var(--spacing-small);
+}
+
+.chat-input-container {
+  border-top: 1px dotted var(--highlight);
+  padding: var(--spacing-small);
+}
+
+.chat-input {
+  flex-grow: 1;
+  padding: var(--spacing-small);
+  border: 1px solid var(--highlight);
+  border-radius: var(--border-radius-small);
+}
+
+.send-btn {
+  padding: var(--spacing-small) var(--spacing-medium);
+  background-color: var(--button-color);
+  color: white;
+  border: 1px solid var(--button-active);
+  border-radius: var(--border-radius-small);
+  cursor: pointer;
+}
+
+.send-btn:hover {
+  border: 1px solid var(--button-active);
+  background-color: var(--button-hover);
+}
+
+.send-btn:active {
+  border-color: var(--button-color);
+  background-color: var(--button-active);
+}
+
+/* ===============================
+   Map Controls
+   =============================== */
+.map-controls {
+  position: relative;
+  width: 100%;
+  height: 0;
+  padding-bottom: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  min-width: 300px;
+  min-height: 300px;
+  pointer-events: none;
+  border-radius: 50% 50% 5% 50%;
+  background: var(--background-base);
+  box-shadow: 0 0 10px rgba(70, 11, 38, 0.4);
+}
+
+.map-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100% - 40px);
+  height: calc(100% - 40px);
+  min-width: 280px;
+  min-height: 280px;
+  max-width: 500px;
+  max-height: 500px;
+  border-radius: var(--border-radius-circle);
+  overflow: hidden;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.slider-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  max-width: 550px;
+  max-height: 550px;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.slider-container-shadow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 88%;
+  height: 88%;
+  max-width: 550px;
+  max-height: 550px;
+  border-radius: var(--border-radius-circle);
+  z-index: 14;
+  pointer-events: none;
+  box-shadow: var(--shadow-inner-dark);
+}
+
+.slider-container .handle,
+.slider-container .active-arc {
+  pointer-events: auto !important;
+}
+
+/* ===============================
+   Slider Elements
+   =============================== */
+
+
+#slider {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+#slider-svg {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  viewBox: 0 0 600 600;
+  preserveAspectRatio: xMidYMid meet;
+}
+
+#start-label,
+#end-label {
+  display: none;
+}
+
+.current-date {
+  color: #777;
+  position: absolute;
+  bottom: var(--spacing-small);
+  right: var(--spacing-small);
+}
+
+.inactive-circle {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 20;
+}
+
+.active-arc {
+  fill: none;
+  stroke: var(--button-active);
+  stroke-width: 15;
+  stroke-linecap: round;
+}
+
+.handle {
+  fill: var(--button-color);
+  stroke: var(--button-active);
+  stroke-width: 3;
+  cursor: pointer;
+}
+
+.center-point {
+  fill: none;
+}
+
+.tick-mark {
+  stroke: var(--chat-bot);
+  stroke-width: 2;
+}
+
+.tick-mark-january {
+  stroke: var(--chat-user);
+  stroke-width: 3;
+}
+
+.year-label {
+  font-size: calc(1vmin + 10px);
+  font-weight: 500;
+  text-anchor: middle;
+  fill: #475569;
+}
