@@ -10,7 +10,7 @@
   --title: rgba(18, 46, 111, 1);
   --text-color: rgba(35, 46, 51, 1);
   --chat-user-message: rgba(119, 118, 118, 0.6);
-  --chat-bot-message: rgba(241, 241, 241, .6);
+  --chat-bot-message: rgba(241, 241, 241, 0.6);
 
   --shadow-light: 0 4px 6px rgba(0, 0, 0, 0.1);
   --shadow-medium: 0 0 15px rgba(70, 11, 38, 0.2);
@@ -105,9 +105,7 @@ body {
   left: 0;
   width: 100%;
   z-index: 50;
-  /* Higher than the responsive-container z-index */
   background-color: rgba(255, 255, 255, 0.8);
-  /* Semi-transparent background */
   padding: 10px 20px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
@@ -180,7 +178,12 @@ body {
     height: 100vh;
   }
 
-  #chat-section-right,
+  #chat-section-right {
+    width: 30%;
+    height: 80vh;
+    flex-direction: column;
+  }
+
   #chat-section-left {
     width: 30%;
     height: 80vh;
@@ -346,7 +349,6 @@ body {
    Slider Elements
    =============================== */
 
-
 #slider {
   width: 100%;
   height: 100%;
@@ -359,8 +361,8 @@ body {
   position: absolute;
   top: 0;
   left: 0;
-  viewBox: 0 0 600 600;
-  preserveAspectRatio: xMidYMid meet;
+  viewbox: 0 0 600 600;
+  preserveaspectratio: xMidYMid meet;
 }
 
 #start-label,
