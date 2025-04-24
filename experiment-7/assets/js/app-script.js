@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  
+
   window.updateMapWithDate = function(dateString) {
     console.log(" Direct update attempt for date:", dateString);
     const updateBtn = document.getElementById('update-date-btn');
@@ -20,15 +20,16 @@
       mapbox: {
         token: window.MAPBOX_TOKEN,
         initialCenter: [-71.07601, 42.28988],
-        initialZoom: 13
+        backgroundInitialZoom: 12,
+        magnifiedInitialZoom: 13
       },
       slider: {
         center: { x: 300, y: 300 },
         radius: 270,
         startAngle: 135,
         endAngle: 225,
-        startDate: new Date(2018, 0), 
-        endDate: new Date(2024, 11) 
+        startDate: new Date(2018, 0),
+        endDate: new Date(2024, 11)
       },
       debounceTime: 3000,
       refreshChatDelay: 500
@@ -71,7 +72,7 @@
           container: 'before-map',
           style: 'mapbox://styles/mapbox/light-v11',
           center: config.initialCenter,
-          zoom: config.initialZoom,
+          zoom: config.backgroundInitialZoom,
           interactive: true,
         });
         App.state.maps.before = beforeMap;
@@ -81,22 +82,22 @@
           container: 'after-map',
           style: 'mapbox://styles/mapbox/streets-v12',
           center: config.initialCenter,
-          zoom: config.initialZoom,
+          zoom: config.magnifiedInitialZoom,
           interactive: false
         });
         App.state.maps.after = afterMap;
         window.afterMap = afterMap;
         afterMap.on('style.load', () => {
-        console.log(' afterMap style fully loaded');
-        this.setupDataLayers(afterMap);
-        const hexStore = document.getElementById('hexbin-data-store');
-        const shotsStore = document.getElementById('shots-data-store');
-        const homStore = document.getElementById('homicides-data-store');
-        if (hexStore && hexStore._dashprivate_store) {
-          const hexData = hexStore._dashprivate_store.data;
-          const shotsData = shotsStore._dashprivate_store.data;
-          const homData = homStore._dashprivate_store.data;
-          if (hexData || shotsData || homData) {
+          console.log(' afterMap style fully loaded');
+          this.setupDataLayers(afterMap);
+          const hexStore = document.getElementById('hexbin-data-store');
+          const shotsStore = document.getElementById('shots-data-store');
+          const homStore = document.getElementById('homicides-data-store');
+          if (hexStore && hexStore._dashprivate_store) {
+            const hexData = hexStore._dashprivate_store.data;
+            const shotsData = shotsStore._dashprivate_store.data;
+            const homData = homStore._dashprivate_store.data;
+            if (hexData || shotsData || homData) {
               App.MapModule.updateMapData(hexData, shotsData, homData);
               console.log('♻️ Initial map data applied');
             }
@@ -115,7 +116,7 @@
         beforeMap.on('move', () => {
           afterMap.jumpTo({
             center: beforeMap.getCenter(),
-            zoom: beforeMap.getZoom(),
+            zoom: beforeMap.getZoom() + 1,
             bearing: beforeMap.getBearing(),
             pitch: beforeMap.getPitch()
           });
@@ -132,7 +133,8 @@
             source: 'hexDataBackground',
             paint: {
               'fill-color': [
-                'interpolate', ['linear'], ['get', 'value'],
+                'interpolate', ['linear'],
+                ['get', 'value'],
                 0, 'rgba(0,0,0,0)',
                 1, '#eeeeee', 5, '#cccccc', 10, '#999999', 20, '#666666'
               ],
@@ -165,8 +167,9 @@
           paint: {
             'fill-color': [
               'case',
-              ['==', ['get', 'value'], null], '#cccccc', 
-              ['interpolate', ['linear'], ['get', 'value'],
+              ['==', ['get', 'value'], null], '#cccccc',
+              ['interpolate', ['linear'],
+                ['get', 'value'],
                 0, 'rgba(0,0,0,0)',
                 1, '#fdebcf',
                 5, '#f08e3e',
@@ -177,7 +180,7 @@
             'fill-opacity': 0.8,
             'fill-outline-color': 'rgba(255,255,255,0.6)'
           }
-          
+
         });
 
         map.addSource('shotsData', {
@@ -221,7 +224,7 @@
 
         App.state.maps.moveTimeout = setTimeout(() => {
           const center = beforeMap.getCenter();
-          const zoom = beforeMap.getZoom();
+          const zoom = beforeMap.getZoom() + 1;
           const features = afterMap.queryRenderedFeatures({ layers: ['hexLayer'] });
           const baseRad = 0.015 * Math.pow(2, 13 - zoom);
           const hexIDs = [];
@@ -441,7 +444,7 @@
           document.addEventListener('touchmove', handleDragMove, { passive: false });
           document.addEventListener('touchend', handleDragEnd);
         };
-      
+
         const handleDragMove = (event) => {
           if (!App.state.slider.isDragging &&
             event.type !== 'mousedown' &&
@@ -449,7 +452,7 @@
           event.preventDefault();
           this.handleDragMove(event);
         };
-      
+
         const handleDragEnd = () => {
           App.state.slider.isDragging = false;
           document.removeEventListener('mousemove', handleDragMove);
@@ -457,7 +460,7 @@
           document.removeEventListener('touchmove', handleDragMove);
           document.removeEventListener('touchend', handleDragEnd);
         };
-      
+
         elements.svg.addEventListener('mousedown', handleDragStart);
         elements.svg.addEventListener('touchstart', handleDragStart, { passive: false });
         const handleDateChange = () => {
@@ -470,7 +473,7 @@
             refreshBtn.click();
           }
         };
-        
+
         elements.handle.addEventListener('mouseup', handleDateChange);
         document.addEventListener('touchend', function(e) {
           if (App.state.slider.isDragging) {
@@ -496,7 +499,7 @@
         const { elements } = this;
         const config = App.config.slider;
         const state = App.state.slider;
-        const { center, startAngle, endAngle } = config; 
+        const { center, startAngle, endAngle } = config;
         const coords = this.utils.screenToSVGCoordinates(event, elements.svg);
         const dx = coords.x - center.x;
         const dy = coords.y - center.y;
@@ -513,7 +516,7 @@
           );
           angle = distToStart < distToEnd ? startAngle : endAngle;
         }
-      
+
         state.currentAngle = angle;
         state.currentDate = this.utils.angleToDate(angle);
 
@@ -544,7 +547,7 @@
           '#date-slider-value',
           '[id="date-slider-value"]'
         ];
-        
+
         let storeElement = null;
         for (const selector of selectors) {
           const element = document.querySelector(selector);
@@ -553,20 +556,20 @@
             break;
           }
         }
-        
+
         if (!storeElement) {
           console.warn("Could not find date-slider-value, will retry later");
           setTimeout(() => this.updateDateStore(dateValue), 500);
           return;
         }
-        
+
         storeElement.textContent = dateValue;
         const event = new CustomEvent("set-data", {
           detail: { data: dateValue }
         });
         storeElement.dispatchEvent(event);
         if (storeElement._dashprivate_setProps) {
-          storeElement._dashprivate_setProps({data: dateValue});
+          storeElement._dashprivate_setProps({ data: dateValue });
         }
 
         const updateBtn = document.getElementById('update-date-btn');
@@ -574,10 +577,10 @@
           updateBtn.setAttribute('data-date', dateValue);
           updateBtn.click();
         }
-        
+
         console.log(" Triggered Dash Store update for:", dateValue);
       },
-       
+
       /**
        * Utility functions for the slider
        */
@@ -695,7 +698,7 @@
 
           const clientX = event.clientX || (event.touches && event.touches[0].clientX);
           const clientY = event.clientY || (event.touches && event.touches[0].clientY);
-          const scaleFactor = svgRect.width / 600; 
+          const scaleFactor = svgRect.width / 600;
           return {
             x: (clientX - svgRect.left) / scaleFactor,
             y: (clientY - svgRect.top) / scaleFactor
@@ -725,23 +728,23 @@
      */
     updateMapData: function(hexData, shotsData, homData) {
       console.log("Map update triggered with features:",
-          hexData ? (hexData.features ? hexData.features.length : 0) : "no data"
+        hexData ? (hexData.features ? hexData.features.length : 0) : "no data"
       );
-    
+
       function tryUpdateMap(attempts = 0) {
         if (attempts >= 5) {
           console.error("Failed to update map after multiple attempts");
           return;
         }
-    
+
         const map = window.afterMap;
         if (!map || !map.isStyleLoaded()) {
           console.warn("afterMap or style not ready, retrying...");
           setTimeout(() => tryUpdateMap(attempts + 1), 500);
           return;
         }
-        
-        console.log("Has hex layer?", map.getLayer("hexLayer"));  
+
+        console.log("Has hex layer?", map.getLayer("hexLayer"));
 
         const ensureSource = (id) => {
           const source = map.getSource(id);
@@ -754,17 +757,17 @@
           }
           return source;
         };
-    
+
         const hexSource = ensureSource("hexData");
         const shotsSource = ensureSource("shotsData");
         const homSource = ensureSource("homicidesData");
-    
+
         if (!hexSource || !shotsSource || !homSource) {
           console.warn("Sources still missing, retrying...");
           setTimeout(() => tryUpdateMap(attempts + 1), 500);
           return;
         }
-    
+
         try {
           if (hexData) {
             console.log("HexData[0]:", JSON.stringify(hexData.features[0], null, 2));
@@ -780,7 +783,7 @@
             homSource.setData(homData);
             console.log("Updated homicides data");
           }
-    
+
           if (window.beforeMap && window.beforeMap.isStyleLoaded()) {
             const bgSource = window.beforeMap.getSource("hexDataBackground");
             if (bgSource && hexData) {
@@ -793,15 +796,15 @@
           setTimeout(() => tryUpdateMap(attempts + 1), 500);
         }
       }
-    
+
       tryUpdateMap();
       return '';
     }
-    
+
   };
 
-  App.SliderModule.init         = App.SliderModule.init.bind(App.SliderModule);
-  App.SliderModule.setupSlider  = App.SliderModule.setupSlider.bind(App.SliderModule);
+  App.SliderModule.init = App.SliderModule.init.bind(App.SliderModule);
+  App.SliderModule.setupSlider = App.SliderModule.setupSlider.bind(App.SliderModule);
   App.SliderModule.drawSliderUI = App.SliderModule.drawSliderUI.bind(App.SliderModule);
   App.SliderModule.handleDragMove = App.SliderModule.handleDragMove.bind(App.SliderModule);
   App.init();
