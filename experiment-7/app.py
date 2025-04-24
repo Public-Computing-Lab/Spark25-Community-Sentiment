@@ -17,7 +17,8 @@ load_dotenv()
 
 class Config:
     APP_VERSION = "0.7.0"
-    CACHE_DIR = os.getenv("EXPERIMENT_6_CACHE_DIR", "./cache")
+    CACHE_DIR = os.getenv("EXPERIMENT_7_CACHE_DIR", "./cache")
+    DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_7_DASH_REQUESTS_PATHNAME")
     API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8888")
     MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
     RETHINKAI_API_KEY = os.getenv("RETHINKAI_API_CLIENT_KEY")
@@ -163,55 +164,51 @@ def get_shots_fired_data(force_refresh=False):
         df_matched = pd.read_parquet(cache_path_matched)
         return df, df_matched
 
+    # def get_311_data(force_refresh=False):
+    #     """
+    #     Always load 311 DataFrame from cache.
+    #     Returns the same pd.DataFrame your old version did.
+    #     """
+    #     cache_path = os.path.join(Config.CACHE_DIR, "df_311.parquet")
+    #     if not os.path.exists(cache_path):
+    #         raise FileNotFoundError(f"311 cache missing: {cache_path}")
+    #     df = pd.read_parquet(cache_path)
+    #     return df
 
-# def get_311_data(force_refresh=False):
-#     """
-#     Always load 311 DataFrame from cache.
-#     Returns the same pd.DataFrame your old version did.
-#     """
-#     cache_path = os.path.join(Config.CACHE_DIR, "df_311.parquet")
-#     if not os.path.exists(cache_path):
-#         raise FileNotFoundError(f"311 cache missing: {cache_path}")
-#     df = pd.read_parquet(cache_path)
-#     return df
+    # def get_shots_fired_data(force_refresh=False):
+    #     """
+    #     Always load shots-fired and matched-homicides DataFrames from cache.
+    #     Returns (df_shots, df_hom_shot_matched) just like before.
+    #     """
+    #     cache_shots   = os.path.join(Config.CACHE_DIR, "df_shots.parquet")
+    #     cache_matched = os.path.join(Config.CACHE_DIR, "df_hom_shot_matched.parquet")
 
+    #     missing = [p for p in (cache_shots, cache_matched) if not os.path.exists(p)]
+    #     if missing:
+    #         raise FileNotFoundError(f"Shots cache missing: {missing}")
 
-# def get_shots_fired_data(force_refresh=False):
-#     """
-#     Always load shots-fired and matched-homicides DataFrames from cache.
-#     Returns (df_shots, df_hom_shot_matched) just like before.
-#     """
-#     cache_shots   = os.path.join(Config.CACHE_DIR, "df_shots.parquet")
-#     cache_matched = os.path.join(Config.CACHE_DIR, "df_hom_shot_matched.parquet")
+    #     df_shots           = pd.read_parquet(cache_shots)
+    #     df_hom_shot_matched = pd.read_parquet(cache_matched)
+    #     return df_shots, df_hom_shot_matched
 
-#     missing = [p for p in (cache_shots, cache_matched) if not os.path.exists(p)]
-#     if missing:
-#         raise FileNotFoundError(f"Shots cache missing: {missing}")
+    # def get_select_311_data(event_ids="", event_date=""):
+    #     """
+    #     Load full 311 cache, filter exactly as the summary endpoints did,
+    #     then return a CSV string.  Matches your old `reply = ...to_csv(...)`.
+    #     """
+    #     df = get_311_data()
 
-#     df_shots           = pd.read_parquet(cache_shots)
-#     df_hom_shot_matched = pd.read_parquet(cache_matched)
-#     return df_shots, df_hom_shot_matched
+    #     if event_ids:
+    #         ids = set(str(i) for i in event_ids.split(",") if i)
+    #         df = df[df["id"].astype(str).isin(ids)]
 
+    #     elif event_date:
+    #         year, month = map(int, event_date.split("-"))
+    #         ts = pd.Timestamp(year=year, month=month, day=1)
+    #         df = df[df["date"].dt.to_period("M").dt.to_timestamp() == ts]
 
-# def get_select_311_data(event_ids="", event_date=""):
-#     """
-#     Load full 311 cache, filter exactly as the summary endpoints did,
-#     then return a CSV string.  Matches your old `reply = ...to_csv(...)`.
-#     """
-#     df = get_311_data()
-
-#     if event_ids:
-#         ids = set(str(i) for i in event_ids.split(",") if i)
-#         df = df[df["id"].astype(str).isin(ids)]
-
-#     elif event_date:
-#         year, month = map(int, event_date.split("-"))
-#         ts = pd.Timestamp(year=year, month=month, day=1)
-#         df = df[df["date"].dt.to_period("M").dt.to_timestamp() == ts]
-
-#     reply = df.to_csv(index=False)
-#     return reply
-
+    #     reply = df.to_csv(index=False)
+    #     return reply
 
     # Load shots fired data
     print("[LOAD] Fetching shots fired data from API...")
@@ -244,10 +241,13 @@ max_value = (latest.year - 2018) * 12 + (latest.month - 1)
 
 app = dash.Dash(
     __name__,
+    suppress_callback_exceptions=True,
+    serve_locally=False,
+    requests_pathname_prefix=Config.DASH_REQUESTS_PATHNAME,
     external_stylesheets=[dbc.themes.BOOTSTRAP, "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"],
     external_scripts=["https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"],
+    meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
 )
-
 
 app.index_string = f"""
 <!DOCTYPE html>
@@ -344,11 +344,7 @@ app.layout = html.Div(
                                     id="loading-spinner",
                                     type="circle",
                                     color="#701238",
-                                    style={
-                                        "position":       "static",   
-                                        "background":     "transparent", 
-                                        "pointerEvents":  "none"      
-                                    },
+                                    style={"position": "static", "background": "transparent", "pointerEvents": "none"},
                                     children=html.Div(id="chat-messages", className="chat-messages"),
                                 ),
                                 html.Div(id="loading-output", style={"display": "none"}),
@@ -408,11 +404,7 @@ app.layout = html.Div(
                                     id="loading-spinner-right",
                                     type="circle",
                                     color="#701238",
-                                    style={
-                                        "position":       "static",   
-                                        "background":     "transparent", 
-                                        "pointerEvents":  "none"      
-                                    },
+                                    style={"position": "static", "background": "transparent", "pointerEvents": "none"},
                                     children=html.Div(id="chat-messages-right", className="chat-messages"),
                                 )
                             ],
@@ -442,12 +434,7 @@ app.layout = html.Div(
         html.Div(id="slider-value-display", className="current-date", style={"display": "none"}),
         dcc.Interval(id="initialization-interval", interval=100, max_intervals=1),
         html.Button(id="refresh-chat-btn", style={"display": "none"}),
-        html.Button(
-            id="update-date-btn", 
-            style={"display": "none"}, 
-            **{"data-date": "December 2024"},
-            n_clicks=0  
-        ),
+        html.Button(id="update-date-btn", style={"display": "none"}, **{"data-date": "December 2024"}, n_clicks=0),
     ],
     className="app-container",
 )
@@ -484,7 +471,7 @@ app.clientside_callback(
     """,
     Output("current-date-store", "data"),
     Input("update-date-btn", "n_clicks"),
-    prevent_initial_call=True
+    prevent_initial_call=True,
 )
 
 
@@ -568,14 +555,10 @@ def update_map_data(date_value):
 
     shots_features = []
     for _, row in shots_month.iterrows():
-        shots_features.append({"type": "Feature", "id": str(row["id"]) if "id" in row else None,
-                              "properties": {"id": str(row["id"]) if "id" in row else None},
-                              "geometry": {"type": "Point", "coordinates": [row["longitude"], row["latitude"]]}})
+        shots_features.append({"type": "Feature", "id": str(row["id"]) if "id" in row else None, "properties": {"id": str(row["id"]) if "id" in row else None}, "geometry": {"type": "Point", "coordinates": [row["longitude"], row["latitude"]]}})
     hom_features = []
     for _, row in homicides_month.iterrows():
-        hom_features.append({"type": "Feature", "id": str(row["id"]) if "id" in row else None,
-                             "properties": {"id": str(row["id"]) if "id" in row else None},
-                              "geometry": {"type": "Point", "coordinates": [row["longitude"], row["latitude"]]}})
+        hom_features.append({"type": "Feature", "id": str(row["id"]) if "id" in row else None, "properties": {"id": str(row["id"]) if "id" in row else None}, "geometry": {"type": "Point", "coordinates": [row["longitude"], row["latitude"]]}})
     shots_data = {"type": "FeatureCollection", "features": shots_features}
     homicides_data = {"type": "FeatureCollection", "features": hom_features}
 
@@ -812,12 +795,8 @@ def handle_initial_prompts(n_clicks, selected, slider_value):
 
     return [stats_message], [community_message]
 
-@callback(
-    Output("date-slider-value", "children"),
-    Input("update-date-btn", "n_clicks"),
-    State("update-date-btn", "data-date"),
-    prevent_initial_call=True
-)
+
+@callback(Output("date-slider-value", "children"), Input("update-date-btn", "n_clicks"), State("update-date-btn", "data-date"), prevent_initial_call=True)
 def update_date_from_slider(n_clicks, date_value):
     if not date_value:
         raise PreventUpdate
