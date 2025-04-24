@@ -18,7 +18,7 @@ load_dotenv()
 class Config:
     APP_VERSION = "0.7.0"
     CACHE_DIR = os.getenv("EXPERIMENT_7_CACHE_DIR", "./cache")
-    DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_7_DASH_REQUESTS_PATHNAME")
+    DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_7_DASH_REQUESTS_PATHNAME", "/")
     API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8888")
     MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
     RETHINKAI_API_KEY = os.getenv("RETHINKAI_API_CLIENT_KEY")
