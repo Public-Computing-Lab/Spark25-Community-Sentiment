@@ -28,11 +28,11 @@ class Config:
     RETHINKAI_API_KEYS = os.getenv("RETHINKAI_API_KEYS").split(",")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL")
-    GEMINI_CACHE_TTL = int(os.getenv("GEMINI_CACHE_TTL", "7"))
-    HOST = os.getenv("API_HOST")
-    PORT = os.getenv("API_PORT")
-    DATASTORE_PATH = BASE_DIR / Path(os.getenv("DATASTORE_PATH", ".").lstrip("./"))
-    PROMPTS_PATH = BASE_DIR / Path(os.getenv("PROMPTS_PATH", ".").lstrip("./"))
+    GEMINI_CACHE_TTL = float(os.getenv("GEMINI_CACHE_TTL", "0.125"))
+    HOST = os.getenv("API_HOST", "127.0.0.1")
+    PORT = os.getenv("API_PORT", "8888")
+    DATASTORE_PATH = BASE_DIR / Path(os.getenv("DATASTORE_PATH", "./datastore").lstrip("./"))
+    PROMPTS_PATH = BASE_DIR / Path(os.getenv("PROMPTS_PATH", "./prompts").lstrip("./"))
     ALLOWED_EXTENSIONS = {"csv", "txt"}
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit
     FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "rethinkAI2025!")
@@ -421,7 +421,7 @@ def json_query_results(query: str) -> Optional[Response]:
         result = cursor.fetchall()
         return jsonify(result) if result else None
     except mysql.connector.Error as err:
-        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection:{Font_Colors.ENDC} {str(err)}")
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection (json_query_results):{Font_Colors.ENDC} {str(err)}")
         return None
     finally:
         if "cursor" in locals() and cursor:
@@ -461,7 +461,7 @@ def stream_query_results(query: str) -> Generator[str, None, None]:
         # Close the JSON structure
         yield "\n]"
     except mysql.connector.Error as err:
-        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection:{Font_Colors.ENDC} {str(err)}")
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection (stream_query_results):{Font_Colors.ENDC} {str(err)}")
         yield "[]\n"  # Return empty array on error
     finally:
         if cursor:
@@ -485,7 +485,7 @@ def csv_query_results(query: str) -> Optional[io.StringIO]:
             writer.writerow(row)
         return result
     except mysql.connector.Error as err:
-        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection:{Font_Colors.ENDC} {str(err)}")
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection (csv_query_results):{Font_Colors.ENDC} {str(err)}")
         return None
     finally:
         if "cursor" in locals() and cursor:
@@ -495,10 +495,6 @@ def csv_query_results(query: str) -> Optional[io.StringIO]:
 
 
 def get_query_results(query: str, output_type: str = ""):
-    """
-    Factory function that returns the appropriate query result function
-    based on the output_type.
-    """
     if output_type == "stream":
         return stream_query_results(query)
     elif output_type == "csv":
@@ -511,7 +507,6 @@ def get_query_results(query: str, output_type: str = ""):
 
 # Send prompt to Gemini
 async def get_gemini_response(prompt: str, cache_name: str) -> str:
-    """Sends the prompt to Google Gemini and returns the response."""
     try:
         model = Config.GEMINI_MODEL
         response = await asyncio.to_thread(
@@ -708,7 +703,7 @@ def log_event(
         return app_response_id
 
     except mysql.connector.Error as err:
-        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection:{Font_Colors.ENDC} {str(err)}")
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection (log_event):{Font_Colors.ENDC} {str(err)}")
         return False
 
     finally:
@@ -949,7 +944,7 @@ def route_chat_context():
                 )  # Return an error response
     if request.method == "POST":
         # TODO: implement 'specific' context_request with list of files from datastore
-        # FOR NOW: assumes 'structured', 'unstructured', 'all', 'experiment_5' context_request
+        # FOR NOW: assumes 'structured', 'unstructured', 'all', 'experiment_5', 'experiment_6', 'experiment_7' context_request
         # Context cache creation appends app_version so caches are versioned.
         if not context_request:
             return jsonify({"Error": "Missing context_request parameter"}), 400
