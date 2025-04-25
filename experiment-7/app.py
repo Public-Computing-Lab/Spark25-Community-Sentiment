@@ -10,13 +10,15 @@ from dash import html, dcc, Input, Output, State, callback, ClientsideFunction
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from dotenv import load_dotenv
+from dash.dependencies import ClientsideFunction
 
 load_dotenv()
 
 
 class Config:
     APP_VERSION = "0.7.0"
-    CACHE_DIR = os.getenv("EXPERIMENT_6_CACHE_DIR", "./cache")
+    CACHE_DIR = os.getenv("EXPERIMENT_7_CACHE_DIR", "./cache")
+    DASH_REQUESTS_PATHNAME = os.getenv("EXPERIMENT_7_DASH_REQUESTS_PATHNAME", "/")
     API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8888")
     MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
     RETHINKAI_API_KEY = os.getenv("RETHINKAI_API_CLIENT_KEY")
@@ -162,6 +164,52 @@ def get_shots_fired_data(force_refresh=False):
         df_matched = pd.read_parquet(cache_path_matched)
         return df, df_matched
 
+    # def get_311_data(force_refresh=False):
+    #     """
+    #     Always load 311 DataFrame from cache.
+    #     Returns the same pd.DataFrame your old version did.
+    #     """
+    #     cache_path = os.path.join(Config.CACHE_DIR, "df_311.parquet")
+    #     if not os.path.exists(cache_path):
+    #         raise FileNotFoundError(f"311 cache missing: {cache_path}")
+    #     df = pd.read_parquet(cache_path)
+    #     return df
+
+    # def get_shots_fired_data(force_refresh=False):
+    #     """
+    #     Always load shots-fired and matched-homicides DataFrames from cache.
+    #     Returns (df_shots, df_hom_shot_matched) just like before.
+    #     """
+    #     cache_shots   = os.path.join(Config.CACHE_DIR, "df_shots.parquet")
+    #     cache_matched = os.path.join(Config.CACHE_DIR, "df_hom_shot_matched.parquet")
+
+    #     missing = [p for p in (cache_shots, cache_matched) if not os.path.exists(p)]
+    #     if missing:
+    #         raise FileNotFoundError(f"Shots cache missing: {missing}")
+
+    #     df_shots           = pd.read_parquet(cache_shots)
+    #     df_hom_shot_matched = pd.read_parquet(cache_matched)
+    #     return df_shots, df_hom_shot_matched
+
+    # def get_select_311_data(event_ids="", event_date=""):
+    #     """
+    #     Load full 311 cache, filter exactly as the summary endpoints did,
+    #     then return a CSV string.  Matches your old `reply = ...to_csv(...)`.
+    #     """
+    #     df = get_311_data()
+
+    #     if event_ids:
+    #         ids = set(str(i) for i in event_ids.split(",") if i)
+    #         df = df[df["id"].astype(str).isin(ids)]
+
+    #     elif event_date:
+    #         year, month = map(int, event_date.split("-"))
+    #         ts = pd.Timestamp(year=year, month=month, day=1)
+    #         df = df[df["date"].dt.to_period("M").dt.to_timestamp() == ts]
+
+    #     reply = df.to_csv(index=False)
+    #     return reply
+
     # Load shots fired data
     print("[LOAD] Fetching shots fired data from API...")
     url = f"{Config.API_BASE_URL}/data/query?app_version={Config.APP_VERSION}&request=911_shots_fired&stream=True"
@@ -193,10 +241,13 @@ max_value = (latest.year - 2018) * 12 + (latest.month - 1)
 
 app = dash.Dash(
     __name__,
+    suppress_callback_exceptions=True,
+    serve_locally=False,
+    requests_pathname_prefix=Config.DASH_REQUESTS_PATHNAME,
     external_stylesheets=[dbc.themes.BOOTSTRAP, "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"],
     external_scripts=["https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"],
+    meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
 )
-
 
 app.index_string = f"""
 <!DOCTYPE html>
@@ -293,6 +344,7 @@ app.layout = html.Div(
                                     id="loading-spinner",
                                     type="circle",
                                     color="#701238",
+                                    style={"position": "static", "background": "transparent", "pointerEvents": "none"},
                                     children=html.Div(id="chat-messages", className="chat-messages"),
                                 ),
                                 html.Div(id="loading-output", style={"display": "none"}),
@@ -333,6 +385,7 @@ app.layout = html.Div(
                                         # "height": f"{Config.HEXBIN_HEIGHT+100}px",
                                     },
                                 ),
+                                html.Div("December 2024", id="date-slider-value", style={"display": "none"}),
                                 html.Div([html.Div(id="slider")], className="slider-container"),
                                 html.Div([html.Div(id="slider-shadow")], className="slider-container-shadow"),
                             ],
@@ -351,6 +404,7 @@ app.layout = html.Div(
                                     id="loading-spinner-right",
                                     type="circle",
                                     color="#701238",
+                                    style={"position": "static", "background": "transparent", "pointerEvents": "none"},
                                     children=html.Div(id="chat-messages-right", className="chat-messages"),
                                 )
                             ],
@@ -376,13 +430,27 @@ app.layout = html.Div(
         dcc.Store(id="user-message-store-right"),
         dcc.Store(id="window-dimensions", data=json.dumps({"width": 1200, "height": 800})),
         dcc.Store(id="hexbin-position", data=json.dumps({"top": 115, "right": 35, "width": Config.HEXBIN_WIDTH, "height": Config.HEXBIN_HEIGHT})),
-        dcc.Store(id="date-slider-value", data="December 2024"),
+        dcc.Store(id="current-date-store", data="December 2024"),
         html.Div(id="slider-value-display", className="current-date", style={"display": "none"}),
         dcc.Interval(id="initialization-interval", interval=100, max_intervals=1),
         html.Button(id="refresh-chat-btn", style={"display": "none"}),
+        html.Button(id="update-date-btn", style={"display": "none"}, **{"data-date": "December 2024"}, n_clicks=0),
     ],
     className="app-container",
 )
+
+
+# Add the middleware to standardize headers
+@app.server.after_request
+def standardize_headers(response):
+    # Remove any existing Connection header
+    if "Connection" in response.headers:
+        del response.headers["Connection"]
+
+    # Set single consistent header
+    response.headers["Connection"] = "keep-alive"
+    return response
+
 
 # Initialize the slider when the page loads
 app.clientside_callback(
@@ -393,32 +461,22 @@ app.clientside_callback(
 
 app.clientside_callback(
     """
-    function(hexData, shotsData, homData) {
-        // guard if map not yet initialized
-        if (!window.afterMap) {
-            console.warn('afterMap not ready');
-            return '';
+    function() {
+        const currentDateDisplay = document.querySelector('.current-date');
+        if (currentDateDisplay) {
+            return currentDateDisplay.textContent;
         }
-        // the actual updater
-        function updateSources() {
-            const map = window.afterMap;
-            let src = map.getSource('hexData');
-            if (src && hexData) src.setData(hexData);
-            src = map.getSource('shotsData');
-            if (src && shotsData) src.setData(shotsData);
-            src = map.getSource('homicidesData');
-            if (src && homData) src.setData(homData);
-        }
-        // if style (and therefore sources) already loaded, update immediately…
-        if (window.afterMap.isStyleLoaded()) {
-            updateSources();
-        } else {
-            // …otherwise wait until load
-            window.afterMap.once('load', updateSources);
-        }
-        return '';
+        return "December 2024"; 
     }
     """,
+    Output("current-date-store", "data"),
+    Input("update-date-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+
+
+app.clientside_callback(
+    ClientsideFunction(namespace="clientside", function_name="updateMapData"),
     Output("dummy-output", "children"),
     Input("hexbin-data-store", "data"),
     Input("shots-data-store", "data"),
@@ -429,19 +487,15 @@ app.clientside_callback(
 app.clientside_callback(
     """
     function(n_clicks) {
-      // If we haven’t actually clicked yet, don’t clear your previous selection
       if (!n_clicks) {
         return window.latestSelection || {'selected_hexbins': [], 'selected_ids': []};
       }
       const btn = document.getElementById('map-move-btn');
       if (!btn) { return {'selected_hexbins': [], 'selected_ids': []}; }
-      // read the attributes that your JS moveend handler set
       const hexids = btn.getAttribute('data-hexids') || "";
       const ids    = btn.getAttribute('data-ids')    || "";
       const hexList = hexids ? hexids.split(',') : [];
       const idList  = ids    ? ids.split(',')    : [];
-      console.log("🔍 clientside read:", hexList, idList);
-      // cache in window so initial load keeps them
       window.latestSelection = {'selected_hexbins': hexList, 'selected_ids': idList};
       return window.latestSelection;
     }
@@ -450,18 +504,15 @@ app.clientside_callback(
     Input("map-move-btn", "n_clicks"),
 )
 
-# slider date callbacks
 
-
-# Display the value from the store
-@app.callback(Output("slider-value-display", "children"), Input("date-slider-value", "data"))
+@app.callback(Output("slider-value-display", "children"), Input("date-slider-value", "children"))
 def update_slider_display(date_value):
     return date_value
 
 
 @callback(
     Output("date-display", "children"),
-    Input("date-slider-value", "data"),
+    Input("date-slider-value", "children"),
 )
 def update_date_display(value):
     year, month = date_string_to_year_month(value)
@@ -474,10 +525,10 @@ def update_date_display(value):
         Output("shots-data-store", "data"),
         Output("homicides-data-store", "data"),
     ],
-    Input("date-slider-value", "data"),
+    Input("current-date-store", "data"),
 )
-def update_map_data(slider_value):
-    year, month = date_string_to_year_month(slider_value)
+def update_map_data(date_value):
+    year, month = date_string_to_year_month(date_value)
     selected_month = pd.Timestamp(f"{year}-{month:02d}")
     df_month = df_311[df_311["month"] == selected_month]
 
@@ -498,15 +549,16 @@ def update_map_data(slider_value):
         boundary = h3.cell_to_boundary(hex_id)
         coords = [[lng, lat] for lat, lng in boundary] + [[boundary[0][1], boundary[0][0]]]
         lat_center, lon_center = h3.cell_to_latlng(hex_id)
-        hex_features.append({"type": "Feature", "properties": {"hex_id": hex_id, "value": len(point_ids), "lat": lat_center, "lon": lon_center, "ids": point_ids}, "geometry": {"type": "Polygon", "coordinates": [coords]}})
+        hex_features.append({"type": "Feature", "id": hex_id, "properties": {"hex_id": hex_id, "value": len(point_ids), "lat": lat_center, "lon": lon_center, "ids": point_ids}, "geometry": {"type": "Polygon", "coordinates": [coords]}})
+
     hex_data = {"type": "FeatureCollection", "features": hex_features}
 
     shots_features = []
     for _, row in shots_month.iterrows():
-        shots_features.append({"type": "Feature", "properties": {"id": str(row["id"]) if "id" in row else None}, "geometry": {"type": "Point", "coordinates": [row["longitude"], row["latitude"]]}})
+        shots_features.append({"type": "Feature", "id": str(row["id"]) if "id" in row else None, "properties": {"id": str(row["id"]) if "id" in row else None}, "geometry": {"type": "Point", "coordinates": [row["longitude"], row["latitude"]]}})
     hom_features = []
     for _, row in homicides_month.iterrows():
-        hom_features.append({"type": "Feature", "properties": {"id": str(row["id"]) if "id" in row else None}, "geometry": {"type": "Point", "coordinates": [row["longitude"], row["latitude"]]}})
+        hom_features.append({"type": "Feature", "id": str(row["id"]) if "id" in row else None, "properties": {"id": str(row["id"]) if "id" in row else None}, "geometry": {"type": "Point", "coordinates": [row["longitude"], row["latitude"]]}})
     shots_data = {"type": "FeatureCollection", "features": shots_features}
     homicides_data = {"type": "FeatureCollection", "features": hom_features}
 
@@ -515,7 +567,7 @@ def update_map_data(slider_value):
 
 @callback(
     Output("loading-spinner", "style", allow_duplicate=True),
-    Input("date-slider-value", "data"),
+    Input("date-slider-value", "children"),
     prevent_initial_call=True,
 )
 def show_left_spinner_on_slider_change(slider_value):
@@ -529,7 +581,7 @@ def show_left_spinner_on_slider_change(slider_value):
     ],
     [
         Input("user-message-store", "data"),
-        Input("date-slider-value", "data"),
+        Input("date-slider-value", "children"),
     ],
     [
         State("chat-messages", "children"),
@@ -584,7 +636,7 @@ def handle_chat_input_right(n_clicks, n_submit, input_value, msgs):
 
 @callback(
     Output("loading-spinner-right", "style", allow_duplicate=True),
-    Input("date-slider-value", "data"),
+    Input("date-slider-value", "children"),
     prevent_initial_call=True,
 )
 def show_right_spinner_on_slider_change(slider_value):
@@ -593,7 +645,7 @@ def show_right_spinner_on_slider_change(slider_value):
 
 @callback(
     [Output("chat-messages-right", "children", allow_duplicate=True), Output("loading-spinner-right", "style", allow_duplicate=True)],
-    [Input("user-message-store-right", "data"), Input("date-slider-value", "data")],
+    [Input("user-message-store-right", "data"), Input("date-slider-value", "children")],
     [State("chat-messages-right", "children"), State("selected-hexbins-store", "data")],
     prevent_initial_call=True,
 )
@@ -708,7 +760,7 @@ def handle_tell_me_prompt(prompt, current_messages):
 @callback(
     [Output("chat-messages", "children", allow_duplicate=True), Output("chat-messages-right", "children", allow_duplicate=True)],
     [Input("tell-me-btn", "n_clicks"), Input("selected-hexbins-store", "data")],
-    [State("date-slider-value", "data")],
+    [State("date-slider-value", "children")],
     prevent_initial_call=True,
 )
 def handle_initial_prompts(n_clicks, selected, slider_value):
@@ -742,6 +794,13 @@ def handle_initial_prompts(n_clicks, selected, slider_value):
     community_message = html.Div([html.Strong("From recent community meetings:"), dcc.Markdown(community_reply, dangerously_allow_html=True)], className="bot-message")
 
     return [stats_message], [community_message]
+
+
+@callback(Output("date-slider-value", "children"), Input("update-date-btn", "n_clicks"), State("update-date-btn", "data-date"), prevent_initial_call=True)
+def update_date_from_slider(n_clicks, date_value):
+    if not date_value:
+        raise PreventUpdate
+    return date_value
 
 
 server = app.server
