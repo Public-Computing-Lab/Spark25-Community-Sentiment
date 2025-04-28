@@ -10,7 +10,7 @@ from dash import html, dcc, Input, Output, State, callback, ClientsideFunction
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from dotenv import load_dotenv
-from dash.dependencies import ClientsideFunction
+from datetime import datetime
 
 load_dotenv()
 
@@ -275,9 +275,7 @@ app.index_string = f"""
 """
 
 
-def date_string_to_year_month(date_string):
-    from datetime import datetime
-
+def date_string_to_year_month(date_string: str):
     try:
         date_obj = datetime.strptime(date_string, "%B %Y")
         return date_obj.year, date_obj.month
@@ -286,14 +284,14 @@ def date_string_to_year_month(date_string):
         return 2024, 12
 
 
-def get_chat_response(prompt):
+def get_chat_response(prompt: str):
     """Get chat response from API"""
     try:
         headers = {
             "Content-Type": "application/json",
             "RethinkAI-API-Key": Config.RETHINKAI_API_KEY,
         }
-        response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_6&app_version={Config.APP_VERSION}", headers=headers, json={"client_query": prompt})
+        response = requests.post(f"{Config.API_BASE_URL}/chat?request=experiment_7&app_version={Config.APP_VERSION}", headers=headers, json={"client_query": prompt})
         response.raise_for_status()
         reply = response.json().get("response", "[No reply received]")
     except Exception as e:
@@ -466,7 +464,7 @@ app.clientside_callback(
         if (currentDateDisplay) {
             return currentDateDisplay.textContent;
         }
-        return "December 2024"; 
+        return "December 2024";
     }
     """,
     Output("current-date-store", "data"),
@@ -594,14 +592,14 @@ def handle_chat_response(stored_input, slider_value, current_messages, selected_
     current_messages = current_messages or []
     year, month = date_string_to_year_month(slider_value)
     selected_date = f"{year}-{month:02d}"
-    prompt = f"Your neighbor has selected the date {selected_date} and wants to understand how the situation " f"in your neighborhood of Dorchester on {selected_date} compares to overall trends..."
+    prompt = f"response-type = analytic. Your neighbor has selected the date {selected_date} and wants to understand how the situation " f"in your neighborhood of Dorchester on {selected_date} compares to overall trends..."
     if selected_hexbins_data.get("selected_ids"):
         event_ids = ",".join(selected_hexbins_data["selected_ids"])
         event_id_data = get_select_311_data(event_ids=event_ids)
         event_date_data = get_select_311_data(event_date=selected_date)
         prompt += f"\n\nYour neighbor has specifically selected an area within Dorchester to examine. " f"The overall neighborhood 311 data on {selected_date} are: {event_date_data}. " f"The specific area 311 data are: {event_id_data}. Compare the local area data, the neighborhood-wide data, " f"and the overall trends in the original 311 data."
-    if stored_input:
-        prompt += f"\n\nThe neighbor asks: {stored_input}"
+    # if stored_input:
+    #     prompt += f"\n\nThe neighbor asks: {stored_input}"
     reply = get_chat_response(prompt)
     bot_response = html.Div([dcc.Markdown(reply, dangerously_allow_html=True)], className="bot-message")
     updated_messages = current_messages + [bot_response]
@@ -657,9 +655,9 @@ def handle_chat_response_right(stored_input, slider_value, msgs, selected):
     if stored_input:
         question = stored_input
     else:
-        question = f"What were the main concerns in the community around {selected_date}?"
+        question = f"response-type = sentiment. What were the main concerns in the community around {selected_date}?"
 
-    prompt = f"Your neighbor wants community insights for {selected_date}. Based on meeting transcripts, what were the main concerns?\n\n{question}"
+    prompt = f"response-type = mixed. Your neighbor wants community insights for {selected_date}. Based on the available data, provide insight in a direct and to-the-point manner to your neighbor's question: \n\n{question}"
 
     reply = get_chat_response(prompt)
 
