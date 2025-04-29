@@ -15,6 +15,7 @@ import uuid
 import asyncio
 import json
 import decimal
+from pydantic import BaseModel
 
 # Load environment variables
 load_dotenv()
@@ -24,7 +25,7 @@ BASE_DIR = Path(__file__).parent
 
 # Configuration constants
 class Config:
-    API_VERSION = "API v 0.4"
+    API_VERSION = "API v 0.5"
     RETHINKAI_API_KEYS = os.getenv("RETHINKAI_API_KEYS").split(",")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL")
@@ -47,13 +48,6 @@ class Config:
     }
 
 
-class Font_Colors:
-    PASS = "\033[92m"
-    FAIL = "\033[91m"
-    ENDC = "\033[0m"
-    BOLD = "\033[1m"
-
-
 # Initialize GenAI client
 genai_client = genai.Client(api_key=Config.GEMINI_API_KEY)
 
@@ -68,6 +62,26 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SECURE=Config.FLASK_SESSION_COOKIE_SECURE,
 )
+
+
+#
+# Font colors for error/print
+#
+class Font_Colors:
+    PASS = "\033[92m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+
+
+#
+# Class for structured data response from llm
+#
+class Structured_Data(BaseModel):
+    living_conditions: str
+    parking: str
+    streets: str
+    trash: str
 
 
 #
@@ -115,7 +129,7 @@ class SQLConstants:
     """
 
     BOS311_TIME_BREAKDOWN = """
-    COUNT(*) AS total_year,
+    COUNT(*) AS total_by_year,
     SUM(CASE WHEN QUARTER(open_dt) = 1 THEN 1 ELSE 0 END) AS q1_total,
     SUM(CASE WHEN QUARTER(open_dt) = 2 THEN 1 ELSE 0 END) AS q2_total,
     SUM(CASE WHEN QUARTER(open_dt) = 3 THEN 1 ELSE 0 END) AS q3_total,
@@ -177,137 +191,287 @@ def build_311_query(
         return query
     elif data_request == "311_summary_context":
         query = f"""
-        WITH incident_data AS (
-        SELECT
-            year,
-            '911 Shot Fired Confirmed' AS incident_type,
-            quarter,
-            month
-        FROM shots_fired_data
-        WHERE
-        {SQLConstants.BOS911_BASE_WHERE}
-        AND ballistics_evidence = 1
-        UNION ALL
-        SELECT
-            year,
-            '911 Shot Fired Unconfirmed' AS incident_type,
-            quarter,
-            month
-        FROM shots_fired_data
-        WHERE
-        {SQLConstants.BOS911_BASE_WHERE}
-        AND ballistics_evidence = 0
-        UNION ALL
-        SELECT
-            year,
-            '911 Homicides' AS incident_type,
-            quarter,
-            month
-        FROM homicide_data
-        WHERE
-        {SQLConstants.BOS911_BASE_WHERE}
-        UNION ALL
-        SELECT
-            YEAR(open_dt) AS year,
-            '311 Trash/Dumping Issues' AS incident_type,
-            QUARTER(open_dt) AS quarter,
-            MONTH(open_dt) AS month
-        FROM bos311_data
-        WHERE
-        type IN ({SQLConstants.CATEGORY_TYPES['trash']})
-        AND {SQLConstants.BOS311_BASE_WHERE}
-        UNION ALL
-        SELECT
-            YEAR(open_dt) AS year,
-            '311 Living Condition Issues' AS incident_type,
-            QUARTER(open_dt) AS quarter,
-            MONTH(open_dt) AS month
-        FROM bos311_data
-        WHERE
-        type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']})
-        AND {SQLConstants.BOS311_BASE_WHERE}
-        UNION ALL
-        SELECT
-            YEAR(open_dt) AS year,
-            '311 Streets Issues' AS incident_type,
-            QUARTER(open_dt) AS quarter,
-            MONTH(open_dt) AS month
-        FROM bos311_data
-        WHERE
-        type IN ({SQLConstants.CATEGORY_TYPES['streets']})
-        AND {SQLConstants.BOS311_BASE_WHERE}
-        UNION ALL
-        SELECT
-            YEAR(open_dt) AS year,
-            '311 Parking Issues' AS incident_type,
-            QUARTER(open_dt) AS quarter,
-            MONTH(open_dt) AS month
-        FROM bos311_data
-        WHERE
-        type IN ({SQLConstants.CATEGORY_TYPES['parking']})
-        AND {SQLConstants.BOS311_BASE_WHERE}
+        WITH category_aggregates AS (
+            SELECT
+                year,
+                '911 Shot Fired Confirmed - Annual Total' AS incident_type,
+                {SQLConstants.BOS911_TIME_BREAKDOWN},
+                'Category' AS level_type,
+                NULL AS category
+            FROM shots_fired_data
+            WHERE {SQLConstants.BOS911_BASE_WHERE}
+            AND ballistics_evidence = 1
+            GROUP BY year, incident_type
+            UNION ALL
+            SELECT
+                year,
+                '911 Shot Fired Unconfirmed - Annual Total' AS incident_type,
+                {SQLConstants.BOS911_TIME_BREAKDOWN},
+                'Category' AS level_type,
+                NULL AS category
+            FROM shots_fired_data
+            WHERE {SQLConstants.BOS911_BASE_WHERE}
+            AND ballistics_evidence = 0
+            GROUP BY year, incident_type
+            UNION ALL
+            SELECT
+                year,
+                '911 Homicides - Annual Total' AS incident_type,
+                {SQLConstants.BOS911_TIME_BREAKDOWN},
+                'Category' AS level_type,
+                NULL AS category
+            FROM homicide_data
+            WHERE {SQLConstants.BOS911_BASE_WHERE}
+            GROUP BY year, incident_type
+            UNION ALL
+            SELECT
+                YEAR(open_dt) AS year,
+                '311 Trash & Dumping Issues - Annual Total' AS incident_type,
+                {SQLConstants.BOS311_TIME_BREAKDOWN},
+                'Category' AS level_type,
+                NULL AS category
+            FROM bos311_data
+            WHERE type IN ({SQLConstants.CATEGORY_TYPES['trash']})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+            GROUP BY year, incident_type
+            UNION ALL
+            SELECT
+                YEAR(open_dt) AS year,
+                '311 Living Condition Issues - Annual Total' AS incident_type,
+                {SQLConstants.BOS311_TIME_BREAKDOWN},
+                'Category' AS level_type,
+                NULL AS category
+            FROM bos311_data
+            WHERE type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+            GROUP BY year, incident_type
+            UNION ALL
+            SELECT
+                YEAR(open_dt) AS year,
+                '311 Streets Issues - Annual Total' AS incident_type,
+                {SQLConstants.BOS311_TIME_BREAKDOWN},
+                'Category' AS level_type,
+                NULL AS category
+            FROM bos311_data
+            WHERE type IN ({SQLConstants.CATEGORY_TYPES['streets']})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+            GROUP BY year, incident_type
+            UNION ALL
+            SELECT
+                YEAR(open_dt) AS year,
+                '311 Parking Issues - Annual Total' AS incident_type,
+                {SQLConstants.BOS311_TIME_BREAKDOWN},
+                'Category' AS level_type,
+                NULL AS category
+            FROM bos311_data
+            WHERE type IN ({SQLConstants.CATEGORY_TYPES['parking']})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+            GROUP BY year, incident_type
+        ),
+        type_details AS (
+            SELECT
+                YEAR(open_dt) AS year,
+                '311 Trash & Dumping Issues' AS category,
+                type AS incident_type,
+                {SQLConstants.BOS311_TIME_BREAKDOWN},
+                'Type' AS level_type
+            FROM bos311_data
+            WHERE type IN ({SQLConstants.CATEGORY_TYPES['trash']})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+            GROUP BY year, type
+            UNION ALL
+            SELECT
+                YEAR(open_dt) AS year,
+                '311 Living Condition Issues' AS category,
+                type AS incident_type,
+                {SQLConstants.BOS311_TIME_BREAKDOWN},
+                'Type' AS level_type
+            FROM bos311_data
+            WHERE type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+            GROUP BY year, type
+            UNION ALL
+            SELECT
+                YEAR(open_dt) AS year,
+                '311 Streets Issues' AS category,
+                type AS incident_type,
+                {SQLConstants.BOS311_TIME_BREAKDOWN},
+                'Type' AS level_type
+            FROM bos311_data
+            WHERE type IN ({SQLConstants.CATEGORY_TYPES['streets']})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+            GROUP BY year, type
+            UNION ALL
+            SELECT
+                YEAR(open_dt) AS year,
+                '311 Parking Issues' AS category,
+                type AS incident_type,
+                {SQLConstants.BOS311_TIME_BREAKDOWN},
+                'Type' AS level_type
+            FROM bos311_data
+            WHERE type IN ({SQLConstants.CATEGORY_TYPES['parking']})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+            GROUP BY year, type
         )
         SELECT
             year,
             incident_type,
-            {SQLConstants.BOS911_TIME_BREAKDOWN}
-        FROM incident_data
-        GROUP BY year, incident_type
-        ORDER BY year, incident_type
-        """
+            total_by_year,
+            q1_total, q2_total, q3_total, q4_total,
+            jan_total, feb_total, mar_total, apr_total, may_total, jun_total,
+            jul_total, aug_total, sep_total, oct_total, nov_total, dec_total,
+            level_type,
+            category
+        FROM category_aggregates
+        UNION ALL
+        SELECT
+            year,
+            incident_type,
+            total_by_year,
+            q1_total, q2_total, q3_total, q4_total,
+            jan_total, feb_total, mar_total, apr_total, may_total, jun_total,
+            jul_total, aug_total, sep_total, oct_total, nov_total, dec_total,
+            level_type,
+            category
+        FROM type_details
+        ORDER BY
+            year,
+            CASE
+                WHEN category = '311 Trash & Dumping Issues' OR incident_type = '311 Trash & Dumping Issues - Annual Total' THEN 1
+                WHEN category = '311 Living Condition Issues' OR incident_type = '311 Living Condition Issues - Annual Total' THEN 2
+                WHEN category = '311 Streets Issues' OR incident_type = '311 Streets Issues - Annual Total' THEN 3
+                WHEN category = '311 Parking Issues' OR incident_type = '311 Parking Issues - Annual Total' THEN 4
+                WHEN incident_type = '911 Shot Fired Confirmed - Annual Total' THEN 5
+                WHEN incident_type = '911 Shot Fired Unconfirmed - Annual Total' THEN 6
+                WHEN incident_type = '911 Homicides - Annual Total' THEN 7
+                ELSE 8
+            END,
+            CASE
+                WHEN level_type = 'Category' THEN 2
+                ELSE 1
+            END,
+            incident_type;
+            """
         return query
     elif data_request == "311_summary" and event_ids:
         query = f"""
         SELECT
-            CASE
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
-            END AS reported_issue,
-            COUNT(*) AS total
-        FROM
-            bos311_data
-        WHERE
-            id IN ({event_ids})
-        GROUP BY reported_issue
+        CASE
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+        END AS category,
+        type AS subcategory,
+        COUNT(*) AS total
+        FROM bos311_data
+        WHERE id IN ({event_ids})
+        GROUP BY category, subcategory
+        UNION ALL
+        SELECT
+        CASE
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+        END AS category,
+        'TOTAL' AS subcategory,
+        COUNT(*) AS total
+        FROM bos311_data
+        WHERE id IN ({event_ids})
+        GROUP BY
+        category
+        ORDER BY
+        category,
+        CASE
+            WHEN subcategory = 'TOTAL' THEN 2
+            ELSE 1
+        END,
+        total DESC;
         """
         return query
     elif data_request == "311_summary" and request_date and request_options:
         query = f"""
         SELECT
-            CASE
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
-            END AS reported_issue,
-            COUNT(*) AS total
-        FROM
-            bos311_data
+        CASE
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+        END AS category,
+        type AS subcategory,
+        COUNT(*) AS total
+        FROM bos311_data
         WHERE
             DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
             AND type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
             AND {SQLConstants.BOS311_BASE_WHERE}
-        GROUP BY reported_issue
+        GROUP BY category, subcategory
+        UNION ALL
+        SELECT
+        CASE
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+        END AS category,
+        'TOTAL' AS subcategory,
+        COUNT(*) AS total
+        FROM bos311_data
+        WHERE
+            DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
+            AND type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+        GROUP BY
+        category
+        ORDER BY
+        category,
+        CASE
+            WHEN subcategory = 'TOTAL' THEN 2
+            ELSE 1
+        END,
+        total DESC;
         """
         return query
     elif data_request == "311_summary" and not request_date and not event_ids and request_options:
         query = f"""
         SELECT
-            CASE
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
-                WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
-            END AS reported_issue,
-            COUNT(*) AS total
-        FROM
-            bos311_data
+        CASE
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+        END AS category,
+        type AS subcategory,
+        COUNT(*) AS total
+        FROM bos311_data
         WHERE
             type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
             AND {SQLConstants.BOS311_BASE_WHERE}
-        GROUP BY reported_issue
+        GROUP BY category, subcategory
+        UNION ALL
+        SELECT
+        CASE
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']}) THEN 'Living Conditions'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['trash']}) THEN 'Trash, Recycling, And Waste'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['streets']}) THEN 'Streets, Sidewalks, And Parks'
+            WHEN type IN ({SQLConstants.CATEGORY_TYPES['parking']}) THEN 'Parking'
+        END AS category,
+        'TOTAL' AS subcategory,
+        COUNT(*) AS total
+        FROM bos311_data
+        WHERE
+            type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
+            AND {SQLConstants.BOS311_BASE_WHERE}
+        GROUP BY
+        category
+        ORDER BY
+        category,
+        CASE
+            WHEN subcategory = 'TOTAL' THEN 2
+            ELSE 1
+        END,
+        total DESC;
         """
         return query
     else:
@@ -506,31 +670,41 @@ def get_query_results(query: str, output_type: str = ""):
 
 
 # Send prompt to Gemini
-async def get_gemini_response(prompt: str, cache_name: str) -> str:
+async def get_gemini_response(prompt: str, cache_name: str, structured_response: bool = False) -> str:
     try:
         model = Config.GEMINI_MODEL
+        if structured_response is True:
+            config = types.GenerateContentConfig(
+                cached_content=cache_name,
+                response_schema=list[Structured_Data],
+                response_mime_type="application/json",
+            )
+        else:
+            config = types.GenerateContentConfig(cached_content=cache_name)
+
         response = await asyncio.to_thread(
             lambda: genai_client.models.generate_content(
                 model=model,
                 contents=prompt,
-                config=types.GenerateContentConfig(cached_content=cache_name),
+                config=config,
             )
         )
         return response.text
+
     except Exception as e:
         print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}")
         return f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}"
 
 
-def create_gemini_context(context_request: str, files: str = "", preamble: str = "", generate_cache: bool = True, app_version: str = "") -> Union[str, int, bool]:
+def create_gemini_context(context_request: str, preamble: str = "", generate_cache: bool = True, app_version: str = "") -> Union[str, int, bool]:
     # test if cache exists
     if generate_cache:
         for cache in genai_client.caches.list():
-            if cache.display_name == context_request + "_" + app_version:
+            if cache.display_name == "APP_VERSION_" + app_version + "_REQUEST_" + context_request and cache.model == Config.GEMINI_MODEL:
                 return cache.name
 
-    files_list = []
     try:
+        files_list = []
         content = {"parts": []}
 
         if context_request == "structured":
@@ -544,40 +718,13 @@ def create_gemini_context(context_request: str, files: str = "", preamble: str =
         elif context_request == "all":
             files_list = get_files()
             preamble_file = context_request + ".txt"
-
-        elif context_request == "specific":
-            if not files:
-                return False
-            specific_files = [f.strip() for f in files.split(",")]
-            files_list = get_files(specific_files=specific_files)
-            preamble_file = context_request + ".txt"
-
-        elif context_request == "experiment_5" or context_request == "experiment_6":
+        elif context_request == "experiment_5" or context_request == "experiment_6" or context_request == "experiment_7":
             files_list = get_files("txt")
-            # query = build_summary_query()
             query = build_311_query(data_request="311_summary_context")
             response = get_query_results(query=query, output_type="csv")
 
             content["parts"].append({"text": response.getvalue()})
 
-            preamble_file = context_request + ".txt"
-
-        elif context_request == "experiment_7_structured":
-            # Provides the context only for the base 311 data in for analytic response
-            # TODO this isn't large enough to warrant caching, move to chat in some way
-            # First get the summary table
-            query = build_311_query(data_request="311_summary_context")
-            results = get_query_results(query=query, output_type="csv")
-            content["parts"].append({"text": results.getvalue()})
-            # Now get the full 311 data dump... for testing
-            query = build_311_query(data_request="311_by_geo", request_options="all")
-            results = get_query_results(query=query, output_type="csv")
-            content["parts"].append({"text": results.getvalue()})
-            preamble_file = context_request + ".txt"
-
-        elif context_request == "experiment_7_unstructured":
-            # Provides the context for the sentiment/perception response
-            files_list = get_files("txt")
             preamble_file = context_request + ".txt"
 
         # Read contents of found files
@@ -586,16 +733,12 @@ def create_gemini_context(context_request: str, files: str = "", preamble: str =
             if file_content is not None:
                 content["parts"].append({"text": file_content})
 
-        # Read prompt preamble
-        if context_request != "specific":
-            path = Config.PROMPTS_PATH / preamble_file
-            if not path.is_file():
-                raise FileNotFoundError(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error: File not found:{Font_Colors.ENDC} {path}")
-            system_prompt = path.read_text(encoding="utf-8")
-        else:
-            system_prompt = preamble
+        path = Config.PROMPTS_PATH / preamble_file
+        if not path.is_file():
+            raise FileNotFoundError(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error: File not found:{Font_Colors.ENDC} {path}")
+        system_prompt = path.read_text(encoding="utf-8")
 
-        display_name = context_request + "_" + app_version
+        display_name = "APP_VERSION_" + app_version + "_REQUEST_" + context_request
 
         # Generate cache or return token count
         if generate_cache:
@@ -616,7 +759,6 @@ def create_gemini_context(context_request: str, files: str = "", preamble: str =
             return cache.name
         else:
             # Return token count for testing
-            # print(f"Conxtex display name: {display_name}")
             content["parts"].append({"text": system_prompt})
             total_tokens = genai_client.models.count_tokens(model=Config.GEMINI_MODEL, contents=content["parts"])
             return total_tokens.total_tokens
@@ -841,11 +983,11 @@ def route_chat():
     app_version = request.args.get("app_version", "0")
 
     context_request = request.args.get("context_request", request.args.get("request", ""))
+    structured_response = request.args.get("structured_response", False)
 
     data = request.get_json()
 
     # Extract chat data parameters
-    data_selected = data.get("data_selected", "")
     data_attributes = data.get("data_attributes", "")
     client_query = data.get("client_query", "")
     prompt_preamble = data.get("prompt_preamble", "")
@@ -853,7 +995,6 @@ def route_chat():
     # data_selected, optional, list of files used when context_request==s
     cache_name = create_gemini_context(
         context_request=context_request,
-        files=data_selected,
         preamble=prompt_preamble,
         generate_cache=True,
         app_version=app_version,
@@ -865,7 +1006,7 @@ def route_chat():
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        app_response = loop.run_until_complete(get_gemini_response(full_prompt, cache_name))
+        app_response = loop.run_until_complete(get_gemini_response(prompt=full_prompt, cache_name=cache_name, structured_response=structured_response))
         if "Error" in app_response:
             print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ ERROR from Gemini API:{Font_Colors.ENDC} {app_response}")
             return jsonify({"Error": app_response}), 500
@@ -874,7 +1015,7 @@ def route_chat():
         log_id = log_event(
             session_id=session_id,
             app_version=app_version,
-            data_selected=context_request + " " + data_selected,
+            data_selected=context_request,
             data_attributes=data_attributes,
             prompt_preamble=prompt_preamble,
             client_query=full_prompt,
@@ -925,7 +1066,6 @@ def route_chat_context():
             # test token count for context cache of <request>
             token_count = create_gemini_context(
                 context_request=context_request,
-                files="",
                 preamble="",
                 generate_cache=False,
                 app_version=app_version,
@@ -966,12 +1106,10 @@ def route_chat_context():
         else:
             data = request.get_json()
             # Extract chat data parameters
-            data_selected = data.get("data_selected", "")
             prompt_preamble = data.get("prompt_preamble", "")
 
             response = create_gemini_context(
                 context_request=context_request,
-                files=data_selected,
                 preamble=prompt_preamble,
                 generate_cache=True,
                 app_version=app_version,
