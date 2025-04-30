@@ -337,6 +337,53 @@ body {
   opacity: 1 !important;
 }
 
+.collapsible-response {
+  margin-bottom: 10px;
+  border-radius: 6px;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.collapsible-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background-color: #f8f8f8;
+  cursor: pointer;
+  border-left: 4px solid #6AAFDB;
+}
+
+.collapsible-header:hover {
+  background-color: #f0f0f0;
+}
+
+.collapsible-header.expanded {
+  border-left-color: #2C5F8E;
+  background-color: #edf5fa;
+}
+
+.date-label {
+  font-weight: 500;
+  font-size: 14px;
+  color: #333;
+}
+
+.toggle-icon {
+  color: #6AAFDB;
+  font-size: 12px;
+}
+
+.collapsible-content {
+  display: none;
+  padding: 0;
+}
+
+.collapsible-header.expanded + .collapsible-content {
+  display: block;
+  padding: 15px;
+}
+
 .send-btn {
   padding: var(--spacing-small) var(--spacing-medium);
   background-color: var(--button-color);
