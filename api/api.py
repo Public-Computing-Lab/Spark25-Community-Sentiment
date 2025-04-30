@@ -974,7 +974,7 @@ def route_data_query():
             if output_type == "csv" and result:
                 output = result.getvalue()
                 response = Response(output, mimetype="text/csv")
-                response.headers["Content-Disposition"] = f"attachment; filename=export.csv"
+                response.headers["Content-Disposition"] = "attachment; filename=export.csv"
                 return response
             return result
 
