@@ -362,19 +362,18 @@ app.layout = html.Div(
                                             [
                                                 dcc.Graph(
                                                     id="category-pie-chart",
-                                                    style={"width": "100%", "height": "150px"},
                                                     config={"displayModeBar": False},
                                                 ),
-                                                html.Div(id="shots-count-display", style={"textAlign": "center", "marginTop": "0.5rem", "marginBottom": "1rem", "fontSize": "1.0rem", "padding": "0.5rem", "backgroundColor": "rgba(255, 255, 255, 0.95)", "borderRadius": "4px", "position": "relative", "zIndex": "50", "boxShadow": "0 2px 8px rgba(0, 0, 0, 0.15)", "border": "1px solid rgba(112, 39, 69, 0.3)"}),
+                                                html.Div(
+                                                    id="shots-count-display",
+                                                ),
                                             ],
                                             className="stats-visualization-container",
-                                            style={"padding": "1rem", "backgroundColor": "rgba(255, 255, 255, 0.3)", "borderRadius": "8px", "marginBottom": "1rem", "marginTop": "0.5rem", "width": "90%", "margin": "0.5rem auto 1rem auto"},
                                         ),
                                         dcc.Loading(
                                             id="loading-spinner",
                                             type="circle",
                                             color="#701238",
-                                            style={"position": "static", "background": "transparent", "pointerEvents": "none"},
                                             children=html.Div(id="chat-messages", className="chat-messages"),
                                         ),
                                         html.Div(id="loading-output", style={"display": "none"}),
@@ -389,7 +388,6 @@ app.layout = html.Div(
                                             id="loading-spinner-right",
                                             type="circle",
                                             color="#701238",
-                                            style={"position": "static", "background": "transparent", "pointerEvents": "none"},
                                             children=html.Div(id="chat-messages-right", className="chat-messages"),
                                         ),
                                     ],
@@ -404,7 +402,12 @@ app.layout = html.Div(
                             ],
                             className="chat-input-container",
                         ),
-                        html.Div([dcc.Input(id="chat-input", type="text", style={"display": "none"})], style={"display": "none"}),
+                        html.Div(
+                            [
+                                dcc.Input(id="chat-input", type="text", style={"display": "none"}),
+                            ],
+                            style={"display": "none"},
+                        ),
                         html.Div(
                             [
                                 dcc.Input(id="chat-input-right", type="text", style={"display": "none"}),
@@ -434,7 +437,7 @@ app.layout = html.Div(
         html.Div(id="background-data-applied", style={"display": "none"}),
         html.Div(id="slider-value-display", className="current-date", style={"display": "none"}),
         dcc.Interval(id="initialization-interval", interval=100, max_intervals=1),
-        html.Button(id="refresh-chat-btn", style={"display": "none"}),
+        html.Button(id="refresh-chat-btn", style={"display": "none"}, n_clicks=0),
         html.Button(id="update-date-btn", style={"display": "none"}, **{"data-date": "December 2024"}, n_clicks=0),
     ],
     className="app-container",
@@ -558,6 +561,100 @@ app.clientside_callback(
     prevent_initial_call=True,
 )
 
+app.clientside_callback(
+    """
+    function(n_refresh, n_date, current_date) {
+      if (!n_refresh && !n_date) return '';
+
+      window.iwCounter = window.iwCounter || 0;
+      const msgs = document.querySelectorAll('.bot-message:not([data-processed="true"])');
+
+      msgs.forEach(msg => {
+        // wait for either <p> or our custom headers
+        if (!msg.querySelector('p') && !msg.querySelector('.llm-response-header')) return;
+        msg.setAttribute('data-processed', 'true');
+
+        // build the collapsible wrapper
+        const originalHTML = msg.innerHTML;
+        const wrapper  = document.createElement('div');
+        wrapper.className = 'collapsible-response';
+
+        // header (date vs number)
+        const isCom = !!msg.closest('#community-chat-container');
+        const label = isCom ? (++window.iwCounter) : current_date;
+        const header = document.createElement('div');
+        header.className = 'collapsible-header expanded';
+        header.innerHTML =
+          '<span class="date-label">' + label + '</span>' +
+          '<span class="toggle-icon">▼</span>';
+        header.addEventListener('click', function() {
+          this.classList.toggle('expanded');
+          const c = this.nextElementSibling;
+          c.style.display = c.style.display==='none' ? '' : 'none';
+          this.querySelector('.toggle-icon').textContent =
+            c.style.display==='none' ? '▶' : '▼';
+        });
+
+        // content container
+        const content = document.createElement('div');
+        content.className = 'collapsible-content';
+        content.innerHTML = originalHTML;
+
+        // ── CATEGORY COLORS ─────────────────────────────────────────
+        if (!isCom) {
+          // your four custom plus re-used burgundy for the fifth
+          const sliceColors = [
+            '#FFA95A',  // Living Conditions
+            '#6987C4',  // Trash
+            '#A9A9A9',  // Streets
+            '#701238',  // Parking
+            '#701238'   // Violent Crime
+          ];
+          const keys = [
+            'living-conditions',
+            'trash',
+            'streets',
+            'parking',
+            'violent-crime'
+          ];
+
+          keys.forEach((key, idx) => {
+            const container = content.querySelector('.llm-response-' + key);
+            if (!container) return;
+
+            // gather all nodes until next header
+            let node = container.nextSibling;
+            const toMove = [];
+            while (node && !(node.nodeType===1 && node.classList.contains('llm-response-header'))) {
+              toMove.push(node);
+              node = node.nextSibling;
+            }
+            toMove.forEach(n => container.appendChild(n));
+
+            // apply your custom slice color at 10% opacity
+            const [r,g,b] = sliceColors[idx].match(/\\w\\w/g).map(h => parseInt(h,16));
+            container.style.backgroundColor = `rgba(${r},${g},${b},0.1)`;
+            container.style.padding = '0.5em';
+            container.style.borderRadius = '4px';
+            container.style.marginBottom = '0.5em';
+          });
+        }
+        // ─────────────────────────────────────────────────────────────
+
+        wrapper.appendChild(header);
+        wrapper.appendChild(content);
+        msg.innerHTML = '';
+        msg.appendChild(wrapper);
+      });
+
+      return '';
+    }
+    """,
+    Output("loading-output", "children"),
+    [Input("refresh-chat-btn", "n_clicks"), Input("update-date-btn", "n_clicks")],
+    [State("current-date-store", "data")],
+)
+
 
 @app.callback(Output("slider-value-display", "children"), Input("date-slider-value", "children"))
 def update_slider_display(date_value):
@@ -632,6 +729,7 @@ def show_left_spinner_on_slider_change(slider_value):
     [
         Output("chat-messages", "children", allow_duplicate=True),
         Output("loading-spinner", "style", allow_duplicate=True),
+        Output("refresh-chat-btn", "n_clicks", allow_duplicate=True),  # Add this output
     ],
     [
         Input("user-message-store", "data"),
@@ -640,10 +738,11 @@ def show_left_spinner_on_slider_change(slider_value):
     [
         State("chat-messages", "children"),
         State("selected-hexbins-store", "data"),
+        State("refresh-chat-btn", "n_clicks"),
     ],
     prevent_initial_call=True,
 )
-def handle_chat_response(stored_input, slider_value, current_messages, selected_hexbins_data):
+def handle_chat_response(stored_input, slider_value, current_messages, selected_hexbins_data, refresh_clicks):
 
     current_messages = current_messages or []
     year, month = date_string_to_year_month(slider_value)
@@ -653,12 +752,19 @@ def handle_chat_response(stored_input, slider_value, current_messages, selected_
         event_ids = ",".join(selected_hexbins_data["selected_ids"])
         event_id_data = get_select_311_data(event_ids=event_ids)
         event_date_data = get_select_311_data(event_date=selected_date)
-        prompt += f"\n\nYour neighbor has specifically selected an area within Dorchester to examine. " f"The overall neighborhood 311 data on {selected_date} are: {event_date_data}. " f"The specific area 311 data are: {event_id_data}. Compare the local area data, the neighborhood-wide data, " f"and the overall trends in the original 311 data."
+        prompt += (
+            f"\n\nYour neighbor has specifically selected an area within Dorchester to examine. "
+            f"The overall neighborhood 311 data on {selected_date} are: {event_date_data}. "
+            f"The specific area 311 data are: {event_id_data}. Compare the local area data, the neighborhood-wide data, "
+            f"and the overall trends in the original 311 data."
+        )
     # Requesting response for 311 By the Numbers
     reply = get_chat_response(prompt=prompt, structured_response=True)
     bot_response = html.Div([dcc.Markdown(reply, dangerously_allow_html=True)], className="bot-message")
     updated_messages = current_messages + [bot_response]
-    return updated_messages, {"display": "none"}
+    refresh_clicks = 0 if refresh_clicks is None else refresh_clicks + 1
+
+    return updated_messages, {"display": "none"}, refresh_clicks
 
 
 @callback(
@@ -700,6 +806,7 @@ def show_right_spinner_on_slider_change(slider_value):
     [
         Output("chat-messages-right", "children", allow_duplicate=True),
         Output("loading-spinner-right", "style", allow_duplicate=True),
+        Output("refresh-chat-btn", "n_clicks", allow_duplicate=True),  # Add this output
     ],
     [
         Input("user-message-store-right", "data"),
@@ -708,10 +815,11 @@ def show_right_spinner_on_slider_change(slider_value):
     [
         State("chat-messages-right", "children"),
         State("selected-hexbins-store", "data"),
+        State("refresh-chat-btn", "n_clicks"),
     ],
     prevent_initial_call=True,
 )
-def handle_chat_response_right(stored_input, slider_value, msgs, selected):
+def handle_chat_response_right(stored_input, slider_value, msgs, selected, refresh_clicks):
     msgs = msgs or []
 
     year, month = date_string_to_year_month(slider_value)
@@ -725,7 +833,9 @@ def handle_chat_response_right(stored_input, slider_value, msgs, selected):
 
     msgs.append(html.Div(dcc.Markdown(reply, dangerously_allow_html=True), className="bot-message"))
 
-    return msgs, {"display": "none"}
+    refresh_clicks = 0 if refresh_clicks is None else refresh_clicks + 1
+
+    return msgs, {"display": "none"}, refresh_clicks
 
 
 @callback(
@@ -747,7 +857,7 @@ def handle_chat_response_right(stored_input, slider_value, msgs, selected):
 def handle_overlay_buttons(show_clicks, tell_clicks, listen_clicks):
     ctx = dash.callback_context
     if not ctx.triggered:
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
     button_id = ctx.triggered[0]["prop_id"].split(".")[0]
     overlay_style = {"opacity": "0", "transition": "opacity 1s linear 300ms, opacity 300ms"}
@@ -789,16 +899,18 @@ def complete_overlay_transition(n_intervals):
         Output("chat-messages", "children", allow_duplicate=True),
         Output("chat-input", "value", allow_duplicate=True),
         Output("loading-output", "children", allow_duplicate=True),
+        Output("refresh-chat-btn", "n_clicks", allow_duplicate=True),  # Add this output
     ],
     [
         Input("tell-me-trigger", "children"),
     ],
     [
         State("chat-messages", "children"),
+        State("refresh-chat-btn", "n_clicks"),
     ],
     prevent_initial_call=True,
 )
-def handle_tell_me_prompt(prompt, current_messages):
+def handle_tell_me_prompt(prompt, current_messages, refresh_clicks):
     if not prompt:
         raise PreventUpdate
 
@@ -814,13 +926,16 @@ def handle_tell_me_prompt(prompt, current_messages):
     )
     updated_messages = current_messages + [bot_response]
 
-    return updated_messages, "", dash.no_update
+    refresh_clicks = 0 if refresh_clicks is None else refresh_clicks + 1
+
+    return updated_messages, "", dash.no_update, refresh_clicks
 
 
 @callback(
     [
         Output("chat-messages", "children", allow_duplicate=True),
         Output("chat-messages-right", "children", allow_duplicate=True),
+        Output("refresh-chat-btn", "n_clicks", allow_duplicate=True),  # Add this output
     ],
     [
         Input("tell-me-btn", "n_clicks"),
@@ -828,10 +943,11 @@ def handle_tell_me_prompt(prompt, current_messages):
     ],
     [
         State("current-date-store", "data"),
+        State("refresh-chat-btn", "n_clicks"),
     ],
     prevent_initial_call=True,
 )
-def handle_initial_prompts(n_clicks, selected, slider_value):
+def handle_initial_prompts(n_clicks, selected, slider_value, refresh_clicks):
 
     if not n_clicks:
         raise PreventUpdate
@@ -853,15 +969,19 @@ def handle_initial_prompts(n_clicks, selected, slider_value):
         if len(ids) > LIMIT:
             area_context += f"\n\nNote: This area had {len(ids)} events, but only {LIMIT} are analyzed due to system limits."
 
-    stats_prompt = f"response-type = analytic. A by-the-numbers overview for Dorchester on {selected_date}:{area_context} " "Your neighbor has selected this specific area to focus on. You don't have to compare the statistics but just analyze the data and give the statistics along with insights. Focus on counts of 311, shots fired, etc."
+    stats_prompt = (
+        f"response-type = analytic. A by-the-numbers overview for Dorchester on {selected_date}:{area_context} "
+        "Your neighbor has selected this specific area to focus on. You don't have to compare the statistics but just analyze the data and give the statistics along with insights. Focus on counts of 311, shots fired, etc."
+    )
     stats_reply = get_chat_response(prompt=stats_prompt, structured_response=True)
     stats_message = html.Div([html.Strong("A by-the-numbers overview of your neighborhood:"), dcc.Markdown(stats_reply, dangerously_allow_html=True)], className="bot-message")
 
     community_prompt = f"response-type = mixed. Community meeting summary for {selected_date}:{area_context} " "Your neighbor has selected this specific area to focus on. Share neighbor quotes and concerns."
     community_reply = get_chat_response(prompt=community_prompt, structured_response=False)
     community_message = html.Div([html.Strong("From recent community meetings:"), dcc.Markdown(community_reply, dangerously_allow_html=True)], className="bot-message")
+    refresh_clicks = 0 if refresh_clicks is None else refresh_clicks + 1
 
-    return [stats_message], [community_message]
+    return [stats_message], [community_message], refresh_clicks
 
 
 @callback(
@@ -907,7 +1027,23 @@ def get_all_hexbin_data(_):
     return {"type": "FeatureCollection", "features": hex_features}
 
 
-@callback([Output("stats-chat-container", "style"), Output("community-chat-container", "style"), Output("stats-tab", "className"), Output("community-tab", "className"), Output("active-tab-store", "data")], [Input("stats-tab", "n_clicks"), Input("community-tab", "n_clicks")], [State("active-tab-store", "data")], prevent_initial_call=True)
+@callback(
+    [
+        Output("stats-chat-container", "style"),
+        Output("community-chat-container", "style"),
+        Output("stats-tab", "className"),
+        Output("community-tab", "className"),
+        Output("active-tab-store", "data"),
+    ],
+    [
+        Input("stats-tab", "n_clicks"),
+        Input("community-tab", "n_clicks"),
+    ],
+    [
+        State("active-tab-store", "data"),
+    ],
+    prevent_initial_call=True,
+)
 def switch_tabs(stats_clicks, community_clicks, active_tab):
     ctx = dash.callback_context
     if not ctx.triggered:
@@ -1030,7 +1166,18 @@ def render_category_pie(counts):
         return go.Figure(layout={"annotations": [{"text": "No data", "x": 0.5, "y": 0.5, "showarrow": False}]})
     labels = list(counts.keys())
     values = list(counts.values())
-    fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.4, showlegend=False)])
+
+    # map each exact string to its color
+    color_map = {
+        "Streets, Sidewalks, And Parks": "#A9A9A9",
+        "Parking": "#701238",
+        "Living Conditions": "#FFA95A",
+        "Trash, Recycling, And Waste": "#6987C4",
+    }
+    # build the color list in the same order as labels
+    colors = [color_map.get(lbl, "#CCCCCC") for lbl in labels]
+
+    fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.4, sort=False, marker=dict(colors=colors), showlegend=False)])  # preserve order
     fig.update_layout(margin={"l": 0, "r": 0, "t": 0, "b": 0})
     return fig
 
@@ -1040,7 +1187,10 @@ def render_category_pie(counts):
     Input("area-shot-count-store", "data"),
 )
 def render_shots_count(count):
-    return f"Shots fired in area: {count}"
+    # Using HTML to create a small dot followed by the text
+    return html.Span(
+        [html.Span("•", className="shots_count"), f" {count}"],
+    )
 
 
 server = app.server
