@@ -437,6 +437,7 @@ app.layout = html.Div(
         dcc.Store(id="hexbin-data-store-background"),
         dcc.Store(id="area-category-counts-store"),
         dcc.Store(id="area-shot-count-store"),
+        dcc.Store(id="area-homicide-count-store"),
         html.Div(id="background-data-applied", style={"display": "none"}),
         html.Div(id="slider-value-display", className="current-date", style={"display": "none"}),
         dcc.Interval(id="initialization-interval", interval=100, max_intervals=1),
@@ -658,6 +659,85 @@ app.clientside_callback(
     [State("current-date-store", "data")],
 )
 
+# — at the very bottom of your app.py, after your other callbacks — 
+
+app.clientside_callback(
+    """
+    function(clickData) {
+      // 1) clear any old highlights
+      document.querySelectorAll('.llm-response-header').forEach(function(hdr) {
+        var box = hdr.nextElementSibling;
+        if (box) box.style.boxShadow = '';
+      });
+
+      // 2) if nothing clicked, bail
+      if (!clickData || !clickData.points || !clickData.points.length) {
+        return '';
+      }
+
+      // 3) see which slice label was clicked
+      var category = clickData.points[0].label;
+
+      // 4) map the exact pie labels → your paragraph keys
+      var labelToKey = {
+        'Living Conditions':             'living-conditions',
+        'Trash, Recycling, And Waste':   'trash',
+        'Streets, Sidewalks, And Parks': 'streets',
+        'Parking':                        'parking',
+        'Violent Crime':                 'violent-crime'
+      };
+      var key = labelToKey[category];
+      if (!key) return '';
+
+      // 5) neon highlight colors per category
+      var highlightColors = {
+        'living-conditions': 'rgba(255,169,90,0.8)',
+        'trash':             'rgba(105,135,196,0.8)',
+        'streets':           'rgba(169,169,169,0.8)',
+        'parking':           'rgba(112,18,56,0.8)',
+        'violent-crime':     'rgba(112,18,56,0.8)'
+      };
+      var neon = highlightColors[key] || 'rgba(0,200,255,0.8)';
+
+      // 6) find the latest stats message
+      var msgs    = document.querySelectorAll('#stats-chat-container .bot-message');
+      if (!msgs.length) return '';
+      var lastMsg = msgs[msgs.length - 1];
+
+      // 7) if it’s collapsed (header lacks 'expanded'), simulate a click to expand
+      var header  = lastMsg.querySelector('.collapsible-header');
+      if (header && !header.classList.contains('expanded')) {
+        header.click();
+      }
+
+      // 8) highlight & scroll the matching paragraph
+      var container = lastMsg.querySelector('.llm-response-' + key);
+      if (container) {
+        container.style.boxShadow = '0 0 15px 5px ' + neon;
+        container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+      return '';
+    }
+    """,
+    Output("loading-output", "children", allow_duplicate=True),
+    Input("category-pie-chart", "clickData"),
+    prevent_initial_call=True
+)
+
+app.clientside_callback(
+    """
+    function(activeTab) {
+      const inp = document.querySelector('.chat-input-container');
+      if (!inp) return '';
+      inp.style.display = activeTab === 'stats' ? 'none' : '';
+      return '';
+    }
+    """,
+    Output('dummy-output', 'children', allow_duplicate=True),
+    Input('active-tab-store', 'data'),
+    prevent_initial_call='initial_duplicate'
+)
 
 @app.callback(Output("slider-value-display", "children"), Input("date-slider-value", "children"))
 def update_slider_display(date_value):
@@ -1159,6 +1239,36 @@ def update_shot_count(selected, date_str):
     count = df_month[df_month["cell"].isin(hex_ids)].shape[0]
     return count
 
+@callback(
+    Output("area-homicide-count-store", "data"),
+    [
+        Input("selected-hexbins-store", "data"),
+        Input("current-date-store",    "data"),
+    ],
+)
+def update_homicide_count(selected, date_str):
+    year, month = date_string_to_year_month(date_str)
+    ts = pd.Timestamp(f"{year}-{month:02d}")
+    df_month = df_hom_shot_matched[
+        df_hom_shot_matched["date"]
+            .dt.to_period("M")
+            .dt.to_timestamp() == ts
+    ].copy()
+
+    # build the H3 cells column via list comprehension
+    df_month["cell"] = [
+        h3.latlng_to_cell(lat, lon, 10)
+        for lat, lon in zip(df_month["latitude"], df_month["longitude"])
+    ]
+
+    hex_ids = selected.get("selected_hexbins", [])
+    if hex_ids:
+        count = df_month["cell"].isin(hex_ids).sum()
+    else:
+        count = len(df_month)
+
+    return count
+
 
 @app.callback(
     Output("category-pie-chart", "figure"),
@@ -1180,21 +1290,59 @@ def render_category_pie(counts):
     # build the color list in the same order as labels
     colors = [color_map.get(lbl, "#CCCCCC") for lbl in labels]
 
-    fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.4, sort=False, marker=dict(colors=colors), showlegend=False)])  # preserve order
+    fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.2, sort=False, marker=dict(colors=colors), showlegend=False)])  # preserve order
     fig.update_layout(margin={"l": 0, "r": 0, "t": 0, "b": 0})
     return fig
 
 
-@app.callback(
+@callback(
     Output("shots-count-display", "children"),
-    Input("area-shot-count-store", "data"),
+    [
+        Input("area-shot-count-store",    "data"),
+        Input("area-homicide-count-store","data"),
+    ],
 )
-def render_shots_count(count):
-    # Using HTML to create a small dot followed by the text
-    return html.Span(
-        [html.Span("•", className="shots_count"), f" {count}"],
-    )
+def render_counts(shots_count, homicides_count):
+    return html.Div([
+        # Shots fired pill
+        html.Div([
+            html.Span("•", style={
+                "color": "#701238",
+                "fontSize": "20px",
+                "marginRight": "4px",
+            }),
+            html.Span(f"{shots_count}", style={"fontWeight": "600"}),
+            html.Span(" Shots Fired", style={"marginLeft": "4px"})
+        ], style={
+            "display": "flex",
+            "alignItems": "center",
+            "backgroundColor": "rgba(112,39,56,0.1)",
+            "padding": "4px 8px",
+            "borderRadius": "12px"
+        }),
 
+        # Homicides pill
+        html.Div([
+            html.Span("•", style={
+                "color": "#000",
+                "fontSize": "30px",
+                "marginRight": "4px",
+            }),
+            html.Span(f"{homicides_count}", style={"fontWeight": "600"}),
+            html.Span(" Homicides", style={"marginLeft": "4px"})
+        ], style={
+            "display": "flex",
+            "alignItems": "center",
+            "backgroundColor": "rgba(0,0,0,0.1)",
+            "padding": "4px 8px",
+            "borderRadius": "12px"
+        }),
+    ], style={
+        "display": "flex",
+        "gap": "1rem",
+        "marginTop": "0.5rem",
+        "fontSize": "14px"
+    })
 
 server = app.server
 
