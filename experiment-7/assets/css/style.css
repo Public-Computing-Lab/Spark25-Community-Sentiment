@@ -6,7 +6,7 @@
   --highlight: rgba(112, 39, 69, 0.4);
   --chat-user: rgba(53, 59, 70, 1);
   --chat-bot: rgba(229, 232, 237, 1);
-  --background-base: rgba(248, 248, 248, 1);
+  --background-base: rgba(240, 240, 240, 1);
   --title: rgba(18, 46, 111, 1);
   --text-color: rgba(35, 46, 51, 1);
   --chat-user-message: rgba(119, 118, 118, 0.6);
@@ -265,6 +265,78 @@ body {
   border-radius: var(--border-radius-small);
 }
 
+._dash-loading-callback {
+  position: static !important;
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  margin: 10px 0;
+  text-align: center;
+}
+
+.chat-messages {
+  scroll-behavior: smooth;
+}
+
+.chat-messages-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-messages-wrapper>div {
+  flex: 1;
+  overflow: overflow;
+}
+
+.chat-tabs-container {
+  display: flex;
+  border-bottom: 1px solid var(--highlight);
+}
+
+#chat-section-right .chat-input-container {
+  display: flex;
+  gap: var(--spacing-small);
+}
+
+.chat-content-container {
+  border-top: none;
+  background: transparent;
+}
+
+.chat-tab {
+  padding: 10px 15px;
+  cursor: pointer;
+  background-color: rgba(255, 255, 255, 0.7);
+  border-top-left-radius: var(--border-radius-small);
+  border-top-right-radius: var(--border-radius-small);
+  border: 1px solid var(--highlight);
+  border-bottom: none;
+  margin-right: 5px;
+  margin-bottom: -1px;
+  transition: all 0.2s ease;
+}
+
+.chat-tab.active {
+  background-color: white;
+  border-bottom: 1px solid white;
+  font-weight: bold;
+}
+
+.chat-tab:hover:not(.active) {
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+.chat-content-container {
+  height: calc(100% - 100px);
+  overflow: hidden;
+}
+
+._dash-loading>._dash-loading-callback {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
 .send-btn {
   padding: var(--spacing-small) var(--spacing-medium);
   background-color: var(--button-color);
@@ -423,4 +495,32 @@ body {
   font-weight: 500;
   text-anchor: middle;
   fill: #475569;
+}
+
+
+@keyframes pulsIn {
+  0% {
+    box-shadow: inset 0 0 0 1rem #fff;
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    box-shadow: inset 0 0 0 0 #fff;
+    opacity: 0;
+  }
+}
+
+@keyframes pulsOut {
+
+  0%,
+  50% {
+    box-shadow: 0 0 0 0 #fff;
+    opacity: 0;
+  }
+
+  100% {
+    box-shadow: 0 0 0 1rem #fff;
+    opacity: 1;
+  }
 }
