@@ -143,15 +143,18 @@ def get_311_data(force_refresh=False):
 
 def get_select_311_data(event_ids="", event_date=""):
 
+    headers = {
+        "Content-Type": "application/json",
+        "RethinkAI-API-Key": Config.RETHINKAI_API_KEY,
+    }
     if event_ids:
-        url = f"{Config.API_BASE_URL}/data/query?request=311_summary&category=all&stream=True&app_version={Config.APP_VERSION}&event_ids={event_ids}"
+        response = requests.post(f"{Config.API_BASE_URL}/data/query?request=311_summary&category=all&stream=False&app_version={Config.APP_VERSION}&output_type=csv", headers=headers, json={"event_ids": event_ids})
+
     elif event_date:
-        url = f"{Config.API_BASE_URL}/data/query?request=311_summary&category=all&stream=True&app_version={Config.APP_VERSION}&date={event_date}"
+        response = requests.get(f"{Config.API_BASE_URL}/data/query?request=311_summary&category=all&stream=True&app_version={Config.APP_VERSION}&date={event_date}&output_type=csv")
 
-    response_df = stream_to_dataframe(url)
-    reply = response_df.to_csv(index=False)
-
-    return reply
+    response.raise_for_status()
+    return response.text
 
 
 def get_shots_fired_data(force_refresh=False):
@@ -1162,8 +1165,8 @@ def update_shot_count(selected, date_str):
     Input("area-category-counts-store", "data"),
 )
 def render_category_pie(counts):
-    if not counts:
-        return go.Figure(layout={"annotations": [{"text": "No data", "x": 0.5, "y": 0.5, "showarrow": False}]})
+    # if not counts:
+    #     return go.Figure(layout={"annotations": [{"text": "No data", "x": 0.5, "y": 0.5, "showarrow": False}]})
     labels = list(counts.keys())
     values = list(counts.values())
 
