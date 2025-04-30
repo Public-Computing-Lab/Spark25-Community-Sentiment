@@ -1165,8 +1165,8 @@ def update_shot_count(selected, date_str):
     Input("area-category-counts-store", "data"),
 )
 def render_category_pie(counts):
-    # if not counts:
-    #     return go.Figure(layout={"annotations": [{"text": "No data", "x": 0.5, "y": 0.5, "showarrow": False}]})
+    if not counts:
+        return go.Figure(layout={"annotations": [{"text": "No data", "x": 0.5, "y": 0.5, "showarrow": False}]})
     labels = list(counts.keys())
     values = list(counts.values())
 
