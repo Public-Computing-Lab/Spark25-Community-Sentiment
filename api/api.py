@@ -887,7 +887,7 @@ def check_session():
 #
 # Endpoint Definitions
 #
-@app.route("/data/query", methods=["GET"])
+@app.route("/data/query", methods=["GET", "POST"])
 def route_data_query():
     session_id = session.get("session_id")
     # Get query parameters
@@ -901,6 +901,11 @@ def route_data_query():
 
     if not data_request:
         return jsonify({"✖ Error": "Missing data_request parameter"}), 400
+
+    if request.method == "POST":
+        # Handles case for requesting many event_ids
+        data = request.get_json()
+        event_ids = data.get("event_ids", "")
 
     try:  # Get and validate request parameters
         request_options = request.args.get("category", "")
@@ -965,7 +970,13 @@ def route_data_query():
                 log_id=g.log_entry,
                 app_response="SUCCESS",
             )
-            return get_query_results(query=query, output_type=output_type)
+            result = get_query_results(query=query, output_type=output_type)
+            if output_type == "csv" and result:
+                output = result.getvalue()
+                response = Response(output, mimetype="text/csv")
+                response.headers["Content-Disposition"] = "attachment; filename=export.csv"
+                return response
+            return result
 
     except Exception as e:
         log_event(

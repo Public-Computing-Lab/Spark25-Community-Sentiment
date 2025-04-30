@@ -136,12 +136,25 @@
                 'interpolate', ['linear'],
                 ['get', 'value'],
                 0, 'rgba(0,0,0,0)',
-                1, '#eeeeee', 5, '#cccccc', 10, '#999999', 20, '#666666'
+                1, '#f5f5f5', // Much lighter gray
+                3, '#e0e0e0', // Light gray
+                5, '#c0c0c0', // Medium gray
+                7, '#a0a0a0', // Darker gray
+                10, '#808080' // Darkest gray (but not too dark)
               ],
-              'fill-opacity': 0.5,
-              'fill-outline-color': 'rgba(200,200,200,0.5)'
+              'fill-opacity': 0.6,
+              'fill-outline-color': 'rgba(200,200,200,0.4)'
             }
           });
+          // Try to get background data immediately
+          const bgStore = document.getElementById('hexbin-data-store-background');
+          if (bgStore && bgStore._dashprivate_store && bgStore._dashprivate_store.data) {
+            const bgSource = beforeMap.getSource('hexDataBackground');
+            if (bgSource) {
+              bgSource.setData(bgStore._dashprivate_store.data);
+              console.log('Initial background map data applied');
+            }
+          }
         });
         beforeMap.on('moveend', () => this.handleMapMoveEnd(beforeMap, afterMap));
       },
@@ -824,4 +837,21 @@ window.clientside = {
     if (wrap) { wrap.scrollTop = wrap.scrollHeight; }
     return '';
   },
+};
+
+window.clientside = {
+  ...window.clientside,
+  scrollChat: function(messages, containerId) {
+    if (!messages) return {};
+
+
+    setTimeout(() => {
+      const chatContainer = document.getElementById(containerId);
+      if (chatContainer) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+    }, 100);
+
+    return {};
+  }
 };
