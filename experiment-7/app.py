@@ -148,10 +148,17 @@ def get_select_311_data(event_ids="", event_date=""):
         "RethinkAI-API-Key": Config.RETHINKAI_API_KEY,
     }
     if event_ids:
-        response = requests.post(f"{Config.API_BASE_URL}/data/query?request=311_summary&category=all&stream=False&app_version={Config.APP_VERSION}&output_type=csv", headers=headers, json={"event_ids": event_ids})
+        response = requests.post(
+            f"{Config.API_BASE_URL}/data/query?request=311_summary&category=all&stream=False&app_version={Config.APP_VERSION}&output_type=csv",
+            headers=headers,
+            json={"event_ids": event_ids},
+        )
 
     elif event_date:
-        response = requests.get(f"{Config.API_BASE_URL}/data/query?request=311_summary&category=all&stream=True&app_version={Config.APP_VERSION}&date={event_date}&output_type=csv")
+        response = requests.get(
+            f"{Config.API_BASE_URL}/data/query?request=311_summary&category=all&stream=False&app_version={Config.APP_VERSION}&date={event_date}&output_type=csv",
+            headers=headers,
+        )
 
     response.raise_for_status()
     return response.text
@@ -640,7 +647,7 @@ app.clientside_callback(
             container.style.backgroundColor = `rgba(${r},${g},${b},0.1)`;
             container.style.padding = '0.5em';
             container.style.borderRadius = '4px';
-            container.style.marginBottom = '0.5em';
+            container.style.marginBottom = '1em';
           });
         }
         // ─────────────────────────────────────────────────────────────
@@ -659,7 +666,7 @@ app.clientside_callback(
     [State("current-date-store", "data")],
 )
 
-# — at the very bottom of your app.py, after your other callbacks — 
+# — at the very bottom of your app.py, after your other callbacks —
 
 app.clientside_callback(
     """
@@ -722,7 +729,7 @@ app.clientside_callback(
     """,
     Output("loading-output", "children", allow_duplicate=True),
     Input("category-pie-chart", "clickData"),
-    prevent_initial_call=True
+    prevent_initial_call=True,
 )
 
 app.clientside_callback(
@@ -734,10 +741,11 @@ app.clientside_callback(
       return '';
     }
     """,
-    Output('dummy-output', 'children', allow_duplicate=True),
-    Input('active-tab-store', 'data'),
-    prevent_initial_call='initial_duplicate'
+    Output("dummy-output", "children", allow_duplicate=True),
+    Input("active-tab-store", "data"),
+    prevent_initial_call="initial_duplicate",
 )
+
 
 @app.callback(Output("slider-value-display", "children"), Input("date-slider-value", "children"))
 def update_slider_display(date_value):
@@ -1239,27 +1247,21 @@ def update_shot_count(selected, date_str):
     count = df_month[df_month["cell"].isin(hex_ids)].shape[0]
     return count
 
+
 @callback(
     Output("area-homicide-count-store", "data"),
     [
         Input("selected-hexbins-store", "data"),
-        Input("current-date-store",    "data"),
+        Input("current-date-store", "data"),
     ],
 )
 def update_homicide_count(selected, date_str):
     year, month = date_string_to_year_month(date_str)
     ts = pd.Timestamp(f"{year}-{month:02d}")
-    df_month = df_hom_shot_matched[
-        df_hom_shot_matched["date"]
-            .dt.to_period("M")
-            .dt.to_timestamp() == ts
-    ].copy()
+    df_month = df_hom_shot_matched[df_hom_shot_matched["date"].dt.to_period("M").dt.to_timestamp() == ts].copy()
 
     # build the H3 cells column via list comprehension
-    df_month["cell"] = [
-        h3.latlng_to_cell(lat, lon, 10)
-        for lat, lon in zip(df_month["latitude"], df_month["longitude"])
-    ]
+    df_month["cell"] = [h3.latlng_to_cell(lat, lon, 10) for lat, lon in zip(df_month["latitude"], df_month["longitude"])]
 
     hex_ids = selected.get("selected_hexbins", [])
     if hex_ids:
@@ -1298,51 +1300,49 @@ def render_category_pie(counts):
 @callback(
     Output("shots-count-display", "children"),
     [
-        Input("area-shot-count-store",    "data"),
-        Input("area-homicide-count-store","data"),
+        Input("area-shot-count-store", "data"),
+        Input("area-homicide-count-store", "data"),
     ],
 )
 def render_counts(shots_count, homicides_count):
-    return html.Div([
-        # Shots fired pill
-        html.Div([
-            html.Span("•", style={
-                "color": "#701238",
-                "fontSize": "20px",
-                "marginRight": "4px",
-            }),
-            html.Span(f"{shots_count}", style={"fontWeight": "600"}),
-            html.Span(" Shots Fired", style={"marginLeft": "4px"})
-        ], style={
-            "display": "flex",
-            "alignItems": "center",
-            "backgroundColor": "rgba(112,39,56,0.1)",
-            "padding": "4px 8px",
-            "borderRadius": "12px"
-        }),
+    return html.Div(
+        [
+            # Shots fired pill
+            html.Div(
+                [
+                    html.Span(
+                        "•",
+                        style={
+                            "color": "#701238",
+                            "fontSize": "20px",
+                            "marginRight": "4px",
+                        },
+                    ),
+                    html.Span(f"{shots_count}", style={"fontWeight": "600"}),
+                    html.Span(" Shots Fired", style={"marginLeft": "4px"}),
+                ],
+                style={"display": "flex", "alignItems": "center", "backgroundColor": "rgba(112,39,56,0.1)", "padding": "4px 8px", "borderRadius": "12px"},
+            ),
+            # Homicides pill
+            html.Div(
+                [
+                    html.Span(
+                        "•",
+                        style={
+                            "color": "#000",
+                            "fontSize": "30px",
+                            "marginRight": "4px",
+                        },
+                    ),
+                    html.Span(f"{homicides_count}", style={"fontWeight": "600"}),
+                    html.Span(" Homicides", style={"marginLeft": "4px"}),
+                ],
+                style={"display": "flex", "alignItems": "center", "backgroundColor": "rgba(0,0,0,0.1)", "padding": "4px 8px", "borderRadius": "12px"},
+            ),
+        ],
+        style={"display": "flex", "gap": "1rem", "marginTop": "0.5rem", "fontSize": "14px"},
+    )
 
-        # Homicides pill
-        html.Div([
-            html.Span("•", style={
-                "color": "#000",
-                "fontSize": "30px",
-                "marginRight": "4px",
-            }),
-            html.Span(f"{homicides_count}", style={"fontWeight": "600"}),
-            html.Span(" Homicides", style={"marginLeft": "4px"})
-        ], style={
-            "display": "flex",
-            "alignItems": "center",
-            "backgroundColor": "rgba(0,0,0,0.1)",
-            "padding": "4px 8px",
-            "borderRadius": "12px"
-        }),
-    ], style={
-        "display": "flex",
-        "gap": "1rem",
-        "marginTop": "0.5rem",
-        "fontSize": "14px"
-    })
 
 server = app.server
 
