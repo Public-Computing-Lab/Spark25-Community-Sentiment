@@ -105,9 +105,13 @@ body {
   left: 0;
   width: 100%;
   z-index: 50;
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(235, 235, 235, 0.5);
   padding: 10px 20px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.app-header-title{
+  font-weight: 900;
 }
 
 /* ===============================
@@ -132,8 +136,8 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
-  margin-top: calc(-100vh / 2 + 300px);
-  margin-left: calc(-100vw / 2 + 300px);
+  /* margin-top: calc(-100vh / 2 + 300px);
+  margin-left: calc(-100vw / 2 + 300px); */
   background: transparent !important;
 }
 
@@ -202,6 +206,10 @@ body {
     width: 45%;
     /* height: 80vh; */
   }
+  
+  .current-date{
+    font-size: 1em !important;
+  }
 }
 
 /* ===============================
@@ -220,7 +228,7 @@ body {
 }
 
 .chat-messages-wrapper {
-  height: calc(100% - 50px);
+  height: calc(100% - 0px);
   overflow-y: scroll;
 }
 
@@ -242,6 +250,17 @@ body {
   padding: 0.5rem 0.75rem;
   margin: 0.75rem;
   width: 94%;
+}
+
+.llm-response-header {
+  display: none;
+}
+
+.llm-response-living-conditions,
+.llm-response-trash,
+.llm-response-streets,
+.llm-response-parking{
+  margin-top: 1em;
 }
 
 #chat-section-left .chat-input-container {
@@ -272,6 +291,13 @@ body {
   height: auto !important;
   margin: 10px 0;
   text-align: center;
+}
+
+#loading-spinner-right,
+#loading-spinner{
+  position: static;
+  background: transparent;
+  pointer-events: none;
 }
 
 .chat-messages {
@@ -497,6 +523,7 @@ body {
 }
 
 .current-date {
+  font-size: .7em;
   color: #777;
   position: absolute;
   bottom: var(--spacing-small);
@@ -571,3 +598,50 @@ body {
     opacity: 1;
   }
 }
+
+/* ===============================
+ Chart Elements
+ =============================== */
+ 
+ #category-pie-chart{
+   width: 100%;
+   height: 150px;
+ }
+ 
+ #shots-count-display{
+   text-align: center;
+   margin-top: 0.5rem;
+   margin-bottom: 1rem;
+   font-size: 1rem;
+   padding: 0.5rem;
+   background-color: transparent;
+   border-radius: 0;
+   position: relative;
+   z-index: 50;
+   box-shadow: none;
+   border:none;
+ }
+ 
+ .stats-visualization-container{
+   padding: 1rem;
+   background-color: rgba(255, 255, 255, 0.3);
+   border-radius: 8px;
+   margin:0.5rem auto 1rem auto;   
+   width: 90%;
+   
+ }
+ 
+ .shots_count{
+   color:#701238;
+   font-size: 30px;
+   margin-right: 5px;
+ }
+ 
+ #shots-count-display{
+   margin: 0 auto;   
+ }
+ 
+ .date-label{
+   font-size: 1.1em;
+   font-weight: 600;
+ }
