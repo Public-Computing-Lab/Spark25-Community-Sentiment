@@ -843,15 +843,19 @@ window.clientside = {
   ...window.clientside,
   scrollChat: function(messages, containerId) {
     if (!messages) return {};
-
-
+    
+    // Get the container
+    const container = document.getElementById(containerId);
+    if (!container) return {};
+    
+    // Force immediate scroll to bottom
+    container.scrollTop = container.scrollHeight;
+    
+    // Also scroll after a short delay to ensure all content is rendered
     setTimeout(() => {
-      const chatContainer = document.getElementById(containerId);
-      if (chatContainer) {
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-      }
+      container.scrollTop = container.scrollHeight;
     }, 100);
-
+    
     return {};
   }
 };

@@ -105,9 +105,13 @@ body {
   left: 0;
   width: 100%;
   z-index: 50;
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(235, 235, 235, 0.5);
   padding: 10px 20px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.app-header-title {
+  font-weight: 900;
 }
 
 /* ===============================
@@ -132,8 +136,8 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
-  margin-top: calc(-100vh / 2 + 300px);
-  margin-left: calc(-100vw / 2 + 300px);
+  /* margin-top: calc(-100vh / 2 + 300px);
+  margin-left: calc(-100vw / 2 + 300px); */
   background: transparent !important;
 }
 
@@ -202,6 +206,14 @@ body {
     width: 45%;
     /* height: 80vh; */
   }
+
+  #category-pie-chart {
+    height: 300px !important;
+  }
+
+  .current-date {
+    font-size: 1em !important;
+  }
 }
 
 /* ===============================
@@ -210,17 +222,22 @@ body {
 .chat-main-container {
   position: relative;
   z-index: 20;
-  background: rgba(255, 255, 255, 0.6);
+  /* background: rgba(255, 255, 255, 0.6); */
   padding: 0 0 15px;
   height: 40vh;
   width: 100%;
-  border-radius: var(--border-radius-medium);
+  /* border-radius: var(--border-radius-medium);
   border: 1px solid var(--highlight);
-  box-shadow: var(--shadow-inner);
+  box-shadow: var(--shadow-inner); */
+  border-radius: var(--border-radius-medium);
+  border-bottom: 1px solid var(--highlight);
+  border-left: 1px solid var(--highlight);
+  border-right: 1px solid var(--highlight);
+
 }
 
 .chat-messages-wrapper {
-  height: calc(100% - 50px);
+  height: calc(100% - 0px);
   overflow-y: scroll;
 }
 
@@ -244,6 +261,17 @@ body {
   width: 94%;
 }
 
+.llm-response-header {
+  display: none;
+}
+
+.llm-response-living-conditions,
+.llm-response-trash,
+.llm-response-streets,
+.llm-response-parking {
+  margin-top: 1em;
+}
+
 #chat-section-left .chat-input-container {
   display: none !important;
 }
@@ -254,6 +282,14 @@ body {
 }
 
 .chat-input-container {
+  position: absolute;
+  bottom: 0;
+  z-index: 1000;
+  width: 100%;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+  background-color: rgba(250, 250, 250, .9);
+  ;
   border-top: 1px dotted var(--highlight);
   padding: var(--spacing-small);
 }
@@ -274,6 +310,13 @@ body {
   text-align: center;
 }
 
+#loading-spinner-right,
+#loading-spinner {
+  position: static;
+  background: transparent;
+  pointer-events: none;
+}
+
 .chat-messages {
   scroll-behavior: smooth;
 }
@@ -283,14 +326,9 @@ body {
   flex-direction: column;
 }
 
-.chat-messages-wrapper>div {
+.chat-messages-wrapper {
   flex: 1;
   overflow: overflow;
-}
-
-.chat-tabs-container {
-  display: flex;
-  border-bottom: 1px solid var(--highlight);
 }
 
 #chat-section-right .chat-input-container {
@@ -301,34 +339,61 @@ body {
 .chat-content-container {
   border-top: none;
   background: transparent;
+  /* border-radius: var(--border-radius-medium); */
+  border: 1px solid var(--highlight);
+  border-top: none;
+  border-bottom: none;
+  box-shadow: var(--shadow-inner);
+  height: calc(100% - 32px);
+  overflow: hidden;
+
+}
+
+.chat-tabs-container {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  border-bottom: 1px solid var(--highlight);
 }
 
 .chat-tab {
-  padding: 10px 15px;
+  padding: 10px;
   cursor: pointer;
-  background-color: rgba(255, 255, 255, 0.7);
+  background-color: rgba(235, 235, 235, 0.7);
+  border-bottom: 1px solid var(--highlight);
+  /* margin-bottom: -1px; */
+  transition: all 0.2s ease;
+}
+
+#stats-tab {
+  width: 50%;
   border-top-left-radius: var(--border-radius-small);
   border-top-right-radius: var(--border-radius-small);
   border: 1px solid var(--highlight);
   border-bottom: none;
+  border-left: none;
   margin-right: 5px;
-  margin-bottom: -1px;
-  transition: all 0.2s ease;
+}
+
+#community-tab {
+  align-self: right;
+  width: 50%;
+  border-top-left-radius: var(--border-radius-small);
+  border-top-right-radius: var(--border-radius-small);
+  border: 1px solid var(--highlight);
+  border-bottom: none;
+  border-right: none;
 }
 
 .chat-tab.active {
   background-color: white;
-  border-bottom: 1px solid white;
+  border-bottom: 3px solid white;
   font-weight: bold;
+  margin-bottom: -1px;
 }
 
 .chat-tab:hover:not(.active) {
   background-color: rgba(255, 255, 255, 0.9);
-}
-
-.chat-content-container {
-  height: calc(100% - 100px);
-  overflow: hidden;
 }
 
 ._dash-loading>._dash-loading-callback {
@@ -341,7 +406,7 @@ body {
   margin-bottom: 10px;
   border-radius: 6px;
   background-color: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .collapsible-header {
@@ -351,7 +416,7 @@ body {
   padding: 10px 15px;
   background-color: #f8f8f8;
   cursor: pointer;
-  border-left: 4px solid #6AAFDB;
+  border-left: 4px solid #6aafdb;
 }
 
 .collapsible-header:hover {
@@ -359,7 +424,7 @@ body {
 }
 
 .collapsible-header.expanded {
-  border-left-color: #2C5F8E;
+  border-left-color: #2c5f8e;
   background-color: #edf5fa;
 }
 
@@ -370,7 +435,7 @@ body {
 }
 
 .toggle-icon {
-  color: #6AAFDB;
+  color: #6aafdb;
   font-size: 12px;
 }
 
@@ -379,7 +444,7 @@ body {
   padding: 0;
 }
 
-.collapsible-header.expanded + .collapsible-content {
+.collapsible-header.expanded+.collapsible-content {
   display: block;
   padding: 15px;
 }
@@ -497,6 +562,7 @@ body {
 }
 
 .current-date {
+  font-size: 0.7em;
   color: #777;
   position: absolute;
   bottom: var(--spacing-small);
@@ -544,7 +610,6 @@ body {
   fill: #475569;
 }
 
-
 @keyframes pulsIn {
   0% {
     box-shadow: inset 0 0 0 1rem #fff;
@@ -570,4 +635,50 @@ body {
     box-shadow: 0 0 0 1rem #fff;
     opacity: 1;
   }
+}
+
+/* ===============================
+ Chart Elements
+ =============================== */
+
+#category-pie-chart {
+  width: 100%;
+  height: 150px;
+}
+
+#shots-count-display {
+  text-align: center;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  padding: 0.5rem;
+  background-color: transparent;
+  border-radius: 0;
+  position: relative;
+  z-index: 50;
+  box-shadow: none;
+  border: none;
+}
+
+.stats-visualization-container {
+  padding: 1rem;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  margin: 0.5rem auto 1rem auto;
+  width: 90%;
+}
+
+.shots_count {
+  color: #701238;
+  font-size: 30px;
+  margin-right: 5px;
+}
+
+#shots-count-display {
+  margin: 0 auto;
+}
+
+.date-label {
+  font-size: 1.1em;
+  font-weight: 600;
 }
