@@ -575,34 +575,64 @@ app.clientside_callback(
 app.clientside_callback(
     """
     function(n_refresh, n_date, current_date) {
-      if (!n_refresh && !n_date) return '';
+    if (!n_refresh && !n_date) return '';
 
-      window.iwCounter = window.iwCounter || 0;
-      const msgs = document.querySelectorAll('.bot-message:not([data-processed="true"])');
+    window.iwCounter = window.iwCounter || 0;
+    
+    const msgs = document.querySelectorAll('.bot-message:not([data-processed="true"])');
 
-      msgs.forEach(msg => {
+    msgs.forEach(msg => {
         // wait for either <p> or our custom headers
         if (!msg.querySelector('p') && !msg.querySelector('.llm-response-header')) return;
         msg.setAttribute('data-processed', 'true');
 
         // build the collapsible wrapper
         const originalHTML = msg.innerHTML;
-        const wrapper  = document.createElement('div');
+        const wrapper = document.createElement('div');
         wrapper.className = 'collapsible-response';
 
-        // header (date vs number)
+        // Determine if this is in the community tab
         const isCom = !!msg.closest('#community-chat-container');
-        const label = isCom ? (++window.iwCounter) : current_date;
+        
+        // Get appropriate label based on tab
+        let label;
+        if (isCom) {
+        // Check if this is a response to a user question or auto-generated
+        const responseType = msg.getAttribute('data-response-type');
+        
+        if (responseType === 'user-question') {
+            // This is a response to a user question - use the question as header
+            const userQuestion = msg.getAttribute('data-user-question');
+            if (userQuestion) {
+            // Truncate if too long
+            if (userQuestion.length > 60) {
+                label = userQuestion.substring(0, 57) + '...';
+            } else {
+                label = userQuestion;
+            }
+            } else {
+            // Fallback
+            label = "What Neighbors Are Saying";
+            }
+        } else {
+            // This is an auto-generated response (from time slider or initial load)
+            label = "What Neighbors Are Saying";
+        }
+        } else {
+        // For stats tab, use date
+        label = current_date;
+        }
+
         const header = document.createElement('div');
         header.className = 'collapsible-header expanded';
         header.innerHTML =
-          '<span class="date-label">' + label + '</span>' +
-          '<span class="toggle-icon">▼</span>';
+        '<span class="date-label" style="font-size: 16px; font-weight: bold;">' + label + '</span>' +
+        '<span class="toggle-icon">▼</span>';
         header.addEventListener('click', function() {
-          this.classList.toggle('expanded');
-          const c = this.nextElementSibling;
-          c.style.display = c.style.display==='none' ? '' : 'none';
-          this.querySelector('.toggle-icon').textContent =
+        this.classList.toggle('expanded');
+        const c = this.nextElementSibling;
+        c.style.display = c.style.display==='none' ? '' : 'none';
+        this.querySelector('.toggle-icon').textContent =
             c.style.display==='none' ? '▶' : '▼';
         });
 
@@ -610,26 +640,55 @@ app.clientside_callback(
         const content = document.createElement('div');
         content.className = 'collapsible-content';
         content.innerHTML = originalHTML;
+        
+        // Make sure content is fully visible
+        content.style.display = 'block';
+        content.style.overflow = 'visible';
+        content.style.height = 'auto';
 
-        // ── CATEGORY COLORS ─────────────────────────────────────────
+        // ── CATEGORY REMOVAL FOR COMMUNITY TAB ─────────────────────────
+        if (isCom) {
+        try {
+            // Simple approach to remove category headers
+            const categoryPatterns = [
+            /Living Conditions:[\s\S]*?((?=Trash:|Streets:|Parking:|$))/g,
+            /Trash:[\s\S]*?((?=Living Conditions:|Streets:|Parking:|$))/g,
+            /Streets:[\s\S]*?((?=Living Conditions:|Trash:|Parking:|$))/g,
+            /Parking:[\s\S]*?((?=Living Conditions:|Trash:|Streets:|$))/g
+            ];
+            
+            let contentHTML = content.innerHTML;
+            // Apply each pattern
+            categoryPatterns.forEach(pattern => {
+            contentHTML = contentHTML.replace(pattern, '');
+            });
+            
+            content.innerHTML = contentHTML;
+        } catch (e) {
+            console.error("Error cleaning categories:", e);
+        }
+        }
+        // ─────────────────────────────────────────────────────────────
+
+        // ── CATEGORY COLORS FOR STATS TAB ─────────────────────────────
         if (!isCom) {
-          // your four custom plus re-used burgundy for the fifth
-          const sliceColors = [
+        // your four custom plus re-used burgundy for the fifth
+        const sliceColors = [
             '#FFA95A',  // Living Conditions
             '#6987C4',  // Trash
             '#A9A9A9',  // Streets
             '#701238',  // Parking
             '#701238'   // Violent Crime
-          ];
-          const keys = [
+        ];
+        const keys = [
             'living-conditions',
             'trash',
             'streets',
             'parking',
             'violent-crime'
-          ];
+        ];
 
-          keys.forEach((key, idx) => {
+        keys.forEach((key, idx) => {
             const container = content.querySelector('.llm-response-' + key);
             if (!container) return;
 
@@ -637,13 +696,13 @@ app.clientside_callback(
             let node = container.nextSibling;
             const toMove = [];
             while (node && !(node.nodeType===1 && node.classList.contains('llm-response-header'))) {
-              toMove.push(node);
-              node = node.nextSibling;
+            toMove.push(node);
+            node = node.nextSibling;
             }
             toMove.forEach(n => container.appendChild(n));
 
             // apply your custom slice color at 10% opacity
-            const [r,g,b] = sliceColors[idx].match(/\\w\\w/g).map(h => parseInt(h,16));
+            const [r,g,b] = sliceColors[idx].match(/\w\w/g).map(h => parseInt(h,16));
             container.style.backgroundColor = `rgba(${r},${g},${b},0.1)`;
             container.style.padding = '0.5em';
             container.style.borderRadius = '4px';
@@ -656,9 +715,9 @@ app.clientside_callback(
         wrapper.appendChild(content);
         msg.innerHTML = '';
         msg.appendChild(wrapper);
-      });
+    });
 
-      return '';
+    return '';
     }
     """,
     Output("loading-output", "children"),
@@ -861,7 +920,6 @@ def handle_chat_response(stored_input, slider_value, current_messages, selected_
 @callback(
     [
         Output("chat-messages-right", "children", allow_duplicate=True),
-        Output("chat-input-right", "value"),
         Output("loading-spinner-right", "style", allow_duplicate=True),
         Output("user-message-store-right", "data"),
     ],
@@ -879,9 +937,10 @@ def handle_chat_input_right(n_clicks, n_submit, input_value, msgs):
     ctx = dash.callback_context
     if not ctx.triggered or not input_value or not input_value.strip():
         raise PreventUpdate
+    
     msgs = msgs or []
-    msgs.append(html.Div(input_value, className="user-message"))
-    return msgs, "", {"display": "block"}, input_value.strip()
+    
+    return msgs, {"display": "block"}, input_value.strip()
 
 
 @callback(
@@ -892,12 +951,11 @@ def handle_chat_input_right(n_clicks, n_submit, input_value, msgs):
 def show_right_spinner_on_slider_change(slider_value):
     return {"display": "block"}
 
-
 @callback(
     [
         Output("chat-messages-right", "children", allow_duplicate=True),
         Output("loading-spinner-right", "style", allow_duplicate=True),
-        Output("refresh-chat-btn", "n_clicks", allow_duplicate=True),  # Add this output
+        Output("refresh-chat-btn", "n_clicks", allow_duplicate=True),
     ],
     [
         Input("user-message-store-right", "data"),
@@ -912,21 +970,64 @@ def show_right_spinner_on_slider_change(slider_value):
 )
 def handle_chat_response_right(stored_input, slider_value, msgs, selected, refresh_clicks):
     msgs = msgs or []
-
+    ctx = dash.callback_context
+    trigger_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
+    
     year, month = date_string_to_year_month(slider_value)
     selected_date = f"{year}-{month:02d}"
-    if stored_input:
-        prompt = f"response-type = mixed. Your neighbor wants community insights for {selected_date}. Based on the available data, provide insight in a direct and to-the-point manner to your neighbor's question: {stored_input}"
+    
+    # Determine if this was triggered by a user question or slider change
+    is_user_question = stored_input and trigger_id == 'user-message-store-right.data'
+    
+    # Build prompt based on trigger source
+    if is_user_question:
+        prompt = f"response-type = community. Your neighbor wants to hear community voices for {selected_date}. Based on the available data, provide insight in a direct and to-the-point manner to your neighbor's question: {stored_input}"
     else:
-        prompt = f"response-type = sentiment. What were the main concerns in the community around {selected_date}?"
+        prompt = f"response-type = community. Share community voices and concerns from {selected_date}. Write from neighbors' perspectives using first-person quotes. Avoid using category headers like 'Living Conditions:', 'Trash:', etc. Focus on personal testimonials and community sentiment. Provide detailed multi-paragraph responses with several specific examples from community members."
+
+    # Get area context if available  
+    area_context = ""
+    ids = selected.get("selected_ids", [])
+    LIMIT = 150
+
+    if ids:
+        limited_ids = ids[:LIMIT]
+        evt_csv = get_select_311_data(event_ids=",".join(limited_ids))
+        date_csv = get_select_311_data(event_date=selected_date)
+
+        area_context = (
+            f"\n\nNeighbors in a specific area reported these issues: {evt_csv}\n\n"
+            f"Across the neighborhood on {selected_date}, reports show: {date_csv}"
+        )
+        
+        if len(ids) > LIMIT:
+            area_context += f"\n\nNote: This area had {len(ids)} reported concerns, but only {LIMIT} are being considered due to system limits."
+
+        # Add area context to the prompt
+        prompt += area_context
 
     reply = get_chat_response(prompt=prompt, structured_response=False)
 
-    msgs.append(html.Div(dcc.Markdown(reply, dangerously_allow_html=True), className="bot-message"))
+    # Add data attributes to the bot message
+    bot_msg_attrs = {
+        "data-response-type": "user-question" if is_user_question else "auto-generated",
+        "data-date": selected_date
+    }
+    
+    # Only add the user question attribute if this is a response to a user question
+    if is_user_question:
+        bot_msg_attrs["data-user-question"] = stored_input
+    
+    msgs.append(html.Div(
+        dcc.Markdown(reply, dangerously_allow_html=True), 
+        className="bot-message",
+        **bot_msg_attrs
+    ))
 
     refresh_clicks = 0 if refresh_clicks is None else refresh_clicks + 1
 
     return msgs, {"display": "none"}, refresh_clicks
+
 
 
 @callback(
@@ -1026,7 +1127,7 @@ def handle_tell_me_prompt(prompt, current_messages, refresh_clicks):
     [
         Output("chat-messages", "children", allow_duplicate=True),
         Output("chat-messages-right", "children", allow_duplicate=True),
-        Output("refresh-chat-btn", "n_clicks", allow_duplicate=True),  # Add this output
+        Output("refresh-chat-btn", "n_clicks", allow_duplicate=True),
     ],
     [
         Input("tell-me-btn", "n_clicks"),
@@ -1039,7 +1140,6 @@ def handle_tell_me_prompt(prompt, current_messages, refresh_clicks):
     prevent_initial_call=True,
 )
 def handle_initial_prompts(n_clicks, selected, slider_value, refresh_clicks):
-
     if not n_clicks:
         raise PreventUpdate
 
@@ -1065,11 +1165,30 @@ def handle_initial_prompts(n_clicks, selected, slider_value, refresh_clicks):
         "Your neighbor has selected this specific area to focus on. You don't have to compare the statistics but just analyze the data and give the statistics along with insights. Focus on counts of 311, shots fired, etc."
     )
     stats_reply = get_chat_response(prompt=stats_prompt, structured_response=True)
-    stats_message = html.Div([html.Strong("A by-the-numbers overview of your neighborhood:"), dcc.Markdown(stats_reply, dangerously_allow_html=True)], className="bot-message")
+    stats_message = html.Div(
+        [html.Strong("A by-the-numbers overview of your neighborhood:"), dcc.Markdown(stats_reply, dangerously_allow_html=True)], 
+        className="bot-message",
+        **{
+            "data-response-type": "auto-generated",
+            "data-date": selected_date
+        }
+    )
 
-    community_prompt = f"response-type = mixed. Community meeting summary for {selected_date}:{area_context} " "Your neighbor has selected this specific area to focus on. Share neighbor quotes and concerns."
+    community_prompt = (
+        f"response-type = community. Share voices from {selected_date} community meetings:{area_context} "
+        "Write from the perspective of residents using first-person quotes. Avoid using category "
+        "headers like 'Living Conditions:', 'Trash:', etc. Focus on personal testimonials and community sentiment. "
+        "Provide detailed multi-paragraph responses with several specific examples from community members."
+    )
     community_reply = get_chat_response(prompt=community_prompt, structured_response=False)
-    community_message = html.Div([html.Strong("From recent community meetings:"), dcc.Markdown(community_reply, dangerously_allow_html=True)], className="bot-message")
+    community_message = html.Div(
+        [html.Strong("From recent community meetings:"), dcc.Markdown(community_reply, dangerously_allow_html=True)], 
+        className="bot-message",
+        **{
+            "data-response-type": "auto-generated",
+            "data-date": selected_date
+        }
+    )
     refresh_clicks = 0 if refresh_clicks is None else refresh_clicks + 1
 
     return [stats_message], [community_message], refresh_clicks
@@ -1150,7 +1269,8 @@ def switch_tabs(stats_clicks, community_clicks, active_tab):
 
 @callback(
     [
-        Output("chat-input", "value", allow_duplicate=True),
+        # Add allow_duplicate=True to the first output
+        Output("chat-input-combined", "value", allow_duplicate=True),
         Output("chat-input-right", "value", allow_duplicate=True),
         Output("chat-input-right", "n_submit", allow_duplicate=True),
         Output("send-button-right", "n_clicks", allow_duplicate=True),
@@ -1172,6 +1292,7 @@ def handle_combined_chat_input(n_clicks, n_submit, input_value, active_tab):
     if not ctx.triggered or not input_value or not input_value.strip():
         raise PreventUpdate
 
+    # Always clear the combined input
     left_input = dash.no_update
     right_input = dash.no_update
     right_submit = dash.no_update
@@ -1188,12 +1309,11 @@ def handle_combined_chat_input(n_clicks, n_submit, input_value, active_tab):
         right_clicks = 1
         right_loading = {"display": "block"}
 
-    return left_input, right_input, right_submit, right_clicks, left_loading, right_loading
-
+    return "", right_input, right_submit, right_clicks, left_loading, right_loading
 
 @callback(
     [
-        Output("chat-input-combined", "value"),
+        Output("chat-input-combined", "value", allow_duplicate=True),
         Output("chat-input-combined", "placeholder"),
     ],
     Input("tell-me-trigger", "children"),
@@ -1204,7 +1324,6 @@ def update_chat_input_from_trigger(trigger_value):
         return "", trigger_value
 
     return dash.no_update, dash.no_update
-
 
 @callback(
     Output("area-category-counts-store", "data"),
@@ -1305,44 +1424,73 @@ def render_category_pie(counts):
     ],
 )
 def render_counts(shots_count, homicides_count):
-    return html.Div(
-        [
-            # Shots fired pill
-            html.Div(
-                [
-                    html.Span(
-                        "•",
-                        style={
-                            "color": "#701238",
-                            "fontSize": "20px",
-                            "marginRight": "4px",
-                        },
-                    ),
-                    html.Span(f"{shots_count}", style={"fontWeight": "600"}),
-                    html.Span(" Shots Fired", style={"marginLeft": "4px"}),
-                ],
-                style={"display": "flex", "alignItems": "center", "backgroundColor": "rgba(112,39,56,0.1)", "padding": "4px 8px", "borderRadius": "12px"},
-            ),
-            # Homicides pill
-            html.Div(
-                [
-                    html.Span(
-                        "•",
-                        style={
-                            "color": "#000",
-                            "fontSize": "30px",
-                            "marginRight": "4px",
-                        },
-                    ),
-                    html.Span(f"{homicides_count}", style={"fontWeight": "600"}),
-                    html.Span(" Homicides", style={"marginLeft": "4px"}),
-                ],
-                style={"display": "flex", "alignItems": "center", "backgroundColor": "rgba(0,0,0,0.1)", "padding": "4px 8px", "borderRadius": "12px"},
-            ),
-        ],
-        style={"display": "flex", "gap": "1rem", "marginTop": "0.5rem", "fontSize": "14px"},
-    )
+    # Create a consistent style for both icons
+    bullet_style = {
+        "fontSize": "34px",      
+        "marginRight": "4px",
+        "display": "inline-block",
+        "verticalAlign": "middle",
+        "lineHeight": "1",
+    }
+    
+    # Create consistent text style
+    text_style = {
+        "display": "inline-block", 
+        "verticalAlign": "middle",
+    }
+    
+    # Create consistent item container style
+    item_style = {
+        "display": "flex",
+        "alignItems": "center", 
+        "justifyContent": "center",
+        "margin": "0 1rem",
+    }
 
+    # Use proper singular/plural forms for shots fired
+    shots_text = "Shot Fired" if shots_count == 1 else "Shots Fired"
+    
+    # Shots fired with consistent styling
+    shots_span = html.Div([
+        html.Span("• ", style={**bullet_style, "color": "#701238"}),
+        html.Span(f"{shots_count} {shots_text}", style=text_style),
+    ], style=item_style)
+    
+    # Initialize items list with shots span
+    items = [shots_span]
+    
+    # Only add homicide count if it's greater than 0
+    if homicides_count and homicides_count > 0:
+        # Use proper singular/plural forms for homicides
+        homicide_text = "Homicide" if homicides_count == 1 else "Homicides"
+        
+        hom_span = html.Div([
+            html.Span("• ", style={**bullet_style, "color": "#000000"}),
+            html.Span(f"{homicides_count} {homicide_text}", style=text_style),
+        ], style=item_style)
+        items.append(hom_span)
+
+    return html.Div(
+        html.Div(
+            items,
+            style={
+                "backgroundColor": "white",
+                "padding": "8px 15px",
+                "borderRadius": "20px",
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "boxShadow": "0 1px 3px rgba(0,0,0,0.1)",
+            }
+        ),
+        style={
+            "display": "flex",
+            "justifyContent": "center",
+            "alignItems": "center",
+            "marginTop": "0.5rem",
+            "fontSize": "16px",
+        }
+    )
 
 server = app.server
 
