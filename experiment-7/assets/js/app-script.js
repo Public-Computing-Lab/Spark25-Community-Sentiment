@@ -19,7 +19,8 @@
     config: {
       mapbox: {
         token: window.MAPBOX_TOKEN,
-        initialCenter: [-71.07601, 42.28988],
+        // initialCenter: [-71.07601, 42.28988],
+        initialCenter: [-71.07, 42.29],
         backgroundInitialZoom: 12,
         magnifiedInitialZoom: 13
       },
@@ -107,6 +108,23 @@
         this.setupEventHandlers(beforeMap, afterMap);
       },
 
+      adjustMapCenter() {
+        const referenceDiv = document.getElementById('map-section');
+        console.log('Getting reference div');
+        if (window.innerWidth > 768) {
+          console.log('Need to recenter map');
+          const shiftX = referenceDiv.offsetWidth / 3;
+          console.log('Shift by: ' + shiftX);
+          const currentCenter = beforeMap.getCenter();
+          const point = beforeMap.project(currentCenter);
+          point.x += shiftX;
+
+          const newCenter = beforeMap.unproject(point);
+
+          beforeMap.setCenter(newCenter);
+        }
+      },
+
       /**
        * Set up map event handlers
        * @param {Object} beforeMap 
@@ -155,6 +173,7 @@
               console.log('Initial background map data applied');
             }
           }
+          this.adjustMapCenter();
         });
         beforeMap.on('moveend', () => this.handleMapMoveEnd(beforeMap, afterMap));
       },
@@ -745,7 +764,7 @@
       );
 
       function tryUpdateMap(attempts = 0) {
-        if (attempts >= 5) {
+        if (attempts >= 10) {
           console.error("Failed to update map after multiple attempts");
           return;
         }
@@ -843,19 +862,19 @@ window.clientside = {
   ...window.clientside,
   scrollChat: function(messages, containerId) {
     if (!messages) return {};
-    
+
     // Get the container
     const container = document.getElementById(containerId);
     if (!container) return {};
-    
+
     // Force immediate scroll to bottom
     container.scrollTop = container.scrollHeight;
-    
+
     // Also scroll after a short delay to ensure all content is rendered
     setTimeout(() => {
       container.scrollTop = container.scrollHeight;
     }, 100);
-    
+
     return {};
   }
 };
