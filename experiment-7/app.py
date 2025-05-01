@@ -573,12 +573,12 @@ app.clientside_callback(
 )
 
 app.clientside_callback(
-    """
+    r"""
     function(n_refresh, n_date, current_date) {
     if (!n_refresh && !n_date) return '';
 
     window.iwCounter = window.iwCounter || 0;
-    
+
     const msgs = document.querySelectorAll('.bot-message:not([data-processed="true"])');
 
     msgs.forEach(msg => {
@@ -593,13 +593,13 @@ app.clientside_callback(
 
         // Determine if this is in the community tab
         const isCom = !!msg.closest('#community-chat-container');
-        
+
         // Get appropriate label based on tab
         let label;
         if (isCom) {
         // Check if this is a response to a user question or auto-generated
         const responseType = msg.getAttribute('data-response-type');
-        
+
         if (responseType === 'user-question') {
             // This is a response to a user question - use the question as header
             const userQuestion = msg.getAttribute('data-user-question');
@@ -640,7 +640,7 @@ app.clientside_callback(
         const content = document.createElement('div');
         content.className = 'collapsible-content';
         content.innerHTML = originalHTML;
-        
+
         // Make sure content is fully visible
         content.style.display = 'block';
         content.style.overflow = 'visible';
@@ -656,13 +656,13 @@ app.clientside_callback(
             /Streets:[\s\S]*?((?=Living Conditions:|Trash:|Parking:|$))/g,
             /Parking:[\s\S]*?((?=Living Conditions:|Trash:|Streets:|$))/g
             ];
-            
+
             let contentHTML = content.innerHTML;
             // Apply each pattern
             categoryPatterns.forEach(pattern => {
             contentHTML = contentHTML.replace(pattern, '');
             });
-            
+
             content.innerHTML = contentHTML;
         } catch (e) {
             console.error("Error cleaning categories:", e);
@@ -902,12 +902,7 @@ def handle_chat_response(stored_input, slider_value, current_messages, selected_
         event_ids = ",".join(selected_hexbins_data["selected_ids"])
         event_id_data = get_select_311_data(event_ids=event_ids)
         event_date_data = get_select_311_data(event_date=selected_date)
-        prompt += (
-            f"\n\nYour neighbor has specifically selected an area within Dorchester to examine. "
-            f"The overall neighborhood 311 data on {selected_date} are: {event_date_data}. "
-            f"The specific area 311 data are: {event_id_data}. Compare the local area data, the neighborhood-wide data, "
-            f"and the overall trends in the original 311 data."
-        )
+        prompt += f"\n\nYour neighbor has specifically selected an area within Dorchester to examine. " f"The overall neighborhood 311 data on {selected_date} are: {event_date_data}. " f"The specific area 311 data are: {event_id_data}. Compare the local area data, the neighborhood-wide data, " f"and the overall trends in the original 311 data."
     # Requesting response for 311 By the Numbers
     reply = get_chat_response(prompt=prompt, structured_response=True)
     bot_response = html.Div([dcc.Markdown(reply, dangerously_allow_html=True)], className="bot-message")
@@ -937,9 +932,9 @@ def handle_chat_input_right(n_clicks, n_submit, input_value, msgs):
     ctx = dash.callback_context
     if not ctx.triggered or not input_value or not input_value.strip():
         raise PreventUpdate
-    
+
     msgs = msgs or []
-    
+
     return msgs, {"display": "block"}, input_value.strip()
 
 
@@ -950,6 +945,7 @@ def handle_chat_input_right(n_clicks, n_submit, input_value, msgs):
 )
 def show_right_spinner_on_slider_change(slider_value):
     return {"display": "block"}
+
 
 @callback(
     [
@@ -971,21 +967,21 @@ def show_right_spinner_on_slider_change(slider_value):
 def handle_chat_response_right(stored_input, slider_value, msgs, selected, refresh_clicks):
     msgs = msgs or []
     ctx = dash.callback_context
-    trigger_id = ctx.triggered[0]['prop_id'] if ctx.triggered else None
-    
+    trigger_id = ctx.triggered[0]["prop_id"] if ctx.triggered else None
+
     year, month = date_string_to_year_month(slider_value)
     selected_date = f"{year}-{month:02d}"
-    
+
     # Determine if this was triggered by a user question or slider change
-    is_user_question = stored_input and trigger_id == 'user-message-store-right.data'
-    
+    is_user_question = stored_input and trigger_id == "user-message-store-right.data"
+
     # Build prompt based on trigger source
     if is_user_question:
         prompt = f"response-type = community. Your neighbor wants to hear community voices for {selected_date}. Based on the available data, provide insight in a direct and to-the-point manner to your neighbor's question: {stored_input}"
     else:
         prompt = f"response-type = community. Share community voices and concerns from {selected_date}. Write from neighbors' perspectives using first-person quotes. Avoid using category headers like 'Living Conditions:', 'Trash:', etc. Focus on personal testimonials and community sentiment. Provide detailed multi-paragraph responses with several specific examples from community members."
 
-    # Get area context if available  
+    # Get area context if available
     area_context = ""
     ids = selected.get("selected_ids", [])
     LIMIT = 150
@@ -995,11 +991,8 @@ def handle_chat_response_right(stored_input, slider_value, msgs, selected, refre
         evt_csv = get_select_311_data(event_ids=",".join(limited_ids))
         date_csv = get_select_311_data(event_date=selected_date)
 
-        area_context = (
-            f"\n\nNeighbors in a specific area reported these issues: {evt_csv}\n\n"
-            f"Across the neighborhood on {selected_date}, reports show: {date_csv}"
-        )
-        
+        area_context = f"\n\nNeighbors in a specific area reported these issues: {evt_csv}\n\n" f"Across the neighborhood on {selected_date}, reports show: {date_csv}"
+
         if len(ids) > LIMIT:
             area_context += f"\n\nNote: This area had {len(ids)} reported concerns, but only {LIMIT} are being considered due to system limits."
 
@@ -1009,25 +1002,17 @@ def handle_chat_response_right(stored_input, slider_value, msgs, selected, refre
     reply = get_chat_response(prompt=prompt, structured_response=False)
 
     # Add data attributes to the bot message
-    bot_msg_attrs = {
-        "data-response-type": "user-question" if is_user_question else "auto-generated",
-        "data-date": selected_date
-    }
-    
+    bot_msg_attrs = {"data-response-type": "user-question" if is_user_question else "auto-generated", "data-date": selected_date}
+
     # Only add the user question attribute if this is a response to a user question
     if is_user_question:
         bot_msg_attrs["data-user-question"] = stored_input
-    
-    msgs.append(html.Div(
-        dcc.Markdown(reply, dangerously_allow_html=True), 
-        className="bot-message",
-        **bot_msg_attrs
-    ))
+
+    msgs.append(html.Div(dcc.Markdown(reply, dangerously_allow_html=True), className="bot-message", **bot_msg_attrs))
 
     refresh_clicks = 0 if refresh_clicks is None else refresh_clicks + 1
 
     return msgs, {"display": "none"}, refresh_clicks
-
 
 
 @callback(
@@ -1160,35 +1145,13 @@ def handle_initial_prompts(n_clicks, selected, slider_value, refresh_clicks):
         if len(ids) > LIMIT:
             area_context += f"\n\nNote: This area had {len(ids)} events, but only {LIMIT} are analyzed due to system limits."
 
-    stats_prompt = (
-        f"response-type = analytic. A by-the-numbers overview for Dorchester on {selected_date}:{area_context} "
-        "Your neighbor has selected this specific area to focus on. You don't have to compare the statistics but just analyze the data and give the statistics along with insights. Focus on counts of 311, shots fired, etc."
-    )
+    stats_prompt = f"response-type = analytic. A by-the-numbers overview for Dorchester on {selected_date}:{area_context} " "Your neighbor has selected this specific area to focus on. You don't have to compare the statistics but just analyze the data and give the statistics along with insights. Focus on counts of 311, shots fired, etc."
     stats_reply = get_chat_response(prompt=stats_prompt, structured_response=True)
-    stats_message = html.Div(
-        [html.Strong("A by-the-numbers overview of your neighborhood:"), dcc.Markdown(stats_reply, dangerously_allow_html=True)], 
-        className="bot-message",
-        **{
-            "data-response-type": "auto-generated",
-            "data-date": selected_date
-        }
-    )
+    stats_message = html.Div([html.Strong("A by-the-numbers overview of your neighborhood:"), dcc.Markdown(stats_reply, dangerously_allow_html=True)], className="bot-message", **{"data-response-type": "auto-generated", "data-date": selected_date})
 
-    community_prompt = (
-        f"response-type = community. Share voices from {selected_date} community meetings:{area_context} "
-        "Write from the perspective of residents using first-person quotes. Avoid using category "
-        "headers like 'Living Conditions:', 'Trash:', etc. Focus on personal testimonials and community sentiment. "
-        "Provide detailed multi-paragraph responses with several specific examples from community members."
-    )
+    community_prompt = f"response-type = community. Share voices from {selected_date} community meetings:{area_context} " "Write from the perspective of residents using first-person quotes. Avoid using category " "headers like 'Living Conditions:', 'Trash:', etc. Focus on personal testimonials and community sentiment. " "Provide detailed multi-paragraph responses with several specific examples from community members."
     community_reply = get_chat_response(prompt=community_prompt, structured_response=False)
-    community_message = html.Div(
-        [html.Strong("From recent community meetings:"), dcc.Markdown(community_reply, dangerously_allow_html=True)], 
-        className="bot-message",
-        **{
-            "data-response-type": "auto-generated",
-            "data-date": selected_date
-        }
-    )
+    community_message = html.Div([html.Strong("From recent community meetings:"), dcc.Markdown(community_reply, dangerously_allow_html=True)], className="bot-message", **{"data-response-type": "auto-generated", "data-date": selected_date})
     refresh_clicks = 0 if refresh_clicks is None else refresh_clicks + 1
 
     return [stats_message], [community_message], refresh_clicks
@@ -1311,6 +1274,7 @@ def handle_combined_chat_input(n_clicks, n_submit, input_value, active_tab):
 
     return "", right_input, right_submit, right_clicks, left_loading, right_loading
 
+
 @callback(
     [
         Output("chat-input-combined", "value", allow_duplicate=True),
@@ -1324,6 +1288,7 @@ def update_chat_input_from_trigger(trigger_value):
         return "", trigger_value
 
     return dash.no_update, dash.no_update
+
 
 @callback(
     Output("area-category-counts-store", "data"),
@@ -1426,48 +1391,54 @@ def render_category_pie(counts):
 def render_counts(shots_count, homicides_count):
     # Create a consistent style for both icons
     bullet_style = {
-        "fontSize": "34px",      
+        "fontSize": "34px",
         "marginRight": "4px",
         "display": "inline-block",
         "verticalAlign": "middle",
         "lineHeight": "1",
     }
-    
+
     # Create consistent text style
     text_style = {
-        "display": "inline-block", 
+        "display": "inline-block",
         "verticalAlign": "middle",
     }
-    
+
     # Create consistent item container style
     item_style = {
         "display": "flex",
-        "alignItems": "center", 
+        "alignItems": "center",
         "justifyContent": "center",
         "margin": "0 1rem",
     }
 
     # Use proper singular/plural forms for shots fired
     shots_text = "Shot Fired" if shots_count == 1 else "Shots Fired"
-    
+
     # Shots fired with consistent styling
-    shots_span = html.Div([
-        html.Span("• ", style={**bullet_style, "color": "#701238"}),
-        html.Span(f"{shots_count} {shots_text}", style=text_style),
-    ], style=item_style)
-    
+    shots_span = html.Div(
+        [
+            html.Span("• ", style={**bullet_style, "color": "#701238"}),
+            html.Span(f"{shots_count} {shots_text}", style=text_style),
+        ],
+        style=item_style,
+    )
+
     # Initialize items list with shots span
     items = [shots_span]
-    
+
     # Only add homicide count if it's greater than 0
     if homicides_count and homicides_count > 0:
         # Use proper singular/plural forms for homicides
         homicide_text = "Homicide" if homicides_count == 1 else "Homicides"
-        
-        hom_span = html.Div([
-            html.Span("• ", style={**bullet_style, "color": "#000000"}),
-            html.Span(f"{homicides_count} {homicide_text}", style=text_style),
-        ], style=item_style)
+
+        hom_span = html.Div(
+            [
+                html.Span("• ", style={**bullet_style, "color": "#000000"}),
+                html.Span(f"{homicides_count} {homicide_text}", style=text_style),
+            ],
+            style=item_style,
+        )
         items.append(hom_span)
 
     return html.Div(
@@ -1481,7 +1452,7 @@ def render_counts(shots_count, homicides_count):
                 "alignItems": "center",
                 "justifyContent": "center",
                 "boxShadow": "0 1px 3px rgba(0,0,0,0.1)",
-            }
+            },
         ),
         style={
             "display": "flex",
@@ -1489,8 +1460,9 @@ def render_counts(shots_count, homicides_count):
             "alignItems": "center",
             "marginTop": "0.5rem",
             "fontSize": "16px",
-        }
+        },
     )
+
 
 server = app.server
 
