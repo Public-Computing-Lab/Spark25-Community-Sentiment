@@ -110,7 +110,7 @@ body {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-.app-header-title{
+.app-header-title {
   font-weight: 900;
 }
 
@@ -206,8 +206,8 @@ body {
     width: 45%;
     /* height: 80vh; */
   }
-  
-  .current-date{
+
+  .current-date {
     font-size: 1em !important;
   }
 }
@@ -259,7 +259,7 @@ body {
 .llm-response-living-conditions,
 .llm-response-trash,
 .llm-response-streets,
-.llm-response-parking{
+.llm-response-parking {
   margin-top: 1em;
 }
 
@@ -294,7 +294,7 @@ body {
 }
 
 #loading-spinner-right,
-#loading-spinner{
+#loading-spinner {
   position: static;
   background: transparent;
   pointer-events: none;
@@ -309,7 +309,7 @@ body {
   flex-direction: column;
 }
 
-.chat-messages-wrapper>div {
+.chat-messages-wrapper > div {
   flex: 1;
   overflow: overflow;
 }
@@ -357,7 +357,7 @@ body {
   overflow: hidden;
 }
 
-._dash-loading>._dash-loading-callback {
+._dash-loading > ._dash-loading-callback {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
@@ -367,7 +367,7 @@ body {
   margin-bottom: 10px;
   border-radius: 6px;
   background-color: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .collapsible-header {
@@ -377,7 +377,7 @@ body {
   padding: 10px 15px;
   background-color: #f8f8f8;
   cursor: pointer;
-  border-left: 4px solid #6AAFDB;
+  border-left: 4px solid #6aafdb;
 }
 
 .collapsible-header:hover {
@@ -385,7 +385,7 @@ body {
 }
 
 .collapsible-header.expanded {
-  border-left-color: #2C5F8E;
+  border-left-color: #2c5f8e;
   background-color: #edf5fa;
 }
 
@@ -396,7 +396,7 @@ body {
 }
 
 .toggle-icon {
-  color: #6AAFDB;
+  color: #6aafdb;
   font-size: 12px;
 }
 
@@ -523,7 +523,7 @@ body {
 }
 
 .current-date {
-  font-size: .7em;
+  font-size: 0.7em;
   color: #777;
   position: absolute;
   bottom: var(--spacing-small);
@@ -571,7 +571,6 @@ body {
   fill: #475569;
 }
 
-
 @keyframes pulsIn {
   0% {
     box-shadow: inset 0 0 0 1rem #fff;
@@ -586,7 +585,6 @@ body {
 }
 
 @keyframes pulsOut {
-
   0%,
   50% {
     box-shadow: 0 0 0 0 #fff;
@@ -602,46 +600,45 @@ body {
 /* ===============================
  Chart Elements
  =============================== */
- 
- #category-pie-chart{
-   width: 100%;
-   height: 150px;
- }
- 
- #shots-count-display{
-   text-align: center;
-   margin-top: 0.5rem;
-   margin-bottom: 1rem;
-   font-size: 1rem;
-   padding: 0.5rem;
-   background-color: transparent;
-   border-radius: 0;
-   position: relative;
-   z-index: 50;
-   box-shadow: none;
-   border:none;
- }
- 
- .stats-visualization-container{
-   padding: 1rem;
-   background-color: rgba(255, 255, 255, 0.3);
-   border-radius: 8px;
-   margin:0.5rem auto 1rem auto;   
-   width: 90%;
-   
- }
- 
- .shots_count{
-   color:#701238;
-   font-size: 30px;
-   margin-right: 5px;
- }
- 
- #shots-count-display{
-   margin: 0 auto;   
- }
- 
- .date-label{
-   font-size: 1.1em;
-   font-weight: 600;
- }
+
+#category-pie-chart {
+  width: 100%;
+  height: 150px;
+}
+
+#shots-count-display {
+  text-align: center;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  padding: 0.5rem;
+  background-color: transparent;
+  border-radius: 0;
+  position: relative;
+  z-index: 50;
+  box-shadow: none;
+  border: none;
+}
+
+.stats-visualization-container {
+  padding: 1rem;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  margin: 0.5rem auto 1rem auto;
+  width: 90%;
+}
+
+.shots_count {
+  color: #701238;
+  font-size: 30px;
+  margin-right: 5px;
+}
+
+#shots-count-display {
+  margin: 0 auto;
+}
+
+.date-label {
+  font-size: 1.1em;
+  font-weight: 600;
+}
