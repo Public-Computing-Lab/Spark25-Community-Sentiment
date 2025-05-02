@@ -977,9 +977,9 @@ def handle_chat_response_right(stored_input, slider_value, msgs, selected, refre
 
     # Build prompt based on trigger source
     if is_user_question:
-        prompt = f"response-type = community. Your neighbor wants to hear community voices for {selected_date}. Based on the available data, provide insight in a direct and to-the-point manner to your neighbor's question: {stored_input}"
+        prompt = f"response-type = sentiment. Your neighbor wants to hear community voices for {selected_date}. Based on the available data, provide insight in a direct and to-the-point manner to your neighbor's question: {stored_input}"
     else:
-        prompt = f"response-type = community. Share community voices and concerns from {selected_date}. Write from neighbors' perspectives using first-person quotes. Avoid using category headers like 'Living Conditions:', 'Trash:', etc. Focus on personal testimonials and community sentiment. Provide detailed multi-paragraph responses with several specific examples from community members."
+        prompt = f"response-type = sentiment. Share community voices and concerns from {selected_date}. Write from neighbors' perspectives using first-person quotes. Do not include category headers like 'Living Conditions:', 'Trash:', etc. Focus on personal testimonials and community sentiment. Provide detailed multi-paragraph responses with several specific examples from community members."
 
     # Get area context if available
     area_context = ""
@@ -1149,7 +1149,7 @@ def handle_initial_prompts(n_clicks, selected, slider_value, refresh_clicks):
     stats_reply = get_chat_response(prompt=stats_prompt, structured_response=True)
     stats_message = html.Div([html.Strong("A by-the-numbers overview of your neighborhood:"), dcc.Markdown(stats_reply, dangerously_allow_html=True)], className="bot-message", **{"data-response-type": "auto-generated", "data-date": selected_date})
 
-    community_prompt = f"response-type = community. Share voices from {selected_date} community meetings:{area_context} " "Write from the perspective of residents using first-person quotes. Avoid using category " "headers like 'Living Conditions:', 'Trash:', etc. Focus on personal testimonials and community sentiment. " "Provide detailed multi-paragraph responses with several specific examples from community members."
+    community_prompt = f"response-type = sentiment. Share voices from {selected_date} community meetings:{area_context} " "Write from the perspective of residents using first-person quotes. Do not use category " "headers like 'Living Conditions:', 'Trash:', etc. Focus on personal testimonials and community sentiment. " "Provide detailed multi-paragraph responses with several specific examples from community members."
     community_reply = get_chat_response(prompt=community_prompt, structured_response=False)
     community_message = html.Div([html.Strong("From recent community meetings:"), dcc.Markdown(community_reply, dangerously_allow_html=True)], className="bot-message", **{"data-response-type": "auto-generated", "data-date": selected_date})
     refresh_clicks = 0 if refresh_clicks is None else refresh_clicks + 1
