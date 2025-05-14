@@ -34,9 +34,11 @@ class Config:
 # creates cache directory if it doesn't exist
 os.makedirs(Config.CACHE_DIR, exist_ok=True)
 
+
 # checks if cached file is older than specified minutes
 def cache_stale(path, max_age_minutes=30):
     return not os.path.exists(path) or (time.time() - os.path.getmtime(path)) > max_age_minutes * 60
+
 
 # streams JSON data from API and convert to DataFrame
 def stream_to_dataframe(url: str) -> pd.DataFrame:
@@ -103,6 +105,7 @@ def stream_to_dataframe(url: str) -> pd.DataFrame:
 
             raise
 
+
 # filters data based on lat/lon and converts dates to standard datetime format
 def process_dataframe(df, location_columns=True, date_column=True):
     if location_columns:
@@ -116,6 +119,7 @@ def process_dataframe(df, location_columns=True, date_column=True):
         df.loc[:, "month"] = df["date"].dt.to_period("M").dt.to_timestamp()
 
     return df
+
 
 # fetching 311 data from the API or cache dir if exists
 def get_311_data(force_refresh=False):
@@ -134,6 +138,7 @@ def get_311_data(force_refresh=False):
 
     df.to_parquet(cache_path, index=False)
     return df
+
 
 # gets 311 data of the hexbins in the selected area
 def get_select_311_data(event_ids="", event_date=""):
@@ -157,6 +162,7 @@ def get_select_311_data(event_ids="", event_date=""):
 
     response.raise_for_status()
     return response.text
+
 
 # gets shots fired data from API or cache
 def get_shots_fired_data(force_refresh=False):
@@ -196,6 +202,7 @@ df_311 = get_311_data()
 latest = df_311["date"].max()
 max_value = (latest.year - 2018) * 12 + (latest.month - 1)
 
+
 # computes 311 category counts for selected area
 def compute_area_category_counts(event_ids: list[str], date_str: str) -> dict[str, int]:
     if not event_ids:
@@ -210,6 +217,7 @@ def compute_area_category_counts(event_ids: list[str], date_str: str) -> dict[st
         label_col, value_col = cols[:2]
     counts = dict(zip(df_area[label_col], df_area[value_col]))
     return counts
+
 
 # computes shots fired counts for selected area
 def compute_area_shot_count(hex_ids: list[str], shots_geojson: dict) -> int:
@@ -258,6 +266,8 @@ app.index_string = f"""
     </body>
 </html>
 """
+
+
 # date conversion
 def date_string_to_year_month(date_string: str):
     try:
@@ -266,6 +276,7 @@ def date_string_to_year_month(date_string: str):
     except Exception as e:
         print(f"Error parsing date string '{date_string}': {e}")
         return 2024, 12
+
 
 # gets response from llm
 def get_chat_response(prompt: str, structured_response: bool = False):
@@ -281,6 +292,7 @@ def get_chat_response(prompt: str, structured_response: bool = False):
         reply = f"[Error: {e}]"
 
     return reply
+
 
 # App layout
 app.layout = html.Div(
@@ -801,10 +813,12 @@ app.clientside_callback(
     prevent_initial_call="initial_duplicate",
 )
 
+
 # Update the UI label "slider-value-display" to exactly match the raw slider date value
 @app.callback(Output("slider-value-display", "children"), Input("date-slider-value", "children"))
 def update_slider_display(date_value):
     return date_value
+
 
 # Convert the raw date string into "YYYY-MM" format for display in the "date-display" component
 @callback(
@@ -814,6 +828,7 @@ def update_slider_display(date_value):
 def update_date_display(value):
     year, month = date_string_to_year_month(value)
     return f"{year}-{month:02d}"
+
 
 # Filter global 311, shots, and homicide DataFrames by selected month and push GeoJSON to client stores
 @callback(
@@ -861,6 +876,7 @@ def update_map_data(date_value):
 
     return hex_data, shots_data, homicides_data
 
+
 # when the date slider moves, show the left loading spinner until new data arrives
 @callback(
     Output("loading-spinner", "style", allow_duplicate=True),
@@ -898,7 +914,12 @@ def handle_chat_response(stored_input, slider_value, current_messages, selected_
         event_ids = ",".join(selected_hexbins_data["selected_ids"])
         event_id_data = get_select_311_data(event_ids=event_ids)
         event_date_data = get_select_311_data(event_date=selected_date)
-        prompt += f"\n\nYour neighbor has specifically selected an area within Dorchester to examine. " f"The overall neighborhood 311 data on {selected_date} are: {event_date_data}. " f"The specific area 311 data are: {event_id_data}. Compare the local area data, the neighborhood-wide data, " f"and the overall trends in the original 311 data."
+        prompt += (
+            f"\n\nYour neighbor has specifically selected an area within Dorchester to examine. "
+            f"The overall neighborhood 311 data on {selected_date} are: {event_date_data}. "
+            f"The specific area 311 data are: {event_id_data}. Compare the local area data, the neighborhood-wide data, "
+            f"and the overall trends in the original 311 data."
+        )
     # Requesting response for 311 By the Numbers
     reply = get_chat_response(prompt=prompt, structured_response=True)
     bot_response = html.Div([dcc.Markdown(reply, dangerously_allow_html=True)], className="bot-message")
@@ -906,6 +927,7 @@ def handle_chat_response(stored_input, slider_value, current_messages, selected_
     refresh_clicks = 0 if refresh_clicks is None else refresh_clicks + 1
 
     return updated_messages, {"display": "none"}, refresh_clicks
+
 
 # on the right side chat-submit show right spinner, and queue the message in "user-message-store-right"
 @callback(
@@ -932,6 +954,7 @@ def handle_chat_input_right(n_clicks, n_submit, input_value, msgs):
     msgs = msgs or []
 
     return msgs, {"display": "block"}, input_value.strip()
+
 
 # when slider value changes, show the right loading spinner until the right chat updates
 @callback(
@@ -1010,6 +1033,7 @@ def handle_chat_response_right(stored_input, slider_value, msgs, selected, refre
 
     return msgs, {"display": "none"}, refresh_clicks
 
+
 # tell me and show me button triggers in the overlay
 @callback(
     [
@@ -1050,6 +1074,7 @@ def handle_overlay_buttons(show_clicks, tell_clicks, listen_clicks):
 
     return overlay_style, map_class, chat_class, auto_focus, tell_me_prompt, 1
 
+
 # after the hide-overlay interval fires, fully hide the overlay and reset its counter
 @callback(
     [
@@ -1065,6 +1090,7 @@ def complete_overlay_transition(n_intervals):
     if n_intervals > 0:
         return {"display": "none"}, 0
     return dash.no_update, dash.no_update
+
 
 # when "Tell Me" button triggers, fetch a summary response for chatbot
 @callback(
@@ -1102,6 +1128,7 @@ def handle_tell_me_prompt(prompt, current_messages, refresh_clicks):
     refresh_clicks = 0 if refresh_clicks is None else refresh_clicks + 1
 
     return updated_messages, "", dash.no_update, refresh_clicks
+
 
 # on app initialization generate first responses for both chatbots
 @callback(
@@ -1141,16 +1168,25 @@ def handle_initial_prompts(n_clicks, selected, slider_value, refresh_clicks):
         if len(ids) > LIMIT:
             area_context += f"\n\nNote: This area had {len(ids)} events, but only {LIMIT} are analyzed due to system limits."
 
-    stats_prompt = f"response-type = analytic. A by-the-numbers overview for Dorchester on {selected_date}:{area_context} " "Your neighbor has selected this specific area to focus on. You don't have to compare the statistics but just analyze the data and give the statistics along with insights. Focus on counts of 311, shots fired, etc."
+    stats_prompt = (
+        f"response-type = analytic. A by-the-numbers overview for Dorchester on {selected_date}:{area_context} "
+        "Your neighbor has selected this specific area to focus on. You don't have to compare the statistics but just analyze the data and give the statistics along with insights. Focus on counts of 311, shots fired, etc."
+    )
     stats_reply = get_chat_response(prompt=stats_prompt, structured_response=True)
     stats_message = html.Div([html.Strong("A by-the-numbers overview of your neighborhood:"), dcc.Markdown(stats_reply, dangerously_allow_html=True)], className="bot-message", **{"data-response-type": "auto-generated", "data-date": selected_date})
 
-    community_prompt = f"response-type = sentiment. Share voices from {selected_date} community meetings:{area_context} " "Write from the perspective of residents using first-person quotes. Do not use category " "headers like 'Living Conditions:', 'Trash:', etc. Focus on personal testimonials and community sentiment. " "Provide detailed multi-paragraph responses with several specific examples from community members."
+    community_prompt = (
+        f"response-type = sentiment. Share voices from {selected_date} community meetings:{area_context} "
+        "Write from the perspective of residents using first-person quotes. Do not use category "
+        "headers like 'Living Conditions:', 'Trash:', etc. Focus on personal testimonials and community sentiment. "
+        "Provide detailed multi-paragraph responses with several specific examples from community members."
+    )
     community_reply = get_chat_response(prompt=community_prompt, structured_response=False)
     community_message = html.Div([html.Strong("From recent community meetings:"), dcc.Markdown(community_reply, dangerously_allow_html=True)], className="bot-message", **{"data-response-type": "auto-generated", "data-date": selected_date})
     refresh_clicks = 0 if refresh_clicks is None else refresh_clicks + 1
 
     return [stats_message], [community_message], refresh_clicks
+
 
 # read the raw date stored in the update-date button’s data-date attribute and push it to the slider-value store
 @callback(
@@ -1194,6 +1230,7 @@ def get_all_hexbin_data(_):
         hex_features.append({"type": "Feature", "id": hex_id, "properties": {"hex_id": hex_id, "value": normalized_value, "count": count, "lat": lat_center, "lon": lon_center}, "geometry": {"type": "Polygon", "coordinates": [coords]}})
 
     return {"type": "FeatureCollection", "features": hex_features}
+
 
 # switch between the stats and community tabs
 @callback(
@@ -1268,6 +1305,7 @@ def handle_combined_chat_input(n_clicks, n_submit, input_value, active_tab):
 
     return "", right_input, right_submit, right_clicks, left_loading, right_loading
 
+
 # update input box to placeholder value once "send" button is clicked
 @callback(
     [
@@ -1282,6 +1320,7 @@ def update_chat_input_from_trigger(trigger_value):
         return "", trigger_value
 
     return dash.no_update, dash.no_update
+
 
 # count and return a dict of 311 complaint categories for the selected hexbin IDs and month
 @callback(
@@ -1302,6 +1341,7 @@ def update_category_counts(selected, date_str):
     counts = df_month["category"].value_counts().to_dict()
 
     return counts
+
 
 # return total or area-filtered number of shots-fired
 @callback(
@@ -1324,6 +1364,7 @@ def update_shot_count(selected, date_str):
     df_month["cell"] = df_month.apply(lambda r: h3.latlng_to_cell(r.latitude, r.longitude, 10), axis=1)
     count = df_month[df_month["cell"].isin(hex_ids)].shape[0]
     return count
+
 
 # return total or area-filtered number of homicides
 @callback(
@@ -1348,6 +1389,7 @@ def update_homicide_count(selected, date_str):
 
     return count
 
+
 # pie chart of complaint categories
 @app.callback(
     Output("category-pie-chart", "figure"),
@@ -1359,19 +1401,19 @@ def render_category_pie(counts):
     labels = list(counts.keys())
     values = list(counts.values())
 
-    
     color_map = {
         "Streets, Sidewalks, And Parks": "#A9A9A9",
         "Parking": "#701238",
         "Living Conditions": "#FFA95A",
         "Trash, Recycling, And Waste": "#6987C4",
     }
-    
+
     colors = [color_map.get(lbl, "#CCCCCC") for lbl in labels]
 
     fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.2, sort=False, marker=dict(colors=colors), showlegend=False)])  # preserve order
     fig.update_layout(margin={"l": 0, "r": 0, "t": 0, "b": 0})
     return fig
+
 
 # render the shot and homicide counts
 @callback(
