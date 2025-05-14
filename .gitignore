@@ -11,6 +11,7 @@ env/
 *.venv
 pip-log.txt
 pip-delete-this-directory.txt
+conda
 
 # 3️⃣ Environment Variables (SECURITY: Protect API Keys & Secrets)
 .env
