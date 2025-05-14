@@ -14,16 +14,18 @@ GET /data/query?request=<request_type>&category=<311_category>&date=%Y-%m&zipcod
 ```app_version=<n.n>```    
 ```category={living_conditions | trash | streets | parking | all}```  
 ```date=%Y-%m``` is date in format 2020-04  
-```stream={True | False}``` toggles streamed data on query. DEPRECATED  
 ```output_type=<csv | json | stream}``` sets how data is returned, defaults to json  
 ```request=<311_by_geo | 311_summary | 311_summary | 911_shots_fired | 911_homicides_and_shots_fired>``` set data to get   
+
+**DEPRECATED**
+```stream={True | False}``` toggles streamed data on query. Use output_type.
 
 **Required**:
 Set 'category=\<category_name\>' 
 
 **Requested**:
 Set 'app_version' for logging purposes
-Set 'stream=True' to return data streams for large queries, default is 'False'
+Set 'output_type' to return data streams for large queries, default is 'False'
 
 **Optional**:
 When 'date' is set, response is only for that date (YYYY-MM)
@@ -31,7 +33,7 @@ When 'zipcode' is set, response is limited to that (or those) zipcodes
 
 ##### Examples:
 
-```GET /data/query?request=311_by_geo&app_version=5.5&category=all&date=2019-02&stream=True```   
+```GET /data/query?request=311_by_geo&app_version=0.7.0&category=all&date=2019-02&output_type=stream```   
 
 *Response*: 
 ```
@@ -42,7 +44,7 @@ When 'zipcode' is set, response is limited to that (or those) zipcodes
 ...]
 ```  
 ---
-```GET /data/query?request=311_by_geo&app_version=5.5&category=all&stream=True```
+```GET /data/query?request=311_by_geo&app_version=0.7.0&category=all&output_type=stream```
   
 *Response*: 
 ```
@@ -53,7 +55,7 @@ When 'zipcode' is set, response is limited to that (or those) zipcodes
 ...]
 ```  
 ---
-```GET /data/query?request=911_shots_fired&app_version=5.5&stream=True```
+```GET /data/query?request=911_shots_fired&app_version=0.7.0&output_type=stream```
 
 *Response*: 
 ```
@@ -64,7 +66,7 @@ When 'zipcode' is set, response is limited to that (or those) zipcodes
 ...]
 ```  
 ---
-```GET /data/query?request=911_homicides_and_shots_fired&app_version=5.5&stream=True```
+```GET /data/query?request=911_homicides_and_shots_fired&app_version=0.7.0&output_type=stream```
 
 *Response*: 
 ```
@@ -75,7 +77,7 @@ When 'zipcode' is set, response is limited to that (or those) zipcodes
 ...]
 ```
 ---
-```GET /data/query?request=311_summary&app_version=${APP_VERSION}&category=all&stream=True```  
+```GET /data/query?request=311_summary&app_version=0.7.0&category=all&output_type=stream```  
 311 summary for all data in base filter  
 *Response*:
 ```
@@ -85,7 +87,7 @@ When 'zipcode' is set, response is limited to that (or those) zipcodes
 {"reported_issue": "Streets, Sidewalks, And Parks", "total": 50003}
 ```
 ---
-```GET /data/query?request=311_summary&app_version=${APP_VERSION}&category=all&devent_ids=<list of 311 ids>&stream=True```  
+```GET /data/query?request=311_summary&app_version=0.7.0&category=all&devent_ids=<list of 311 ids>&output_type=stream```  
 311 summary from listed ids  
 *Response*:
 ```
@@ -94,7 +96,7 @@ When 'zipcode' is set, response is limited to that (or those) zipcodes
 {"reported_issue": "Living Conditions", "total": 1}
 ```
 ---
-```GET /data/query?request=311_summary&app_version=${APP_VERSION}&category=all&date=<YYYY-MM>&stream=True```  
+```GET /data/query?request=311_summary&app_version=0.7.0&category=all&date=<YYYY-MM>&output_type=stream```  
 311 summary for stated date  
 NOTE: if event_ids and data are both given, will only return summary by id  
 *Response*:
@@ -105,6 +107,49 @@ NOTE: if event_ids and data are both given, will only return summary by id
 {"reported_issue": "Streets, Sidewalks, And Parks", "total": 667}
 ```
 
+### /chat/data/query \[ POST \] 
+---
+#### **POST data query request, used when requesting many 311 records**
+```
+POST /data/query?request=311_summary&app_version=0.7.0&output_type=json"  
+``` 
+*Json Data object*  
+```
+{  
+    event_ids: "1718415,1716303,1707849,1714058,1714546,..."  
+}  
+```
+*Response*  
+```  
+[ 
+  { 
+    "category": "Living Conditions", 
+    "subcategory": "TOTAL", 
+    "total": 1 
+  }, 
+  { 
+    "category": "Parking", 
+    "subcategory": "Parking Enforcement", 
+    "total": 3 
+  }, 
+  { 
+    "category": "Parking", 
+    "subcategory": "TOTAL", 
+    "total": 3 
+  }, 
+  { 
+    "category": "Streets, Sidewalks, And Parks", 
+    "subcategory": "Request for Pothole Repair", 
+    "total": 9 
+  }, 
+  { 
+    "category": "Streets, Sidewalks, And Parks", 
+    "subcategory": "TOTAL", 
+    "total": 9 
+  } 
+]
+```  
+
 ### /chat \[ POST \]
 ---
 #### **POST user question with prompt preamble for data context**
@@ -114,11 +159,11 @@ POST /chat?request={structured | unstructured | all | specific}
 *Json Data object*
 ```
 {
-    app_version = "{app_version}"
-    data_selected = ["{file1.csv}", "{file2.txt}"] #required for context_request=specific
-    data_attributes = ["{attrib1}", "{attrib2}", "{attrib3}"] #optional
-    client_query = "{User chat query}",
-    prompt_preamble = "{Prompt preable} #required for context_request=specific"
+    app_version: "{app_version}"
+    data_selected: ["{file1.csv}", "{file2.txt}"] #required for context_request=specific
+    data_attributes: ["{attrib1}", "{attrib2}", "{attrib3}"] #optional
+    client_query: "{User chat query}",
+    prompt_preamble: "{Prompt preable} #required for context_request=specific"
 }
 ```
 *Response*
@@ -139,10 +184,10 @@ POST /chat/context?request=<context_request>
 *Json Data object*
 ```
 {
-    app_version = "{app_version}"
-    data_selected = "'{file1.csv}', '{file2.txt}'", # optional
-    data_attributes = ["{attrib1}", "{attrib2}", "{attrib3}"], # optional
-    prompt_preamble = "{Prompt preable} # optional
+    app_version: "{app_version}"
+    data_selected: "'{file1.csv}', '{file2.txt}'", # optional
+    data_attributes: ["{attrib1}", "{attrib2}", "{attrib3}"], # optional
+    prompt_preamble: "{Prompt preable} # optional
 }
 ```
 *Response*
@@ -159,10 +204,10 @@ Clears the requested context cache. When context_request == all, will clear all 
 *Json Data object*
 ```
 {
-    app_version = "{app_version}"
-    data_selected = "'{file1.csv}', '{file2.txt}'", # optional
-    data_attributes = ["{attrib1}", "{attrib2}", "{attrib3}"], # optional
-    prompt_preamble = "{Prompt preable} # optional
+    app_version: "{app_version}"
+    data_selected: "'{file1.csv}', '{file2.txt}'", # optional
+    data_attributes: ["{attrib1}", "{attrib2}", "{attrib3}"], # optional
+    prompt_preamble: "{Prompt preable} # optional
 }
 ```
 *Response*
