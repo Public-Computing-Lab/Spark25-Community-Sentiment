@@ -12,7 +12,6 @@ import os
 import re
 import io
 import uuid
-import asyncio
 import json
 import decimal
 from pydantic import BaseModel
@@ -25,7 +24,7 @@ BASE_DIR = Path(__file__).parent
 
 # Configuration constants
 class Config:
-    API_VERSION = "API v 0.5"
+    API_VERSION = "API v 0.6"
     RETHINKAI_API_KEYS = os.getenv("RETHINKAI_API_KEYS").split(",")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL")
@@ -669,8 +668,7 @@ def get_query_results(query: str, output_type: str = ""):
         raise ValueError(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error getting query results:{Font_Colors.ENDC} Invalid output_type: {output_type}")
 
 
-# Send prompt to Gemini
-async def get_gemini_response(prompt: str, cache_name: str, structured_response: bool = False) -> str:
+def get_gemini_response(prompt: str, cache_name: str, structured_response: bool = False) -> str:
     try:
         model = Config.GEMINI_MODEL
         if structured_response is True:
@@ -682,12 +680,11 @@ async def get_gemini_response(prompt: str, cache_name: str, structured_response:
         else:
             config = types.GenerateContentConfig(cached_content=cache_name)
 
-        response = await asyncio.to_thread(
-            lambda: genai_client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=config,
-            )
+        # Direct synchronous call instead of asyncio.to_thread
+        response = genai_client.models.generate_content(
+            model=model,
+            contents=prompt,
+            config=config,
         )
         return response.text
 
@@ -1015,9 +1012,11 @@ def route_chat():
 
     # Process chat
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        app_response = loop.run_until_complete(get_gemini_response(prompt=full_prompt, cache_name=cache_name, structured_response=structured_response))
+        app_response = get_gemini_response(
+            prompt=full_prompt,
+            cache_name=cache_name,
+            structured_response=structured_response,
+        )
         if "Error" in app_response:
             print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ ERROR from Gemini API:{Font_Colors.ENDC} {app_response}")
             return jsonify({"Error": app_response}), 500
