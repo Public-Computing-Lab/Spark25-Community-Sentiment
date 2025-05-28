@@ -1,9 +1,0 @@
-name: test-env 
-channels:
-  - conda-forge 
-dependencies:
-  - python>=3.5
-  - anaconda
-  - pip
-  - pip:
-    - -r requirements.txt
