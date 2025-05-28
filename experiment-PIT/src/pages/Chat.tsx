@@ -2,13 +2,21 @@ import React, { useState, useRef, useEffect } from 'react'
 import './Chat.css'
 
 function Chat() {
-  const [messages, setMessages] = useState<string[]>([])
+  type Message = {
+    text: string
+    sender: 'user' | 'ml'
+  }
+  const [messages, setMessages] = useState<Message[]>([
+    { text: 'Hi there! Welcome to 26 Blocks. I\'m here to help you explore safety insights in your neighborhood. What would you like to find today?', sender: 'ml'}
+  ])
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const sendMessage = () => {
     if (input.trim() === '') return
-    setMessages(prev => [...prev, input.trim()])
+    const userMsg = input.trim()
+
+    setMessages(prev => [...prev, {text: userMsg, sender: 'user'}])
     setInput('')
   }
 
@@ -26,7 +34,12 @@ function Chat() {
 
       <div className="chat-messages">
         {messages.map((msg, idx) => (
-          <div key={idx} className="chat-bubble">{msg}</div>
+          <div 
+            key={idx} 
+            className={msg.sender === 'ml' ? 'ml-chat-bubble' : 'user-chat-bubble'}
+          >
+            {msg.text}
+          </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
