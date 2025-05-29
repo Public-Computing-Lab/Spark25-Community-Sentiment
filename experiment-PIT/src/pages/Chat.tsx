@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { BOTTOM_NAV_HEIGHT } from '../constants/layoutConstants';
 import { Box, Typography, TextField, IconButton } from '@mui/material'
 import SendIcon from '@mui/icons-material/Send'
 
@@ -37,7 +38,7 @@ function Chat() {
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100%',
+        height: `calc(100vh - ${BOTTOM_NAV_HEIGHT}px)`,
         width: '100%',
         bgcolor: 'background.paper',
         color: 'text.primary',
