@@ -5,13 +5,13 @@ import BottomNavigationAction from '@mui/material/BottomNavigationAction';
 import Paper from '@mui/material/Paper';
 
 import HomeIcon from '@mui/icons-material/Home';
-import MapIcon from '@mui/icons-material/Map';
-import ChatBubbleIcon from '@mui/icons-material/ChatBubble';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import ForumIcon from '@mui/icons-material/Forum';
 
 const navLinks = [
   { label: 'Home', to: '/', icon: <HomeIcon /> },
-  { label: 'Map', to: '/map', icon: <MapIcon /> },
-  { label: 'Chat', to: '/chat', icon: <ChatBubbleIcon /> },
+  { label: 'Map', to: '/map', icon: <LocationOnIcon /> },
+  { label: 'Chat', to: '/chat', icon: <ForumIcon /> },
 ];
 
 function Navbar() {
