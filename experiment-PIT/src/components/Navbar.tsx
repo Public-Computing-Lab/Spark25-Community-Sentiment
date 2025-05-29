@@ -1,41 +1,39 @@
-import { AppBar, Toolbar, Link as MuiLink } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
+import * as React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import BottomNavigation from '@mui/material/BottomNavigation';
+import BottomNavigationAction from '@mui/material/BottomNavigationAction';
+import Paper from '@mui/material/Paper';
+
+import HomeIcon from '@mui/icons-material/Home';
+import MapIcon from '@mui/icons-material/Map';
+import ChatBubbleIcon from '@mui/icons-material/ChatBubble';
 
 const navLinks = [
-  { label: 'Home', to: '/' },
-  { label: 'Map', to: '/map' },
-  { label: 'Chat', to: '/chat' },
+  { label: 'Home', to: '/', icon: <HomeIcon /> },
+  { label: 'Map', to: '/map', icon: <MapIcon /> },
+  { label: 'Chat', to: '/chat', icon: <ChatBubbleIcon /> },
 ];
 
-function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
-  return (
-    <MuiLink
-      component={RouterLink}
-      to={to}
-      underline="hover"
-      color="text.primary"
-      sx={{ fontWeight: 'bold' }}
-    >
-      {children}
-    </MuiLink>
-  );
-}
-
 function Navbar() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const currentIndex = navLinks.findIndex(link => link.to === location.pathname);
+  const [value, setValue] = React.useState(currentIndex !== -1 ? currentIndex : 0);
+
+  const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+    setValue(newValue);
+    navigate(navLinks[newValue].to);
+  };
+
   return (
-    <AppBar
-      position="sticky"
-      color="default"
-      sx={{ top: 'auto', bottom: 0, bgcolor: 'background.paper'}}
-    >
-      <Toolbar sx={{ justifyContent: 'center', gap: 3 }}>
-        {navLinks.map(({ label, to }) => (
-          <NavLink key={to} to={to}>
-            {label}
-          </NavLink>
+    <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0 }} elevation={3}>
+      <BottomNavigation showLabels value={value} onChange={handleChange}>
+        {navLinks.map(({ label, icon }, index) => (
+          <BottomNavigationAction key={index} label={label} icon={icon} />
         ))}
-      </Toolbar>
-    </AppBar>
+      </BottomNavigation>
+    </Paper>
   );
 }
 
