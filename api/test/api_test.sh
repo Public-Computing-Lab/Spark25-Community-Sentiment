@@ -5,7 +5,7 @@ API_URL="http://127.0.0.1:8888"
 #API_URL="https://boston.ourcommunity.is/api"
 APP_VERSION="test.x"
 COOKIE_FILE="cookies.txt"
-RETHINKAI_API_KEY="rethinkAI.IWkBWUvNRDFU7STfEd2rcWURGWQQQZFx2DdV7in3UVoRW9P97FQbS6"
+RETHINKAI_API_KEY=<rethink api key>
 
 # Colors
 GREEN='\033[0;32m'
