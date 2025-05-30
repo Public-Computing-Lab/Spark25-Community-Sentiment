@@ -20,8 +20,9 @@ function Map() {
       style: "mapbox://styles/mapbox/light-v11", //should decide on style
     });
 
-    //adding rect borders of TNT
+    
     mapRef.current.on('load', () => {
+      //adding rect borders of TNT
       mapRef.current.addSource('TNT', {
         type: 'geojson',
         data: {
@@ -42,7 +43,7 @@ function Map() {
       });
 
       mapRef.current.addLayer({
-        id: 'outline',
+        id: 'tnt-outline',
         type: 'line',
         source: 'TNT',
         layout: {},
@@ -52,7 +53,32 @@ function Map() {
         }
       });
 
+      // Fetching and adding community assets
+      fetch('/data/map.geojson')
+        .then((response) => response.json())
+        .then((geojsonData) => {
+          mapRef.current.addSource('assets', {
+            type: 'geojson',
+            data: geojsonData,
+          });
+
+          mapRef.current.addLayer({
+            id: 'community-assets',
+            type: 'circle',
+            source: 'assets',
+            paint: {
+              'circle-radius': 5,
+              'circle-color': '#228B22',
+            },
+          });
+        })
+        
+      //adding initial community assets from map annotations
+
     });
+
+    //adding initial map annotations
+
     return () => {
       mapRef.current.remove() //removes map after unmounting
     }
