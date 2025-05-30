@@ -63,19 +63,28 @@ function Map() {
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100%',
-        width: '100%',
-        bgcolor: 'background.paper',
-        color: 'text.primary',
-        overflow: 'hidden',
-        position: 'relative',
-        p: 2,
       }}
     >
-      <Typography variant="h4" component="h1" mb={2}>
-        map map
+      <Box sx={{ //element rendering the map
+        left: '0', 
+        top: '0', 
+        position: 'absolute', 
+        width: '100vw !important',
+        height: '100%',
+      }}
+        ref={mapContainerRef}
+      />
+      <Typography 
+        variant="h3"
+        sx={{
+          position: 'absolute',
+          zIndex: '10',
+          padding: '0.5em',
+        }}
+      > Map View
       </Typography>
     </Box>
+    
   )
 }
 
