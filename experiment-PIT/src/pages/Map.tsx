@@ -16,6 +16,7 @@ function Map() {
       container: mapContainerRef.current,
       center: [-71.076543, 42.288386], //centered based on 4 rectangle coordinates of TNT
       zoom: 14.5,
+      minZoom: 12,
       style: "mapbox://styles/mapbox/light-v11", //should decide on style
     });
 
