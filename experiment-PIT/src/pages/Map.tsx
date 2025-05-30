@@ -1,4 +1,4 @@
-import './Map.css'
+import { Box, Typography } from '@mui/material'
 import {useRef, useEffect} from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -59,7 +59,23 @@ function Map() {
 
 
   return (
-    <div id="map-container" ref={mapContainerRef}/>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        width: '100%',
+        bgcolor: 'background.paper',
+        color: 'text.primary',
+        overflow: 'hidden',
+        position: 'relative',
+        p: 2,
+      }}
+    >
+      <Typography variant="h4" component="h1" mb={2}>
+        map map
+      </Typography>
+    </Box>
   )
 }
 
