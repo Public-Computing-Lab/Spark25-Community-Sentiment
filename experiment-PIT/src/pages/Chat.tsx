@@ -1,49 +1,79 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { BOTTOM_NAV_HEIGHT } from '../constants/layoutConstants';
-import { Box, Typography, TextField, IconButton } from '@mui/material'
-import SendIcon from '@mui/icons-material/Send'
+import React, { useState, useRef, useEffect } from "react"
+import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
+import { Box, Typography, TextField, IconButton } from "@mui/material"
+import SendIcon from "@mui/icons-material/Send"
+import { sendChatMessage } from "../api/api"
+
+type Message = {
+  text: string
+  sender: "user" | "ml"
+}
 
 function Chat() {
-  type Message = {
-    text: string
-    sender: 'user' | 'ml'
-  }
   const [messages, setMessages] = useState<Message[]>([
     {
       text:
         "Hi there! Welcome to 26 Blocks. I'm here to help you explore safety insights in your neighborhood. What would you like to find today?",
-      sender: 'ml',
+      sender: "ml",
     },
   ])
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState("")
+  const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const sendMessage = () => {
-    if (input.trim() === '') return
+  const sendMessage = async () => {
+    if (input.trim() === "" || isSending) return
+
     const userMsg = input.trim()
-    setMessages((prev) => [...prev, { text: userMsg, sender: 'user' }])
-    setInput('')
+    setMessages((prev) => [...prev, { text: userMsg, sender: "user" }])
+    setInput("")
+    setIsSending(true)
+
+    try {
+      // Call backend API helper to get AI response
+      const data = await sendChatMessage(userMsg)
+
+      // Append backend response to messages
+      if (data.response) {
+        setMessages((prev) => [...prev, { text: data.response, sender: "ml" }])
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          { text: "Sorry, no response from server.", sender: "ml" },
+        ])
+      }
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: "Oops, something went wrong. Please try again.",
+          sender: "ml",
+        },
+      ])
+    } finally {
+      setIsSending(false)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') sendMessage()
+    if (e.key === "Enter") sendMessage()
   }
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
   return (
     <Box
       sx={{
-        display: 'flex',
-        flexDirection: 'column',
+        display: "flex",
+        flexDirection: "column",
         height: `calc(100vh - ${BOTTOM_NAV_HEIGHT}px)`,
-        width: '100%',
-        bgcolor: 'background.paper',
-        color: 'text.primary',
-        overflow: 'hidden',
-        position: 'relative',
+        width: "100%",
+        bgcolor: "background.paper",
+        color: "text.primary",
+        overflow: "hidden",
+        position: "relative",
         p: 2,
       }}
     >
@@ -54,34 +84,35 @@ function Chat() {
       <Box
         sx={{
           flex: 1,
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
           gap: 1.25,
-          bgcolor: 'background.default',
+          bgcolor: "background.default",
           px: 1,
           pb: 1,
           borderRadius: 1,
-          border: '1px solid',
-          borderColor: 'divider',
+          border: "1px solid",
+          borderColor: "divider",
         }}
       >
         {messages.map((msg, idx) => (
           <Box
             key={idx}
             sx={{
-              alignSelf: msg.sender === 'ml' ? 'flex-start' : 'flex-end',
-              bgcolor: 'background.paper',
-              color: 'text.primary',
+              alignSelf: msg.sender === "ml" ? "flex-start" : "flex-end",
+              bgcolor: "background.paper",
+              color: "text.primary",
               border: 2,
-              borderColor: 'text.primary',
+              borderColor: "text.primary",
               borderRadius: 2,
-              maxWidth: '75%',
-              fontSize: '1.2rem',
+              maxWidth: "75%",
+              fontSize: "1.2rem",
               p: 1.5,
-              wordWrap: 'break-word',
-              textAlign: msg.sender === 'ml' ? 'left' : 'right',
-              whiteSpace: 'pre-wrap',
+              wordWrap: "break-word",
+              textAlign: msg.sender === "ml" ? "left" : "right",
+              whiteSpace: "pre-wrap",
+              opacity: isSending && msg.sender === "ml" && idx === messages.length - 1 ? 0.6 : 1,
             }}
           >
             {msg.text}
@@ -97,14 +128,14 @@ function Chat() {
           sendMessage()
         }}
         sx={{
-          display: 'flex',
-          alignItems: 'center',
+          display: "flex",
+          alignItems: "center",
           border: 1,
-          borderColor: 'divider',
+          borderColor: "divider",
           borderRadius: 1,
           mt: 2,
           p: 0.5,
-          bgcolor: 'background.paper',
+          bgcolor: "background.paper",
         }}
       >
         <TextField
@@ -116,12 +147,13 @@ function Chat() {
           onKeyDown={handleKeyDown}
           InputProps={{ disableUnderline: true }}
           sx={{ px: 1 }}
+          disabled={isSending}
         />
 
         <IconButton
           color="primary"
           onClick={sendMessage}
-          disabled={input.trim() === ''}
+          disabled={input.trim() === "" || isSending}
           aria-label="send message"
           sx={{ ml: 1 }}
         >
