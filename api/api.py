@@ -16,6 +16,9 @@ import json
 import decimal
 from pydantic import BaseModel
 
+from flask import Flask
+from flask_cors import CORS
+
 # Load environment variables
 load_dotenv()
 
@@ -31,12 +34,16 @@ class Config:
     GEMINI_CACHE_TTL = float(os.getenv("GEMINI_CACHE_TTL", "0.125"))
     HOST = os.getenv("API_HOST", "127.0.0.1")
     PORT = os.getenv("API_PORT", "8888")
-    DATASTORE_PATH = BASE_DIR / Path(os.getenv("DATASTORE_PATH", "./datastore").lstrip("./"))
+    DATASTORE_PATH = BASE_DIR / Path(
+        os.getenv("DATASTORE_PATH", "./datastore").lstrip("./")
+    )
     PROMPTS_PATH = BASE_DIR / Path(os.getenv("PROMPTS_PATH", "./prompts").lstrip("./"))
     ALLOWED_EXTENSIONS = {"csv", "txt"}
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit
     FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "rethinkAI2025!")
-    FLASK_SESSION_COOKIE_SECURE = os.getenv("FLASK_SESSION_COOKIE_SECURE", "False").lower() == "true"
+    FLASK_SESSION_COOKIE_SECURE = (
+        os.getenv("FLASK_SESSION_COOKIE_SECURE", "False").lower() == "true"
+    )
 
     # Database configuration
     DB_CONFIG = {
@@ -60,6 +67,15 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=7),
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SECURE=Config.FLASK_SESSION_COOKIE_SECURE,
+)
+
+
+# Enable CORS
+CORS(
+    app,
+    supports_credentials=True,
+    expose_headers=["RethinkAI-API-Key"],
+    resources={r"/*": {"origins": "*"}},
 )
 
 
@@ -96,7 +112,9 @@ class SQLConstants:
     }
 
     # Set the 'all' category to include all individual categories
-    CATEGORY_TYPES["all"] = ", ".join([cat for cat in ", ".join(CATEGORY_TYPES.values()).split(", ")])
+    CATEGORY_TYPES["all"] = ", ".join(
+        [cat for cat in ", ".join(CATEGORY_TYPES.values()).split(", ")]
+    )
 
     BOS311_NORMALIZED_TYPE_CASE = f"""
     CASE
@@ -148,7 +166,9 @@ class SQLConstants:
     """
 
     # 311 specific constants
-    BOS311_BASE_WHERE = "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
+    BOS311_BASE_WHERE = (
+        "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
+    )
 
     # 911 specific constants
     BOS911_BASE_WHERE = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
@@ -432,7 +452,12 @@ def build_311_query(
         total DESC;
         """
         return query
-    elif data_request == "311_summary" and not request_date and not event_ids and request_options:
+    elif (
+        data_request == "311_summary"
+        and not request_date
+        and not event_ids
+        and request_options
+    ):
         query = f"""
         SELECT
         CASE
@@ -474,7 +499,9 @@ def build_311_query(
         """
         return query
     else:
-        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating query:{Font_Colors.ENDC}: check query args")
+        print(
+            f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating query:{Font_Colors.ENDC}: check query args"
+        )
         return ""
 
 
@@ -533,25 +560,48 @@ def check_date_format(date_string: str) -> bool:
 
 
 def check_filetype(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in Config.ALLOWED_EXTENSIONS
+    return (
+        "." in filename
+        and filename.rsplit(".", 1)[1].lower() in Config.ALLOWED_EXTENSIONS
+    )
 
 
-def get_files(file_type: Optional[str] = None, specific_files: Optional[List[str]] = None) -> List[str]:
+def get_files(
+    file_type: Optional[str] = None, specific_files: Optional[List[str]] = None
+) -> List[str]:
     """Get a list of files from the datastore directory."""
     try:
         if not Config.DATASTORE_PATH.exists():
             return []
 
         if specific_files:
-            return [f.name for f in Config.DATASTORE_PATH.iterdir() if f.is_file() and f.name in specific_files and not f.name.startswith(".")]
+            return [
+                f.name
+                for f in Config.DATASTORE_PATH.iterdir()
+                if f.is_file()
+                and f.name in specific_files
+                and not f.name.startswith(".")
+            ]
 
         if file_type:
-            return [f.name for f in Config.DATASTORE_PATH.iterdir() if f.is_file() and f.suffix.lower() == f".{file_type}" and not f.name.startswith(".")]
+            return [
+                f.name
+                for f in Config.DATASTORE_PATH.iterdir()
+                if f.is_file()
+                and f.suffix.lower() == f".{file_type}"
+                and not f.name.startswith(".")
+            ]
 
-        return [f.name for f in Config.DATASTORE_PATH.iterdir() if f.is_file() and not f.name.startswith(".")]
+        return [
+            f.name
+            for f in Config.DATASTORE_PATH.iterdir()
+            if f.is_file() and not f.name.startswith(".")
+        ]
 
     except Exception as e:
-        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error getting files:{Font_Colors.ENDC} {e}")
+        print(
+            f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error getting files:{Font_Colors.ENDC} {e}"
+        )
         return []
 
 
@@ -565,7 +615,9 @@ def get_file_content(filename: str) -> Optional[str]:
         return file_path.read_text(encoding="utf-8")
 
     except Exception as e:
-        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error reading file {filename}:{Font_Colors.ENDC} {e}")
+        print(
+            f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error reading file {filename}:{Font_Colors.ENDC} {e}"
+        )
         return None
 
 
@@ -584,7 +636,9 @@ def json_query_results(query: str) -> Optional[Response]:
         result = cursor.fetchall()
         return jsonify(result) if result else None
     except mysql.connector.Error as err:
-        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection (json_query_results):{Font_Colors.ENDC} {str(err)}")
+        print(
+            f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection (json_query_results):{Font_Colors.ENDC} {str(err)}"
+        )
         return None
     finally:
         if "cursor" in locals() and cursor:
@@ -624,7 +678,9 @@ def stream_query_results(query: str) -> Generator[str, None, None]:
         # Close the JSON structure
         yield "\n]"
     except mysql.connector.Error as err:
-        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection (stream_query_results):{Font_Colors.ENDC} {str(err)}")
+        print(
+            f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection (stream_query_results):{Font_Colors.ENDC} {str(err)}"
+        )
         yield "[]\n"  # Return empty array on error
     finally:
         if cursor:
@@ -648,7 +704,9 @@ def csv_query_results(query: str) -> Optional[io.StringIO]:
             writer.writerow(row)
         return result
     except mysql.connector.Error as err:
-        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection (csv_query_results):{Font_Colors.ENDC} {str(err)}")
+        print(
+            f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection (csv_query_results):{Font_Colors.ENDC} {str(err)}"
+        )
         return None
     finally:
         if "cursor" in locals() and cursor:
@@ -665,10 +723,14 @@ def get_query_results(query: str, output_type: str = ""):
     elif output_type == "json" or output_type == "":
         return json_query_results(query)
     else:
-        raise ValueError(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error getting query results:{Font_Colors.ENDC} Invalid output_type: {output_type}")
+        raise ValueError(
+            f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error getting query results:{Font_Colors.ENDC} Invalid output_type: {output_type}"
+        )
 
 
-def get_gemini_response(prompt: str, cache_name: str, structured_response: bool = False) -> str:
+def get_gemini_response(
+    prompt: str, cache_name: str, structured_response: bool = False
+) -> str:
     try:
         model = Config.GEMINI_MODEL
         if structured_response is True:
@@ -689,15 +751,26 @@ def get_gemini_response(prompt: str, cache_name: str, structured_response: bool 
         return response.text
 
     except Exception as e:
-        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}")
+        print(
+            f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}"
+        )
         return f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}"
 
 
-def create_gemini_context(context_request: str, preamble: str = "", generate_cache: bool = True, app_version: str = "") -> Union[str, int, bool]:
+def create_gemini_context(
+    context_request: str,
+    preamble: str = "",
+    generate_cache: bool = True,
+    app_version: str = "",
+) -> Union[str, int, bool]:
     # test if cache exists
     if generate_cache:
         for cache in genai_client.caches.list():
-            if cache.display_name == "APP_VERSION_" + app_version + "_REQUEST_" + context_request and cache.model == Config.GEMINI_MODEL:
+            if (
+                cache.display_name
+                == "APP_VERSION_" + app_version + "_REQUEST_" + context_request
+                and cache.model == Config.GEMINI_MODEL
+            ):
                 return cache.name
 
     try:
@@ -715,7 +788,11 @@ def create_gemini_context(context_request: str, preamble: str = "", generate_cac
         elif context_request == "all":
             files_list = get_files()
             preamble_file = context_request + ".txt"
-        elif context_request == "experiment_5" or context_request == "experiment_6" or context_request == "experiment_7":
+        elif (
+            context_request == "experiment_5"
+            or context_request == "experiment_6"
+            or context_request == "experiment_7"
+        ):
             files_list = get_files("txt")
             query = build_311_query(data_request="311_summary_context")
             response = get_query_results(query=query, output_type="csv")
@@ -732,7 +809,9 @@ def create_gemini_context(context_request: str, preamble: str = "", generate_cac
 
         path = Config.PROMPTS_PATH / preamble_file
         if not path.is_file():
-            raise FileNotFoundError(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error: File not found:{Font_Colors.ENDC} {path}")
+            raise FileNotFoundError(
+                f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error: File not found:{Font_Colors.ENDC} {path}"
+            )
         system_prompt = path.read_text(encoding="utf-8")
 
         display_name = "APP_VERSION_" + app_version + "_REQUEST_" + context_request
@@ -740,7 +819,14 @@ def create_gemini_context(context_request: str, preamble: str = "", generate_cac
         # Generate cache or return token count
         if generate_cache:
             # Set cache expiration time
-            cache_ttl = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=Config.GEMINI_CACHE_TTL)).isoformat().replace("+00:00", "Z")
+            cache_ttl = (
+                (
+                    datetime.datetime.now(datetime.timezone.utc)
+                    + datetime.timedelta(days=Config.GEMINI_CACHE_TTL)
+                )
+                .isoformat()
+                .replace("+00:00", "Z")
+            )
 
             # Create the cache
             cache = genai_client.caches.create(
@@ -757,11 +843,15 @@ def create_gemini_context(context_request: str, preamble: str = "", generate_cac
         else:
             # Return token count for testing
             content["parts"].append({"text": system_prompt})
-            total_tokens = genai_client.models.count_tokens(model=Config.GEMINI_MODEL, contents=content["parts"])
+            total_tokens = genai_client.models.count_tokens(
+                model=Config.GEMINI_MODEL, contents=content["parts"]
+            )
             return total_tokens.total_tokens
 
     except Exception as e:
-        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating context:{Font_Colors.ENDC} {e}")
+        print(
+            f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating context:{Font_Colors.ENDC} {e}"
+        )
         return f"✖ Error generating context: {e}"
 
 
@@ -842,7 +932,9 @@ def log_event(
         return app_response_id
 
     except mysql.connector.Error as err:
-        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection (log_event):{Font_Colors.ENDC} {str(err)}")
+        print(
+            f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error in database connection (log_event):{Font_Colors.ENDC} {str(err)}"
+        )
         return False
 
     finally:
@@ -856,10 +948,17 @@ def log_event(
 #
 @app.before_request
 def check_session():
+    if request.method == "OPTIONS":
+        # Preflight CORS request – skip auth
+        return None
+
     rethinkai_api_client_key = request.headers.get("RethinkAI-API-Key")
     app_version = request.args.get("app_version", "")
 
-    if not rethinkai_api_client_key or rethinkai_api_client_key not in Config.RETHINKAI_API_KEYS:
+    if (
+        not rethinkai_api_client_key
+        or rethinkai_api_client_key not in Config.RETHINKAI_API_KEYS
+    ):
         return jsonify({"Error": "Invalid or missing API key"}), 401
 
     if "session_id" not in session:
@@ -908,18 +1007,24 @@ def route_data_query():
         request_options = request.args.get("category", "")
         if data_request.startswith("311_by") and not request_options:
             return (
-                jsonify({"✖ Error": "Missing required options parameter for 311 request"}),
+                jsonify(
+                    {"✖ Error": "Missing required options parameter for 311 request"}
+                ),
                 400,
             )
 
         if data_request.startswith("311_on_date") and not request_date:
             return (
-                jsonify({"✖ Error": "Missing required options parameter for 311 request"}),
+                jsonify(
+                    {"✖ Error": "Missing required options parameter for 311 request"}
+                ),
                 400,
             )
 
         # Validate date format for date-specific queries
-        if data_request.startswith("311_on_date") and not check_date_format(request_date):
+        if data_request.startswith("311_on_date") and not check_date_format(
+            request_date
+        ):
             return jsonify({"✖ Error": 'Incorrect date format. Expects "YYYY-MM"'}), 400
 
         # Build query using the appropriate query builder
@@ -958,7 +1063,12 @@ def route_data_query():
         # Return w/ streaming
         if stream_result == "True":
             # return Response(stream_with_context(stream_query_results(query=query)), mimetype="application/json")
-            return Response(stream_with_context(get_query_results(query=query, output_type="stream")), mimetype="application/json")
+            return Response(
+                stream_with_context(
+                    get_query_results(query=query, output_type="stream")
+                ),
+                mimetype="application/json",
+            )
         # Return non-streaming
         else:
             log_event(
@@ -971,7 +1081,9 @@ def route_data_query():
             if output_type == "csv" and result:
                 output = result.getvalue()
                 response = Response(output, mimetype="text/csv")
-                response.headers["Content-Disposition"] = "attachment; filename=export.csv"
+                response.headers["Content-Disposition"] = (
+                    "attachment; filename=export.csv"
+                )
                 return response
             return result
 
@@ -990,7 +1102,9 @@ def route_chat():
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
 
-    context_request = request.args.get("context_request", request.args.get("request", ""))
+    context_request = request.args.get(
+        "context_request", request.args.get("request", "")
+    )
     structured_response = request.args.get("structured_response", False)
 
     data = request.get_json()
@@ -1018,7 +1132,9 @@ def route_chat():
             structured_response=structured_response,
         )
         if "Error" in app_response:
-            print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ ERROR from Gemini API:{Font_Colors.ENDC} {app_response}")
+            print(
+                f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ ERROR from Gemini API:{Font_Colors.ENDC} {app_response}"
+            )
             return jsonify({"Error": app_response}), 500
 
         # Log the interaction
@@ -1064,7 +1180,9 @@ def route_chat_context():
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
 
-    context_request = request.args.get("context_request", request.args.get("request", ""))
+    context_request = request.args.get(
+        "context_request", request.args.get("request", "")
+    )
 
     if request.method == "GET":
         # return list of context caches if <request> is ""
@@ -1083,11 +1201,15 @@ def route_chat_context():
 
             if isinstance(token_count, int):
                 return jsonify({"token_count": token_count})
-            elif hasattr(token_count, "total_tokens") and isinstance(token_count.total_tokens, int):
+            elif hasattr(token_count, "total_tokens") and isinstance(
+                token_count.total_tokens, int
+            ):
                 return jsonify({"token_count": token_count.total_tokens})
             else:
                 # Handle the error appropriately, e.g., log the error and return an error response
-                print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error getting token count:{Font_Colors.ENDC} {token_count}")  # Log the error
+                print(
+                    f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error getting token count:{Font_Colors.ENDC} {token_count}"
+                )  # Log the error
                 return (
                     jsonify({"error": "Failed to get token count"}),
                     500,
@@ -1162,7 +1284,9 @@ def route_log():
                 app_response="SUCCESS",
             )
             return (
-                jsonify({"message": "Log entry created successfully", "log_id": log_id}),
+                jsonify(
+                    {"message": "Log entry created successfully", "log_id": log_id}
+                ),
                 201,
             )
         else:
@@ -1196,7 +1320,9 @@ def route_log():
                 app_response="SUCCESS",
             )
             return (
-                jsonify({"message": "Log entry updated successfully", "log_id": log_id}),
+                jsonify(
+                    {"message": "Log entry updated successfully", "log_id": log_id}
+                ),
                 201,
             )
         else:
@@ -1221,7 +1347,9 @@ def route_llm_summary():
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT summary FROM llm_summaries WHERE month_label = %s", (month,))
+        cursor.execute(
+            "SELECT summary FROM llm_summaries WHERE month_label = %s", (month,)
+        )
         row = cursor.fetchone()
 
         if not row:
@@ -1264,7 +1392,9 @@ def route_all_llm_summaries():
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT month_label, summary FROM llm_summaries ORDER BY month_label ASC")
+        cursor.execute(
+            "SELECT month_label, summary FROM llm_summaries ORDER BY month_label ASC"
+        )
         rows = cursor.fetchall()
 
         log_event(
