@@ -177,6 +177,13 @@ function Chat() {
           <SendIcon />
         </IconButton>
       </Box>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ mt: 0.1, mb: 0, textAlign: "center" }}
+      >
+        Chat responses may be inaccurate. Check important information.
+      </Typography>
     </Box>
   )
 }

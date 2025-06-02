@@ -1,4 +1,5 @@
 import { Box, Typography } from '@mui/material'
+import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 
 function Home() {
   return (
@@ -6,7 +7,7 @@ function Home() {
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100%',
+        height: `calc(100vh - ${BOTTOM_NAV_HEIGHT}px)`,
         width: '100%',
         bgcolor: 'background.paper',
         color: 'text.primary',
