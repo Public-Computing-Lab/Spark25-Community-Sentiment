@@ -1,5 +1,6 @@
 import { Box, Typography } from '@mui/material'
 import {useRef, useEffect} from 'react';
+import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -113,14 +114,14 @@ function Map() {
       sx={{
         display: 'flex',
         flexDirection: 'column',
+        height: `calc(100vh - ${BOTTOM_NAV_HEIGHT}px)`,
       }}
     >
       <Box sx={{ //element rendering the map
         left: '0', 
         top: '0', 
-        position: 'absolute', 
-        width: '100vw !important',
-        height: '100%',
+        flex: 1, 
+        width: '100%',
       }}
         ref={mapContainerRef}
       />
