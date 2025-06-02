@@ -20,7 +20,7 @@ function Map() {
       style: "mapbox://styles/mapbox/light-v11", //should decide on style
     });
 
-    
+    //adding initial map annotations
     mapRef.current.on('load', () => {
       //adding rect borders of TNT
       mapRef.current.addSource('TNT', {
@@ -49,12 +49,13 @@ function Map() {
         layout: {},
         paint: {
           'line-color': '#0d54c2',
-          'line-width': 3
+          'line-width': 3,
+          'line-opacity': 0.6,
         }
       });
 
       // Fetching and adding community assets
-      fetch('/data/map.geojson')
+      fetch('/data/map_2.geojson')
         .then((response) => response.json())
         .then((geojsonData) => {
           mapRef.current.addSource('assets', {
@@ -77,7 +78,29 @@ function Map() {
 
     });
 
-    //adding initial map annotations
+    //use mapbox.Popup() for tooltips [ON CLICK]
+    const popup = new mapboxgl.Popup({
+      closeOnClick: true
+    })
+
+    mapRef.current.on('click', 'community-assets', (e) => { //getting popup text
+        const name = e.features[0].properties['Name'];
+        const alternates = e.features[0].properties['Alternate Names'];
+        const coordinates = e.features[0].geometry['coordinates'].slice();
+
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+          coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360; //adjusting X coordinate of popup
+        } //may need to give more wiggle room for mobile 
+
+        const description = name.concat(alternates) //need to figure out better styling for popup
+
+        new mapboxgl.Popup()
+          .setLngLat(coordinates)
+          .setText(description)
+          .addTo(mapRef.current);
+
+    })
+    
 
     return () => {
       mapRef.current.remove() //removes map after unmounting
