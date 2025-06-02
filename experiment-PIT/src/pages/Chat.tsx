@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from "react"
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
+import { sendChatMessage } from "../api/api"
+
 import { Box, Typography, TextField, IconButton } from "@mui/material"
 import SendIcon from "@mui/icons-material/Send"
-import { sendChatMessage } from "../api/api"
+import RefreshIcon from "@mui/icons-material/Refresh"
+import DownloadIcon from "@mui/icons-material/Download"
 
 type Message = {
   text: string
@@ -10,25 +13,22 @@ type Message = {
 }
 
 function Chat() {
-  const [messages, setMessages] = useState<Message[]>(() => {
+  const opening_message: Message[] = [
+    {
+      text: "Hi there! Welcome to 26 Blocks. " +
+        "I'm here to help you explore safety insights in your neighborhood. " + 
+        "What would you like to find today?",
+      sender: "ml",
+    },
+  ]
+  const getInitialMessages = (): Message[] => {
     const storedMessages = localStorage.getItem("chatMessages")
     return storedMessages
       ? JSON.parse(storedMessages)
-      : [
-          {
-          text: "Hi there! Welcome to 26 Blocks.",
-          sender: "ml",
-          },
-          {
-            text: "I'm here to help you explore safety insights in your neighborhood.",
-            sender: "ml",
-          },
-          {
-            text: "What would you like to find today?",
-            sender: "ml",
-          },
-        ]
-  })
+      : opening_message
+  }
+
+  const [messages, setMessages] = useState<Message[]>(getInitialMessages)
   const [input, setInput] = useState("")
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -72,6 +72,25 @@ function Chat() {
     }
   }
 
+  const handleClearChat = () => {
+    localStorage.removeItem("chatMessages")
+    setMessages(getInitialMessages())
+  }
+
+  const handleExportSummary = () => {
+    const summary = messages
+      .map((msg) => `${msg.sender === "user" ? "User" : "Assistant"}: ${msg.text}`)
+      .join("\n\n")
+    const blob = new Blob([summary], { type: "text/plain;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "chat-summary.txt"
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") sendMessage()
   }
@@ -94,9 +113,19 @@ function Chat() {
         p: 2,
       }}
     >
-      <Typography variant="h4" component="h1" mb={2}>
-        Chat with Us
-      </Typography>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+        <Typography variant="h4" component="h1">
+          Chat with Us
+        </Typography>
+        <Box>
+          <IconButton aria-label="Export Chat Summary" onClick={handleExportSummary}>
+            <DownloadIcon />
+          </IconButton>
+          <IconButton aria-label="Clear Chat" onClick={handleClearChat}>
+            <RefreshIcon />
+          </IconButton>
+        </Box>
+      </Box>
 
       <Box
         sx={{
