@@ -19,7 +19,7 @@ function Home() {
         Home
       </Typography>
       <Typography variant="h1" component="h1" mb={2}>
-        How the Community Feels
+        What's Happening in Dorchester?
       </Typography>
     </Box>
   )
