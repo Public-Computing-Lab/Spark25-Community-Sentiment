@@ -10,16 +10,33 @@ type Message = {
 }
 
 function Chat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      text:
-        "Hi there! Welcome to 26 Blocks. I'm here to help you explore safety insights in your neighborhood. What would you like to find today?",
-      sender: "ml",
-    },
-  ])
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const storedMessages = localStorage.getItem("chatMessages")
+    return storedMessages
+      ? JSON.parse(storedMessages)
+      : [
+          {
+          text: "Hi there! Welcome to 26 Blocks.",
+          sender: "ml",
+          },
+          {
+            text: "I'm here to help you explore safety insights in your neighborhood.",
+            sender: "ml",
+          },
+          {
+            text: "What would you like to find today?",
+            sender: "ml",
+          },
+        ]
+  })
   const [input, setInput] = useState("")
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Save messages to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem("chatMessages", JSON.stringify(messages))
+  }, [messages])
 
   const sendMessage = async () => {
     if (input.trim() === "" || isSending) return
