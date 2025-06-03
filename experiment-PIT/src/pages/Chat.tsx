@@ -5,7 +5,7 @@ import {
   suggested_questions,
 } from "../constants/chatMessages";
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants";
-import { sendChatMessage } from "../api/api";
+import { sendChatMessage, getChatSummary } from "../api/api";
 
 import {
   Box,
@@ -35,6 +35,7 @@ function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [confirmExportOpen, setConfirmExportOpen] = useState(false);
+  const [summaryError, setSummaryError] = useState(false);
 
   // Save messages to localStorage when they change
   useEffect(() => {
@@ -80,12 +81,14 @@ function Chat() {
     setMessages(getInitialMessages());
   };
 
-  const handleExportSummary = () => {
-    const summary = messages
-      .map(
-        (msg) => `${msg.sender === "user" ? "User" : "Assistant"}: ${msg.text}`
-      )
-      .join("\n\n");
+  const handleExportSummary = async () => {
+    const summary = await getChatSummary(messages);
+
+    if (summary === "Summary generation failed.") {
+      setSummaryError(true);
+      return;
+    }
+
     const blob = new Blob([summary], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
 
@@ -309,7 +312,8 @@ function Chat() {
         <DialogTitle>Export Chat Summary?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            This will download the chat as a text file. Do you want to continue?
+            This will download a summary of the chat as a text file. Do you want
+            to continue?
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -323,6 +327,21 @@ function Chat() {
             variant="contained"
           >
             Export
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Summary Failed Dialog */}
+      <Dialog open={summaryError} onClose={() => setSummaryError(false)}>
+        <DialogTitle>Summary Generation Failed</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            The summary could not be generated. Please try again later.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSummaryError(false)} autoFocus>
+            OK
           </Button>
         </DialogActions>
       </Dialog>

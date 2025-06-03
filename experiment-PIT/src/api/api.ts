@@ -1,4 +1,10 @@
 import axios from "axios";
+import type { Message } from "../constants/chatMessages"
+
+const header = {
+    "RethinkAI-API-Key": import.meta.env.VITE_RETHINKAI_API_CLIENT_KEY,
+    "Content-Type": "application/json",
+  }
 
 export async function sendChatMessage(message: string) {
   const url = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False`
@@ -6,11 +12,6 @@ export async function sendChatMessage(message: string) {
   const json = {
     "client_query": message,
   };
-
-  const header = {
-    "RethinkAI-API-Key": import.meta.env.VITE_RETHINKAI_API_CLIENT_KEY,
-    "Content-Type": "application/json",
-  }
 
   try {
     console.log("➡️ Sending POST to:", url);
@@ -37,6 +38,18 @@ export async function sendChatMessage(message: string) {
     }
 
     throw error;
+  }
+}
+
+export async function getChatSummary(messages: Message[]) {
+  const url = `${import.meta.env.VITE_BASE_URL}/chat/summary?app_version=0.7.0`
+  
+  try {
+    const response = await axios.post(url, {messages}, {headers: header});
+    return response.data.summary;
+  } catch (error) {
+    console.error("Failed to get chat summary:", error);
+    return "Summary generation failed.";
   }
 }
 
