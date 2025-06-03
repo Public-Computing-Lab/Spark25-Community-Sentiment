@@ -6,6 +6,7 @@ import {
 } from "../constants/chatMessages";
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants";
 import { sendChatMessage, getChatSummary } from "../api/api";
+import { jsPDF } from "jspdf";
 
 import {
   Box,
@@ -89,14 +90,15 @@ function Chat() {
       return;
     }
 
-    const blob = new Blob([summary], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
+    const doc = new jsPDF();
+    const margin = 10;
+    const lineHeight = 10;
+    const maxLineWidth = 180; // A4 page width minus margins
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "chat-summary.txt";
-    a.click();
-    URL.revokeObjectURL(url);
+    const lines = doc.splitTextToSize(summary, maxLineWidth);
+    doc.text(lines, margin, margin + lineHeight);
+
+    doc.save("chat-summary.pdf");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -312,8 +314,8 @@ function Chat() {
         <DialogTitle>Export Chat Summary?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            This will download a summary of the chat as a text file. Do you want
-            to continue?
+            This will download a summary of the chat as a pdf. Do you want to
+            continue?
           </DialogContentText>
         </DialogContent>
         <DialogActions>
