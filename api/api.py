@@ -792,6 +792,7 @@ def create_gemini_context(
             context_request == "experiment_5"
             or context_request == "experiment_6"
             or context_request == "experiment_7"
+            or context_request == "experiment_pit"
         ):
             files_list = get_files("txt")
             query = build_311_query(data_request="311_summary_context")
