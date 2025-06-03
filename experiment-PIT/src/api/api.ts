@@ -39,3 +39,17 @@ export async function sendChatMessage(message: string) {
     throw error;
   }
 }
+
+export async function getShotsData(){//need to integrate date filtering???
+  const url = `${import.meta.env.VITE_BASE_URL}/data/query?request=911_shots_fired&app_version=0.7.0&output_type=stream`
+
+  try {
+    console.log("➡️ Sending GET request:", url);
+    const response = await axios.get(url);
+
+    console.log("✅ Response status:", response.status);
+    console.log("🧾 Response data:", response.data);
+
+  }
+
+} 
