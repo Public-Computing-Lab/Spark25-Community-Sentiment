@@ -22,4 +22,8 @@ export const suggested_questions = [
     question: "How are the road conditions on Talbot Ave?",
     subLabel: "Exploring geographic data",
   },
+  {
+    question: "Where do residents avoid walking at night?",
+    subLabel: "Learn about hot spots",
+  },
 ];
