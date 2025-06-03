@@ -40,16 +40,74 @@ export async function sendChatMessage(message: string) {
   }
 }
 
-export async function getShotsData(){//need to integrate date filtering???
-  const url = `${import.meta.env.VITE_BASE_URL}/data/query?request=911_shots_fired&app_version=0.7.0&output_type=stream`
+export async function getShotsData(filtered_date?: string){//must make sure it is in correct format
+  const url = `${import.meta.env.VITE_BASE_URL}/data/query`
+
+  const params = {
+    app_version: '0.7.0',
+    request: '911_shots_fired',
+    stream: 'True',
+    date: filtered_date,
+  }
+
+  const headers = {
+    "RethinkAI-API-Key": import.meta.env.VITE_RETHINKAI_API_CLIENT_KEY,
+  };
 
   try {
-    console.log("➡️ Sending GET request:", url);
-    const response = await axios.get(url);
+    // const response = await axios.get(url, { headers});
+    // console.log("➡️ Sending GET request:", url);
+    const response = await axios.get(url, { params, headers});
+    console.log("➡️ Sending GET request:", url, params);
+    console.log("✅ Response status:", response.status);
+    console.log("🧾 Response data:", response.data);
+
+    return response.data
+  } catch (error: any) {
+    if (axios.isAxiosError(error)) {
+      console.error("❌ Axios error getting shots data:", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+    } else {
+      console.error("❌ Unknown error getting shots data:", error.toJSON());
+    }
+
+    throw error;
+  }
+} 
+
+export async function get311Data(filtered_date?: number, category?: string){
+  const url = `${import.meta.env.VITE_BASE_URL}/data/query` //should output type be
+  const params = {
+    request: '311_by_geo',
+    category: category || 'all', //default to all if not provided 
+    date: filtered_date,
+    app_version: '0.7.0',
+    output_type: 'stream',
+  }
+
+  try {
+    const response = await axios.get(url, { params });
+    console.log("➡️ Sending GET request:", url, params);
 
     console.log("✅ Response status:", response.status);
     console.log("🧾 Response data:", response.data);
 
+    return response.data
+  } catch (error: any) {
+    if (axios.isAxiosError(error)) {
+      console.error("❌ Axios error getting 311 data:", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+    } else {
+      console.error("❌ Unknown error getting 311 data:", error.toJSON());
+    }
+
+    throw error;
   }
 
-} 
+}

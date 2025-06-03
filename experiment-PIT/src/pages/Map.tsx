@@ -3,6 +3,7 @@ import {useRef, useEffect} from 'react';
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { get311Data, getShotsData } from '../api/api';
 
 //besure to install mapbox-gl 
 
@@ -22,7 +23,7 @@ function Map() {
     });
 
     //adding initial map annotations
-    mapRef.current.on('load', () => {
+    mapRef.current.on('load', async () => { //made async in order to be able to load shots data
       //adding rect borders of TNT
       mapRef.current.addSource('TNT', {
         type: 'geojson',
@@ -75,8 +76,18 @@ function Map() {
           });
         })
         
-      // Fetching and adding 911 data
+      const loadShotsData = async () => {
+        const shots_data = await getShotsData();
+        console.log(shots_data);
+      }
 
+      // const load311Data = async () => {
+      //   const data_311 = await get311Data();
+      //   console.log(data_311)
+      // }
+      
+      await loadShotsData();
+      // await load311Data();
     });
 
     //use mapbox.Popup() for tooltips [ON CLICK]
@@ -102,7 +113,7 @@ function Map() {
 
     })
     
-
+    
     return () => {
       mapRef.current.remove() //removes map after unmounting
     }

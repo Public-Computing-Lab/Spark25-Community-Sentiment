@@ -80,6 +80,7 @@ cookies.txt
 # exclude data files from data folders
 **/cache/*
 **/data/*
+!experiment-PIT/public/data/map_2.geojson
 api/datastore/*
 
 # exception to the rule
