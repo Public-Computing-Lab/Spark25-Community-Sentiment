@@ -1,5 +1,6 @@
 import { Box, Typography } from '@mui/material'
 import {useRef, useEffect} from 'react';
+import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -113,26 +114,28 @@ function Map() {
       sx={{
         display: 'flex',
         flexDirection: 'column',
+        height: `calc(100vh - ${BOTTOM_NAV_HEIGHT}px)`,
+        width: '100%',
+        bgcolor: 'background.paper',
+        color: 'text.primary',
+        overflow: 'hidden',
+        position: 'relative',
+        p: 2,
       }}
     >
+      <Typography variant="h4" component="h1" mb={2}> 
+        Map View
+      </Typography>
       <Box sx={{ //element rendering the map
         left: '0', 
         top: '0', 
-        position: 'absolute', 
-        width: '100vw !important',
+        flex: 1, 
+        width: '100%',
         height: '100%',
+        position: 'relative',
       }}
         ref={mapContainerRef}
       />
-      <Typography 
-        variant="h3"
-        sx={{
-          position: 'absolute',
-          zIndex: '10',
-          padding: '0.5em',
-        }}
-      > Map View
-      </Typography>
     </Box>
     
   )
