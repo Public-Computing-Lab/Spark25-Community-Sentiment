@@ -1,6 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
+import type { Message } from "../constants/chatMessages";
+import {
+  opening_message,
+  suggested_questions,
+} from "../constants/chatMessages";
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants";
-import { sendChatMessage } from "../api/api";
+import { sendChatMessage, getChatSummary } from "../api/api";
+import { jsPDF } from "jspdf";
 
 import {
   Box,
@@ -18,21 +24,7 @@ import SendIcon from "@mui/icons-material/Send";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DownloadIcon from "@mui/icons-material/Download";
 
-type Message = {
-  text: string;
-  sender: "user" | "ml";
-};
-
 function Chat() {
-  const opening_message: Message[] = [
-    {
-      text:
-        "Hi there! Welcome to 26 Blocks. " +
-        "I'm here to help you explore safety insights in your neighborhood. " +
-        "What would you like to find today?",
-      sender: "ml",
-    },
-  ];
   const getInitialMessages = (): Message[] => {
     const storedMessages = localStorage.getItem("chatMessages");
     return storedMessages ? JSON.parse(storedMessages) : opening_message;
@@ -44,16 +36,17 @@ function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [confirmExportOpen, setConfirmExportOpen] = useState(false);
+  const [summaryError, setSummaryError] = useState(false);
 
   // Save messages to localStorage when they change
   useEffect(() => {
     localStorage.setItem("chatMessages", JSON.stringify(messages));
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (input.trim() === "" || isSending) return;
+  const sendMessage = async (customInput?: string) => {
+    const userMsg = (customInput ?? input).trim();
+    if (userMsg === "" || isSending) return;
 
-    const userMsg = input.trim();
     setMessages((prev) => [...prev, { text: userMsg, sender: "user" }]);
     setInput("");
     setIsSending(true);
@@ -89,20 +82,23 @@ function Chat() {
     setMessages(getInitialMessages());
   };
 
-  const handleExportSummary = () => {
-    const summary = messages
-      .map(
-        (msg) => `${msg.sender === "user" ? "User" : "Assistant"}: ${msg.text}`
-      )
-      .join("\n\n");
-    const blob = new Blob([summary], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
+  const handleExportSummary = async () => {
+    const summary = await getChatSummary(messages);
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "chat-summary.txt";
-    a.click();
-    URL.revokeObjectURL(url);
+    if (summary === "Summary generation failed.") {
+      setSummaryError(true);
+      return;
+    }
+
+    const doc = new jsPDF();
+    const margin = 10;
+    const lineHeight = 10;
+    const maxLineWidth = 180; // A4 page width minus margins
+
+    const lines = doc.splitTextToSize(summary, maxLineWidth);
+    doc.text(lines, margin, margin + lineHeight);
+
+    doc.save("chat-summary.pdf");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -200,6 +196,41 @@ function Chat() {
           <div ref={messagesEndRef} />
         </Box>
 
+        {messages.length === 1 && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>
+              Suggested Questions
+            </Typography>
+            {suggested_questions.map((q, idx) => (
+              <Box
+                key={idx}
+                sx={{
+                  px: 2,
+                  py: 1,
+                  mb: 1,
+                  borderRadius: 2,
+                  bgcolor: "background.paper",
+                  border: "1px solid",
+                  borderColor: "divider",
+                  cursor: "pointer",
+                  "&:hover": {
+                    backgroundColor: "action.hover",
+                  },
+                }}
+                onClick={() => {
+                  setInput(q.question);
+                  sendMessage(q.question);
+                }}
+              >
+                <Typography variant="body1">{q.question}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {q.subLabel}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
+
         <Box
           component="form"
           onSubmit={(e) => {
@@ -220,7 +251,7 @@ function Chat() {
           <TextField
             fullWidth
             variant="standard"
-            placeholder="Type your safety concerns..."
+            placeholder="Type to learn about community safety..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -231,7 +262,7 @@ function Chat() {
 
           <IconButton
             color="primary"
-            onClick={sendMessage}
+            onClick={() => sendMessage()}
             disabled={input.trim() === "" || isSending}
             aria-label="send message"
             sx={{ ml: 1 }}
@@ -283,7 +314,8 @@ function Chat() {
         <DialogTitle>Export Chat Summary?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            This will download the chat as a text file. Do you want to continue?
+            This will download a summary of the chat as a pdf. Do you want to
+            continue?
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -297,6 +329,21 @@ function Chat() {
             variant="contained"
           >
             Export
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Summary Failed Dialog */}
+      <Dialog open={summaryError} onClose={() => setSummaryError(false)}>
+        <DialogTitle>Summary Generation Failed</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            The summary could not be generated. Please try again later.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSummaryError(false)} autoFocus>
+            OK
           </Button>
         </DialogActions>
       </Dialog>

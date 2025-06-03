@@ -792,6 +792,8 @@ def create_gemini_context(
             context_request == "experiment_5"
             or context_request == "experiment_6"
             or context_request == "experiment_7"
+            or context_request == "experiment_pit"
+            or context_request == "get_summary"
         ):
             files_list = get_files("txt")
             query = build_311_query(data_request="311_summary_context")
@@ -1254,6 +1256,36 @@ def route_chat_context():
                 app_response="SUCCESS",
             )
             return jsonify(response)
+
+
+@app.route("/chat/summary", methods=["POST"])
+def chat_summary():
+    data = request.get_json()
+    messages = data.get("messages", [])
+    app_version = request.args.get("app_version", "0")
+
+    if not messages:
+        return jsonify({"error": "No messages provided."}), 400
+
+    chat_transcript = "\n".join(
+        f"{'User' if msg['sender'] == 'user' else 'Chat'}: {msg['text']}"
+        for msg in messages
+    )
+
+    cache_name = create_gemini_context(
+        context_request="get_summary",
+        preamble="",
+        generate_cache=True,
+        app_version=app_version,
+    )
+
+    try:
+        summary = get_gemini_response(prompt=chat_transcript, cache_name=cache_name)
+        return jsonify({"summary": summary})
+
+    except Exception as e:
+        print(f"✖ Error summarizing chat: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/log", methods=["POST", "PUT"])
