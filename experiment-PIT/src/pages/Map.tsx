@@ -75,7 +75,7 @@ function Map() {
           });
         })
         
-      //adding initial community assets from map annotations
+      // Fetching and adding 911 data
 
     });
 
