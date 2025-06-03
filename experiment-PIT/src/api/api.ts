@@ -51,5 +51,7 @@ export async function getShotsData(){//need to integrate date filtering???
     console.log("🧾 Response data:", response.data);
 
   }
-
+  finally {
+    return;
+  }
 } 
