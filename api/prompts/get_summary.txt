@@ -1,2 +1,5 @@
 Summarize the following conversation between a user and a chat bot.
-Highlight the key topics, questions, and insights shared.
+Highlight the key topics and insights shared.
+Use bullet point format, but don't use markdown formatting.
+Keep responses within 100 words, shorter is better.
+Do not include any other text in your response besides the summary.
