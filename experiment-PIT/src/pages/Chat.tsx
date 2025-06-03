@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
+import type { Message } from "../constants/chatMessages";
+import { opening_message } from "../constants/chatMessages";
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants";
 import { sendChatMessage } from "../api/api";
 
@@ -18,21 +20,7 @@ import SendIcon from "@mui/icons-material/Send";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DownloadIcon from "@mui/icons-material/Download";
 
-type Message = {
-  text: string;
-  sender: "user" | "ml";
-};
-
 function Chat() {
-  const opening_message: Message[] = [
-    {
-      text:
-        "Hi there! Welcome to 26 Blocks. " +
-        "I'm here to help you explore safety insights in your neighborhood. " +
-        "What would you like to find today?",
-      sender: "ml",
-    },
-  ];
   const getInitialMessages = (): Message[] => {
     const storedMessages = localStorage.getItem("chatMessages");
     return storedMessages ? JSON.parse(storedMessages) : opening_message;
