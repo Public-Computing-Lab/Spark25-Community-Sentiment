@@ -11,4 +11,15 @@ export const opening_message: Message[] = [
         "What would you like to find today?",
       sender: "ml",
     },
-  ];
+];
+
+export const suggested_questions = [
+  {
+    question: "What are my neighbors worried about?",
+    subLabel: "Searching community meeting transcripts",
+  },
+  {
+    question: "How are the road conditions on Talbot Ave?",
+    subLabel: "Exploring geographic data",
+  },
+];

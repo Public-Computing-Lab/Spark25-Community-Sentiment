@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { Message } from "../constants/chatMessages";
-import { opening_message } from "../constants/chatMessages";
+import {
+  opening_message,
+  suggested_questions,
+} from "../constants/chatMessages";
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants";
 import { sendChatMessage } from "../api/api";
 
@@ -38,10 +41,10 @@ function Chat() {
     localStorage.setItem("chatMessages", JSON.stringify(messages));
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (input.trim() === "" || isSending) return;
+  const sendMessage = async (customInput?: string) => {
+    const userMsg = (customInput ?? input).trim();
+    if (userMsg === "" || isSending) return;
 
-    const userMsg = input.trim();
     setMessages((prev) => [...prev, { text: userMsg, sender: "user" }]);
     setInput("");
     setIsSending(true);
@@ -188,6 +191,41 @@ function Chat() {
           <div ref={messagesEndRef} />
         </Box>
 
+        {messages.length === 1 && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>
+              Suggested Questions
+            </Typography>
+            {suggested_questions.map((q, idx) => (
+              <Box
+                key={idx}
+                sx={{
+                  px: 2,
+                  py: 1,
+                  mb: 1,
+                  borderRadius: 2,
+                  bgcolor: "background.paper",
+                  border: "1px solid",
+                  borderColor: "divider",
+                  cursor: "pointer",
+                  "&:hover": {
+                    backgroundColor: "action.hover",
+                  },
+                }}
+                onClick={() => {
+                  setInput(q.question);
+                  sendMessage(q.question);
+                }}
+              >
+                <Typography variant="body1">{q.question}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {q.subLabel}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
+
         <Box
           component="form"
           onSubmit={(e) => {
@@ -208,7 +246,7 @@ function Chat() {
           <TextField
             fullWidth
             variant="standard"
-            placeholder="Type your safety concerns..."
+            placeholder="Type to learn about community safety..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -219,7 +257,7 @@ function Chat() {
 
           <IconButton
             color="primary"
-            onClick={sendMessage}
+            onClick={() => sendMessage()}
             disabled={input.trim() === "" || isSending}
             aria-label="send message"
             sx={{ ml: 1 }}
