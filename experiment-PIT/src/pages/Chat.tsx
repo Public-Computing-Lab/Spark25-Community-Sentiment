@@ -23,6 +23,7 @@ import {
 import SendIcon from "@mui/icons-material/Send";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DownloadIcon from "@mui/icons-material/Download";
+import CircularProgress from "@mui/material/CircularProgress";
 
 function Chat() {
   const getInitialMessages = (): Message[] => {
@@ -193,6 +194,28 @@ function Chat() {
               {msg.text}
             </Box>
           ))}
+          {isSending && (
+            <Box
+              sx={{
+                alignSelf: "flex-start",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                bgcolor: "background.paper",
+                border: 2,
+                borderColor: "text.secondary",
+                borderRadius: 2,
+                maxWidth: "75%",
+                p: 1.5,
+              }}
+            >
+              <CircularProgress size={16} />
+              <Typography variant="body2" color="text.secondary">
+                Bot is thinking...
+              </Typography>
+            </Box>
+          )}
+
           <div ref={messagesEndRef} />
         </Box>
 
