@@ -81,6 +81,8 @@ cookies.txt
 **/cache/*
 **/data/*
 !experiment-PIT/public/data/map_2.geojson
+!experiment-PIT/public/data/process_311.ts
+!experiment-PIT/public/data/process_911.ts
 api/datastore/*
 
 # exception to the rule
