@@ -59,7 +59,7 @@ export async function getShotsData(filtered_date?: string){//must make sure it i
   const params = {
     app_version: '0.7.0',
     request: '911_shots_fired',
-    stream: 'True',
+    output_type:'json',
     date: filtered_date,
   }
 
@@ -101,8 +101,12 @@ export async function get311Data(filtered_date?: number, category?: string){
     output_type: 'stream',
   }
 
+  const headers = {
+    "RethinkAI-API-Key": import.meta.env.VITE_RETHINKAI_API_CLIENT_KEY,
+  };
+
   try {
-    const response = await axios.get(url, { params });
+    const response = await axios.get(url, { params, headers});
     console.log("➡️ Sending GET request:", url, params);
 
     console.log("✅ Response status:", response.status);
@@ -122,5 +126,4 @@ export async function get311Data(filtered_date?: number, category?: string){
 
     throw error;
   }
-
 }

@@ -4,6 +4,7 @@ import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { get311Data, getShotsData } from '../api/api';
+import { processShotsData } from '../../public/data/process_311';
 
 //besure to install mapbox-gl 
 
@@ -75,20 +76,31 @@ function Map() {
             },
           });
         })
-        
-      const loadShotsData = async () => {
-        const shots_data = await getShotsData();
-        console.log(shots_data);
-      }
+    
+      // await processShotsData();
+    
 
-      // const load311Data = async () => {
-      //   const data_311 = await get311Data();
-      //   console.log(data_311)
-      // }
-      
-      await loadShotsData();
-      // await load311Data();
+      mapRef.current.addSource('shots_data', {
+        type: 'vector',
+        url: "mapbox://akamra118.cdgafd5a" //change to non-personal account
+      }); //currently non-local!!
+
+      mapRef.current.addLayer({
+        id: 'shots_vector',
+        type: 'circle',
+        source: 'shots_data',
+        'source-layer': "shots_data_2-1odqyk",
+        paint: {
+          'circle-radius': 5,
+          'circle-color': '#880808',
+        }
+      })
+
+      await get311Data();
     });
+
+      
+   
 
     //use mapbox.Popup() for tooltips [ON CLICK]
     const popup = new mapboxgl.Popup({
@@ -117,7 +129,7 @@ function Map() {
     return () => {
       mapRef.current.remove() //removes map after unmounting
     }
-  }, [])
+  }, []);
 
 
   return (
