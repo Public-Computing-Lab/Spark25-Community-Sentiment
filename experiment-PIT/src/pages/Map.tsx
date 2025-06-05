@@ -96,7 +96,24 @@ function Map() {
         }
       })
 
-      await get311Data();
+      //adding 311 data
+      // mapRef.current.addSource('311_data', {
+      //   type: 'vector',
+      //   url: "" //change to non-personal account
+      // })
+
+      // mapRef.current.addLayer({
+      //   id: '311_vector',
+      //   type: 'circle',
+      //   source: '311_data',
+      //   'source-layer': "",
+      //   paint: {
+      //     'circle-radius': 5,
+      //     'circle-color': '',
+      //   }
+      // })
+
+      
     });
 
       
