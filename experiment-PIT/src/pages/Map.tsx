@@ -3,7 +3,6 @@ import {useRef, useEffect} from 'react';
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { get311Data, getShotsData } from '../api/api';
 import { processShotsData } from '../../public/data/process_311';
 
 //besure to install mapbox-gl 
