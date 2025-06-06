@@ -1,7 +1,10 @@
 import { Box, Typography } from '@mui/material'
 import {useRef, useEffect} from 'react';
+import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { processShotsData } from '../../public/data/process_911';
+import { process311Data } from '../../public/data/process_311';
 
 //besure to install mapbox-gl 
 
@@ -20,8 +23,8 @@ function Map() {
       style: "mapbox://styles/mapbox/light-v11", //should decide on style
     });
 
-    
-    mapRef.current.on('load', () => {
+    //adding initial map annotations
+    mapRef.current.on('load', async () => { //made async in order to be able to load shots data
       //adding rect borders of TNT
       mapRef.current.addSource('TNT', {
         type: 'geojson',
@@ -49,12 +52,13 @@ function Map() {
         layout: {},
         paint: {
           'line-color': '#0d54c2',
-          'line-width': 3
+          'line-width': 3,
+          'line-opacity': 0.6,
         }
       });
 
       // Fetching and adding community assets
-      fetch('/data/map.geojson')
+      fetch('/data/map_2.geojson')
         .then((response) => response.json())
         .then((geojsonData) => {
           mapRef.current.addSource('assets', {
@@ -72,17 +76,74 @@ function Map() {
             },
           });
         })
-        
-      //adding initial community assets from map annotations
+    
+      const shots_geojson = await processShotsData();
+      const request_geojson = await process311Data();
+
+      // mapRef.current.addSource('shots_data', { //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
+      //   type: 'geojson',
+      //   data: shots_geojson
+      // });
+
+      // mapRef.current.addLayer({
+      //   id: 'shots_vector',
+      //   type: 'circle',
+      //   source: 'shots_data',
+      //   paint: {
+      //     'circle-radius': 3,
+      //     'circle-color': '#880808',
+      //   }
+      // })
+
+      // //adding 311 data
+      // mapRef.current.addSource('311_data', { //takes even longer than 911 data...
+      //   type: 'geojson',
+      //   data: request_geojson //change to non-personal account
+      // });
+
+      // mapRef.current.addLayer({
+      //   id: '311_vector',
+      //   type: 'circle',
+      //   source: '311_data',
+      //   paint: {
+      //     'circle-radius': 3,
+      //     'circle-color': '#6495ED',
+      //   }
+      // })
 
     });
 
-    //adding initial map annotations
+      
+   
 
+    //use mapbox.Popup() for tooltips [ON CLICK]
+    const popup = new mapboxgl.Popup({
+      closeOnClick: true
+    })
+
+    mapRef.current.on('click', 'community-assets', (e) => { //getting popup text
+        const name = e.features[0].properties['Name'];
+        const alternates = e.features[0].properties['Alternate Names'];
+        const coordinates = e.features[0].geometry['coordinates'].slice();
+
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+          coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360; //adjusting X coordinate of popup
+        } //may need to give more wiggle room for mobile 
+
+        const description = name.concat(alternates) //need to figure out better styling for popup
+
+        new mapboxgl.Popup()
+          .setLngLat(coordinates)
+          .setText(description)
+          .addTo(mapRef.current);
+
+    })
+    
+    
     return () => {
       mapRef.current.remove() //removes map after unmounting
     }
-  }, [])
+  }, []);
 
 
   return (
@@ -90,26 +151,28 @@ function Map() {
       sx={{
         display: 'flex',
         flexDirection: 'column',
+        height: `calc(100vh - ${BOTTOM_NAV_HEIGHT}px)`,
+        width: '100%',
+        bgcolor: 'background.paper',
+        color: 'text.primary',
+        overflow: 'hidden',
+        position: 'relative',
+        p: 2,
       }}
     >
+      <Typography variant="h4" component="h1" mb={2}> 
+        Map View
+      </Typography>
       <Box sx={{ //element rendering the map
         left: '0', 
         top: '0', 
-        position: 'absolute', 
-        width: '100vw !important',
+        flex: 1, 
+        width: '100%',
         height: '100%',
+        position: 'relative',
       }}
         ref={mapContainerRef}
       />
-      <Typography 
-        variant="h3"
-        sx={{
-          position: 'absolute',
-          zIndex: '10',
-          padding: '0.5em',
-        }}
-      > Map View
-      </Typography>
     </Box>
     
   )
