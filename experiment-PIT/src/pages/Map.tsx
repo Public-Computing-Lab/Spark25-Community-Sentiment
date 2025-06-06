@@ -3,7 +3,8 @@ import {useRef, useEffect} from 'react';
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { processShotsData } from '../../public/data/process_311';
+import { processShotsData } from '../../public/data/process_911';
+import { process311Data } from '../../public/data/process_311';
 
 //besure to install mapbox-gl 
 
@@ -76,43 +77,40 @@ function Map() {
           });
         })
     
-      // await processShotsData();
-    
+      const shots_geojson = await processShotsData();
+      const request_geojson = await process311Data();
 
-      mapRef.current.addSource('shots_data', {
-        type: 'vector',
-        url: "mapbox://akamra118.cdgafd5a" //change to non-personal account
-      }); //currently non-local!!
+      // mapRef.current.addSource('shots_data', { //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
+      //   type: 'geojson',
+      //   data: shots_geojson
+      // });
 
-      mapRef.current.addLayer({
-        id: 'shots_vector',
-        type: 'circle',
-        source: 'shots_data',
-        'source-layer': "shots_data_2-1odqyk",
-        paint: {
-          'circle-radius': 5,
-          'circle-color': '#880808',
-        }
-      })
-
-      //adding 311 data
-      // mapRef.current.addSource('311_data', {
-      //   type: 'vector',
-      //   url: "" //change to non-personal account
+      // mapRef.current.addLayer({
+      //   id: 'shots_vector',
+      //   type: 'circle',
+      //   source: 'shots_data',
+      //   paint: {
+      //     'circle-radius': 3,
+      //     'circle-color': '#880808',
+      //   }
       // })
+
+      // //adding 311 data
+      // mapRef.current.addSource('311_data', { //takes even longer than 911 data...
+      //   type: 'geojson',
+      //   data: request_geojson //change to non-personal account
+      // });
 
       // mapRef.current.addLayer({
       //   id: '311_vector',
       //   type: 'circle',
       //   source: '311_data',
-      //   'source-layer': "",
       //   paint: {
-      //     'circle-radius': 5,
-      //     'circle-color': '',
+      //     'circle-radius': 3,
+      //     'circle-color': '#6495ED',
       //   }
       // })
 
-      
     });
 
       
