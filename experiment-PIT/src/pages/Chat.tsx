@@ -26,6 +26,17 @@ import DownloadIcon from "@mui/icons-material/Download";
 import CircularProgress from "@mui/material/CircularProgress";
 
 function Chat() {
+  const getOrCreateSessionId = () => {
+    const stored = localStorage.getItem("sessionId");
+    if (stored) return stored;
+
+    const newId = `chat_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+    localStorage.setItem("sessionId", newId);
+    return newId;
+  };
+
   const getInitialMessages = (): Message[] => {
     const storedMessages = localStorage.getItem("chatMessages");
     return storedMessages ? JSON.parse(storedMessages) : opening_message;
@@ -38,6 +49,7 @@ function Chat() {
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [confirmExportOpen, setConfirmExportOpen] = useState(false);
   const [summaryError, setSummaryError] = useState(false);
+  const [sessionId, setSessionId] = useState(getOrCreateSessionId());
 
   // Save messages to localStorage when they change
   useEffect(() => {
@@ -54,7 +66,7 @@ function Chat() {
 
     try {
       // Call backend API helper to get AI response
-      const data = await sendChatMessage(userMsg);
+      const data = await sendChatMessage(userMsg, sessionId);
 
       // Append backend response to messages
       if (data.response) {
@@ -80,7 +92,9 @@ function Chat() {
 
   const handleClearChat = () => {
     localStorage.removeItem("chatMessages");
+    localStorage.removeItem("sessionId");
     setMessages(getInitialMessages());
+    setSessionId(getOrCreateSessionId());
   };
 
   const handleExportSummary = async () => {

@@ -6,11 +6,12 @@ const header = {
     "Content-Type": "application/json",
   }
 
-export async function sendChatMessage(message: string) {
+export async function sendChatMessage(message: string, localSessionId: string) {
   const url = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False`
 
   const json = {
     "client_query": message,
+    "local_session_id": localSessionId
   };
 
   try {

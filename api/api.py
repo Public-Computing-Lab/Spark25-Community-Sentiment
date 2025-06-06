@@ -757,27 +757,42 @@ def get_gemini_response(
         return f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}"
 
 
+def sanitize_session_id(session_id):
+    return re.sub(r"[^a-zA-Z0-9_\-]", "_", session_id)
+
+
 def create_gemini_context(
     context_request: str,
     preamble: str = "",
     generate_cache: bool = True,
     app_version: str = "",
+    local_session_id: str = "",
 ) -> Union[str, int, bool]:
-    # test if cache exists
-    if generate_cache:
-        for cache in genai_client.caches.list():
-            if (
-                cache.display_name
-                == "APP_VERSION_" + app_version + "_REQUEST_" + context_request
-                and cache.model == Config.GEMINI_MODEL
-            ):
-                return cache.name
-
     try:
+        if local_session_id:
+            safe_session_id = sanitize_session_id(local_session_id)
+            display_name = f"{context_request}_{safe_session_id}"
+            print(f"Received sanitized local_session_id: {safe_session_id}")
+            print(f"Constructed display_name: {display_name}")
+        else:
+            display_name = "APP_VERSION_" + app_version + "_REQUEST_" + context_request
+
+        # test if cache exists
+        if generate_cache:
+            print("existing caches:")
+            for cache in genai_client.caches.list():
+                print(cache.display_name)
+                if (
+                    cache.display_name == display_name
+                    and cache.model == Config.GEMINI_MODEL
+                ):
+                    print(genai_client.caches.get(name=cache.name))
+                    return cache.name
+
         files_list = []
         content = {"parts": []}
 
-         #adding community assets to context (ignoring potential other csv in datastore)
+        # adding community assets to context (ignoring potential other csv in datastore)
         if context_request == "structured":
             files_list = get_files("csv", ["geocoding-community-assets.csv"])
             preamble_file = context_request + ".txt"
@@ -803,6 +818,8 @@ def create_gemini_context(
             content["parts"].append({"text": response.getvalue()})
 
             preamble_file = context_request + ".txt"
+        else:
+            preamble_file = context_request + ".txt"
 
         # Read contents of found files
         for file in files_list:
@@ -817,8 +834,6 @@ def create_gemini_context(
             )
         system_prompt = path.read_text(encoding="utf-8")
 
-        display_name = "APP_VERSION_" + app_version + "_REQUEST_" + context_request
-
         # Generate cache or return token count
         if generate_cache:
             # Set cache expiration time
@@ -832,15 +847,19 @@ def create_gemini_context(
             )
 
             # Create the cache
-            cache = genai_client.caches.create(
-                model=Config.GEMINI_MODEL,
-                config=types.CreateCachedContentConfig(
-                    display_name=display_name,
-                    system_instruction=system_prompt,
-                    expire_time=cache_ttl,
-                    contents=content["parts"],
-                ),
-            )
+            try:
+                cache = genai_client.caches.create(
+                    model=Config.GEMINI_MODEL,
+                    config=types.CreateCachedContentConfig(
+                        display_name=display_name,
+                        system_instruction=system_prompt,
+                        expire_time=cache_ttl,
+                        contents=content["parts"],
+                    ),
+                )
+                print(f"✅ Cache created successfully: {display_name}")
+            except Exception as e:
+                print(f"❌ Exception when making cache: {e}")
 
             return cache.name
         else:
@@ -1116,6 +1135,7 @@ def route_chat():
     data_attributes = data.get("data_attributes", "")
     client_query = data.get("client_query", "")
     prompt_preamble = data.get("prompt_preamble", "")
+    local_session_id = data.get("local_session_id", "")
 
     # data_selected, optional, list of files used when context_request==s
     cache_name = create_gemini_context(
@@ -1123,6 +1143,7 @@ def route_chat():
         preamble=prompt_preamble,
         generate_cache=True,
         app_version=app_version,
+        local_session_id=local_session_id,
     )
 
     full_prompt = f"User question: {client_query}"
