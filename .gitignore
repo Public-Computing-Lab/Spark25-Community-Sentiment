@@ -80,11 +80,15 @@ cookies.txt
 # exclude data files from data folders
 **/cache/*
 **/data/*
+!experiment-PIT/public/data/map_2.geojson
+!experiment-PIT/public/data/process_311.ts
+!experiment-PIT/public/data/process_911.ts
 api/datastore/*
 
 # exception to the rule
 **/cache/.gitkeep
 **/data/.gitkeep
 !api/datastore/.gitkeep 
+!api/datastore/geocoding-community-assets.csv
 !api/*.sql
 !setup/*.sql
