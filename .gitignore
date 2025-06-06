@@ -89,5 +89,6 @@ api/datastore/*
 **/cache/.gitkeep
 **/data/.gitkeep
 !api/datastore/.gitkeep 
+!api/datastore/geocoding-community-assets.csv
 !api/*.sql
 !setup/*.sql

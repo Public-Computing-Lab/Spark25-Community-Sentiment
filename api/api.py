@@ -777,8 +777,9 @@ def create_gemini_context(
         files_list = []
         content = {"parts": []}
 
+         #adding community assets to context (ignoring potential other csv in datastore)
         if context_request == "structured":
-            files_list = get_files("csv")
+            files_list = get_files("csv", ["geocoding-community-assets.csv"])
             preamble_file = context_request + ".txt"
 
         elif context_request == "unstructured":
