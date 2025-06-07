@@ -54,15 +54,18 @@ function Chat() {
 
     try {
       // Call backend API helper to get AI response
-      const data = await sendChatMessage(userMsg);
+      const data = await sendChatMessage(userMsg, messages);
 
       // Append backend response to messages
       if (data.response) {
-        setMessages((prev) => [...prev, { text: data.response, sender: "ml" }]);
+        setMessages((prev) => [
+          ...prev,
+          { text: data.response, sender: "Gemini" },
+        ]);
       } else {
         setMessages((prev) => [
           ...prev,
-          { text: "Sorry, no response from server.", sender: "ml" },
+          { text: "Sorry, no response from server.", sender: "Gemini" },
         ]);
       }
     } catch (error) {
@@ -70,7 +73,7 @@ function Chat() {
         ...prev,
         {
           text: "Oops, something went wrong. Please try again.",
-          sender: "ml",
+          sender: "Gemini",
         },
       ]);
     } finally {
@@ -171,7 +174,7 @@ function Chat() {
             <Box
               key={idx}
               sx={{
-                alignSelf: msg.sender === "ml" ? "flex-start" : "flex-end",
+                alignSelf: msg.sender === "Gemini" ? "flex-start" : "flex-end",
                 bgcolor: "background.paper",
                 color: "text.primary",
                 border: 2,
@@ -181,11 +184,11 @@ function Chat() {
                 fontSize: "1.2rem",
                 p: 1.5,
                 wordWrap: "break-word",
-                textAlign: msg.sender === "ml" ? "left" : "right",
+                textAlign: msg.sender === "Gemini" ? "left" : "right",
                 whiteSpace: "pre-wrap",
                 opacity:
                   isSending &&
-                  msg.sender === "ml" &&
+                  msg.sender === "Gemini" &&
                   idx === messages.length - 1
                     ? 0.6
                     : 1,

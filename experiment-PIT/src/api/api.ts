@@ -6,11 +6,11 @@ const header = {
     "Content-Type": "application/json",
   }
 
-export async function sendChatMessage(message: string) {
+export async function sendChatMessage(message: string, history: Message[]) {
   const url = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False`
 
   const json = {
-    "client_query": message,
+    "client_query": message + "Here's the message history to provide context to this request: " + JSON.stringify(history),
   };
 
   try {
