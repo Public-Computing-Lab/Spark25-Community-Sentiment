@@ -1,6 +1,6 @@
 export type Message = {
   text: string;
-  sender: "user" | "ml";
+  sender: "user" | "Gemini";
 };
 
 export const opening_message: Message[] = [
@@ -9,7 +9,7 @@ export const opening_message: Message[] = [
         "Hi there! Welcome to 26 Blocks. " +
         "I'm here to help you explore safety insights in your neighborhood. " +
         "What would you like to find today?",
-      sender: "ml",
+      sender: "Gemini",
     },
 ];
 

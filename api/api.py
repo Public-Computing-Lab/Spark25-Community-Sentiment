@@ -749,6 +749,7 @@ def get_query_results(query: str, output_type: str = ""):
 def get_gemini_response(
     prompt: str, cache_name: str, structured_response: bool = False
 ) -> str:
+    print(prompt)
     try:
         model = Config.GEMINI_MODEL
         if structured_response is True:
