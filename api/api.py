@@ -105,7 +105,7 @@ class Structured_Data(BaseModel):
 class SQLConstants:
     # TNT neighborhood coordinates. Using less specific rectangular shape for now.
     # Format: "lng_bottom_left lat_bottom_left, lng_top_left lat_top_left, lng_top_right lat_top_right, lng_bottom_right lat_bottom_right, lng_bottom_left lat_bottom_left"
-    DEFAULT_POLYGON_COORDINATES = "-71.081297 42.284182, -71.081784 42.293107, -71.071730 42.293255, -71.071601 42.284301, -71.081297 42.284182"
+    # DEFAULT_POLYGON_COORDINATES = "-71.081297 42.284182, -71.081784 42.293107, -71.071730 42.293255, -71.071601 42.284301, -71.081297 42.284182"
 
     # 311 category mappings
     CATEGORY_TYPES = {
@@ -170,20 +170,26 @@ class SQLConstants:
     """
 
     # 311 specific constants
-    BOS311_BASE_WHERE = f"""
-    ST_Contains(
-        ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
-        coordinates
+    # BOS311_BASE_WHERE = f"""
+    # ST_Contains(
+    #     ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
+    #     coordinates
+    # )
+    # """
+
+    BOS311_BASE_WHERE = (
+        "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
     )
-    """
 
     # 911 specific constants
-    BOS911_BASE_WHERE = f"""
-    ST_Contains(
-        ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
-        coordinates
-    )
-    """
+    BOS911_BASE_WHERE = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
+
+    # BOS911_BASE_WHERE = f"""
+    # ST_Contains(
+    #     ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
+    #     coordinates
+    # )
+    # """
 
 
 #
@@ -789,7 +795,7 @@ def create_gemini_context(
         files_list = []
         content = {"parts": []}
 
-         #adding community assets to context (ignoring potential other csv in datastore)
+        # adding community assets to context (ignoring potential other csv in datastore)
         if context_request == "structured":
             files_list = get_files("csv", ["geocoding-community-assets.csv"])
             preamble_file = context_request + ".txt"
