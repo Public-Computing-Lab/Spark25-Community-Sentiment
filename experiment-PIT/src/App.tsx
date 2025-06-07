@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-import { Box, CssBaseline } from "@mui/material";
+import { CssBaseline, Box } from "@mui/material";
 import Navbar from "./components/Navbar";
 import Chat from "./pages/Chat";
 // import Home from "./pages/Home";
