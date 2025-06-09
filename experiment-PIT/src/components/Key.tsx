@@ -3,9 +3,9 @@ import { Box, Typography} from '@mui/material';
 function Key() {
     return (
         <Box sx={{
-            maxWidth: "50vw",
-            width: "20vw",
-            height: "13vh",
+            maxWidth: "40vw",
+            width: "30vw",
+            height: "15vh",
             bgcolor: 'white',
             boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
             '&:hover': {
@@ -19,7 +19,7 @@ function Key() {
                 padding: '0.5em',
                 fontWeight: 'bold',
             }}>
-                Data Legend
+                Legend
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', paddingLeft: '1em' }}>
                 <Box sx={{
@@ -27,7 +27,7 @@ function Key() {
                     height: '10px',
                     backgroundColor: '#880808', // Red for Shootings
                     borderRadius: '50%',
-                    marginRight: '0.5em',
+                    marginRight: '0.4em',
                 }} />
                 <Typography sx={{ fontSize: "12px" }}>
                     Shootings
@@ -40,10 +40,22 @@ function Key() {
                     height: '10px',
                     backgroundColor: '#228B22', // Red for Shootings
                     borderRadius: '50%',
+                    marginRight: '0.4em',
+                }} />
+                <Typography sx={{ fontSize: "12px" }}>
+                    Assets
+                </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', paddingLeft: '1em' }}>
+                <Box sx={{
+                    width: '10px',
+                    height: '10px',
+                    backgroundColor: '#FBEC5D', // Red for Shootings
+                    borderRadius: '50%',
                     marginRight: '0.5em',
                 }} />
                 <Typography sx={{ fontSize: "12px" }}>
-                    Community Assets
+                    311 Requests
                 </Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', paddingLeft: '1em' }}>

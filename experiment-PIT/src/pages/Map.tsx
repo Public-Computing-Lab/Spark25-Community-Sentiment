@@ -57,7 +57,43 @@ function Map() {
         }
       });
 
-      // Fetching and adding community assets
+     
+    
+      const shots_geojson = await processShotsData();
+      const request_geojson = await process311Data();
+
+      mapRef.current.addSource('shots_data', { //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
+        type: 'geojson',
+        data: shots_geojson
+      });
+
+      mapRef.current.addLayer({
+        id: 'shots_vector',
+        type: 'circle',
+        source: 'shots_data',
+        paint: {
+          'circle-radius': 3,
+          'circle-color': '#880808',
+        }
+      })
+
+      //adding 311 data
+      mapRef.current.addSource('311_data', { //takes even longer than 911 data...
+        type: 'geojson',
+        data: request_geojson //change to non-personal account
+      });
+
+      mapRef.current.addLayer({
+        id: '311_vector',
+        type: 'circle',
+        source: '311_data',
+        paint: {
+          'circle-radius': 3,
+          'circle-color': '#FBEC5D',
+        }
+      });
+      
+       // Fetching and adding community assets
       fetch('/data/map_2.geojson')
         .then((response) => response.json())
         .then((geojsonData) => {
@@ -76,45 +112,8 @@ function Map() {
             },
           });
         })
-    
-      const shots_geojson = await processShotsData();
-      const request_geojson = await process311Data();
-
-      // mapRef.current.addSource('shots_data', { //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
-      //   type: 'geojson',
-      //   data: shots_geojson
-      // });
-
-      // mapRef.current.addLayer({
-      //   id: 'shots_vector',
-      //   type: 'circle',
-      //   source: 'shots_data',
-      //   paint: {
-      //     'circle-radius': 3,
-      //     'circle-color': '#880808',
-      //   }
-      // })
-
-      // //adding 311 data
-      // mapRef.current.addSource('311_data', { //takes even longer than 911 data...
-      //   type: 'geojson',
-      //   data: request_geojson //change to non-personal account
-      // });
-
-      // mapRef.current.addLayer({
-      //   id: '311_vector',
-      //   type: 'circle',
-      //   source: '311_data',
-      //   paint: {
-      //     'circle-radius': 3,
-      //     'circle-color': '#6495ED',
-      //   }
-      // })
 
     });
-
-      
-   
 
     //use mapbox.Popup() for tooltips [ON CLICK]
     const popup = new mapboxgl.Popup({
