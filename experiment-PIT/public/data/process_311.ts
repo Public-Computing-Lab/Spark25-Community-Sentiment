@@ -37,8 +37,8 @@ export const process311Data = async () => {
                 "geometry": {
                     "type": "Point",
                     "coordinates": [
-                        parseFloat(request_latitude),
-                        parseFloat(request_longitude)
+                        parseFloat(request_longitude),
+                        parseFloat(request_latitude)
                     ]
                 } 
             })
