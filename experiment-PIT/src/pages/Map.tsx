@@ -1,4 +1,5 @@
 import { Box, Typography } from '@mui/material'
+import Key from '../components/Key';
 import {useRef, useEffect} from 'react';
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
@@ -51,9 +52,8 @@ function Map() {
         source: 'TNT',
         layout: {},
         paint: {
-          'line-color': '#0d54c2',
+          'line-color': '#82aae7',
           'line-width': 3,
-          'line-opacity': 0.6,
         }
       });
 
@@ -130,11 +130,11 @@ function Map() {
           coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360; //adjusting X coordinate of popup
         } //may need to give more wiggle room for mobile 
 
-        const description = name.concat(alternates) //need to figure out better styling for popup
+        const description = `<strong>${name}</strong><br>${alternates}` //need to figure out better styling for popup
 
         new mapboxgl.Popup()
           .setLngLat(coordinates)
-          .setText(description)
+          .setHTML(description)
           .addTo(mapRef.current);
 
     })
@@ -161,8 +161,9 @@ function Map() {
       }}
     >
       <Typography variant="h4" component="h1" mb={2}> 
-        Map View
+          Map View
       </Typography>
+      
       <Box sx={{ //element rendering the map
         left: '0', 
         top: '0', 
@@ -173,6 +174,9 @@ function Map() {
       }}
         ref={mapContainerRef}
       />
+      <Box sx={{mb: 3, position: 'absolute', left: '5', top: '4em'}}>
+          <Key />
+      </Box>
     </Box>
     
   )
