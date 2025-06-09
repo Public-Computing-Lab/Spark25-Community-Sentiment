@@ -181,15 +181,15 @@ class SQLConstants:
     #     "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
     # )
 
-    # # 911 specific constants
-    # BOS911_BASE_WHERE = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
+    # 911 specific constants
+    BOS911_BASE_WHERE = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
 
-    BOS911_BASE_WHERE = f"""
-    ST_Contains(
-        ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
-        coordinates
-    )
-    """
+    # BOS911_BASE_WHERE = f"""
+    # ST_Contains(
+    #     ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
+    #     coordinates
+    # )
+    # """
 
 
 #
