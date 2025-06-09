@@ -177,19 +177,17 @@ class SQLConstants:
     )
     """
 
-    # BOS311_BASE_WHERE = (
-    #     "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
-    # )
-
     # 911 specific constants
-    BOS911_BASE_WHERE = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
+    BOS911_BASE_WHERE_HOMOCIDES = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
 
-    # BOS911_BASE_WHERE = f"""
-    # ST_Contains(
-    #     ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
-    #     coordinates
-    # )
-    # """
+    # Only works when coordinates exist (shots fired data)
+    BOS911_BASE_WHERE = f"""
+    year >= 2018 AND year < 2025
+    AND ST_Contains(
+        ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
+        coordinates
+    )
+    """
 
 
 #
@@ -258,7 +256,7 @@ def build_311_query(
                 'Category' AS level_type,
                 NULL AS category
             FROM homicide_data
-            WHERE {SQLConstants.BOS911_BASE_WHERE}
+            WHERE {SQLConstants.BOS911_BASE_WHERE_HOMOCIDES}
             GROUP BY year, incident_type
             UNION ALL
             SELECT
