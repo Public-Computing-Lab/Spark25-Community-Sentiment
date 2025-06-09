@@ -8,9 +8,11 @@ const header = {
 
 export async function sendChatMessage(message: string, history: Message[]) {
   const url = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False`
-
+  
+  const formattedHistory = history.map(message => JSON.stringify(message)).join('\n');
+  console.log("history: ", formattedHistory);
   const json = {
-    "client_query": message + " Here's the message history to provide context to this request: " + JSON.stringify(history),
+    "client_query": message + "\n Here's the message history to provide context to this request: " + JSON.stringify(formattedHistory),
   };
 
   try {
