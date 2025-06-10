@@ -1,44 +1,18 @@
-import { Box, Typography, Button, Drawer, Stack, Slider, FormGroup, FormControlLabel, Checkbox } from '@mui/material';
+import { Box, Typography, Button, Drawer, Stack, Slider } from '@mui/material';
 import { useState } from 'react';
 import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
 
 
 function FilterDialog({ 
     layers,
-    onSelectionChange, //callback function
-    onSliderChange
 } : {
     layers: string[]
-    onSelectionChange : (selectedLayers: string[]) => void
-    onSliderChange : (selectedYears: number[]) => void
 }) {
   const [open, setOpen] = useState(false);
-  const [selectedData, setSelectedData] = useState<string[]>(["Community Assets"]);
-  const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
-
 
   const toggleFilter = (newOpen: boolean) => () => {
     setOpen(newOpen);
   };
-
-  const handleSelectData = (layerSelected: string) => () => {
-    setSelectedData((prevSelectedData) => {
-        const filteredData = prevSelectedData.includes(layerSelected) ? prevSelectedData.filter(element => element !== layerSelected) : [...prevSelectedData, layerSelected];
-        //if layer is already in prevSelectedData, filter it out, otherwise, add it.
-        onSelectionChange(filteredData);
-        //pass the new array up to parent through onSelectionChange
-        return filteredData;
-    });
-  };
-
-  const handleSelectYears = (_event: Event, newValues: number[]) => {
-    setSelectedYears(() => {
-      onSliderChange(newValues);
-      console.log(newValues);
-      return newValues;
-    });
-    
-  }
 
   return (
     <div>
@@ -69,8 +43,6 @@ function FilterDialog({
                 min={2018}
                 valueLabelDisplay="auto"
                 max={2024}
-                value={selectedYears}
-                onChange={handleSelectYears}
                 sx={{
                   marginLeft: '1em',
                   marginRight: '1em'
@@ -81,19 +53,8 @@ function FilterDialog({
           <Typography>
             Data Type
           </Typography>
-          <FormGroup>
-            {layers.map((layer) => (
-               <FormControlLabel 
-                key={layer} 
-                control={
-                  <Checkbox 
-                    checked={selectedData.includes(layer)} 
-                    onChange={handleSelectData(layer)}
-                    />
-                } 
-                label={layer} />
-            ))}
-          </FormGroup>
+          
+
         </Box>
         
       </Drawer>
