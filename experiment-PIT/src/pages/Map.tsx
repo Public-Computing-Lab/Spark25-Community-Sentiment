@@ -1,17 +1,21 @@
-import { Box, Typography } from '@mui/material'
+import { Box, Typography, Button } from '@mui/material'
 import Key from '../components/Key';
-import {useRef, useEffect} from 'react';
+import {useRef, useEffect, useState} from 'react';
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { processShotsData } from '../../public/data/process_911';
 import { process311Data } from '../../public/data/process_311';
+import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
+import FilterDialog from '../components/FilterDialog';
 
 //besure to install mapbox-gl 
 
 function Map() {
   const mapRef = useRef();
   const mapContainerRef = useRef(); //.current assigns it a value
+  const [layers, setLayers] = useState([]);
+
 
   useEffect(() => {
     mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; //using personal access token for now
@@ -56,8 +60,6 @@ function Map() {
           'line-width': 3,
         }
       });
-
-     
     
       const shots_geojson = await processShotsData();
       const request_geojson = await process311Data();
@@ -89,7 +91,7 @@ function Map() {
         source: '311_data',
         paint: {
           'circle-radius': 3,
-          'circle-color': '#FBEC5D',
+          'circle-color': '#FFC300',
         }
       });
       
@@ -111,7 +113,20 @@ function Map() {
               'circle-color': '#228B22',
             },
           });
+
+          // Retrieve all layers after community-assets is added
+          const mapLayers = mapRef.current.getStyle().layers;
+          const layerIds = mapLayers
+            .filter(layer => layer.type === 'circle') //getting only the layers i've added
+            .map(layer => layer.id);
+          setLayers(layerIds);
+
         })
+        .catch((error) => {
+          console.error('Error fetching community assets:', error);
+        });
+
+      
 
     });
 
@@ -139,6 +154,7 @@ function Map() {
     })
     
     
+
     return () => {
       mapRef.current.remove() //removes map after unmounting
     }
@@ -176,6 +192,8 @@ function Map() {
       <Box sx={{mb: 3, position: 'absolute', left: '5', top: '4em'}}>
           <Key />
       </Box>
+      <FilterDialog layers={layers}/>
+      
     </Box>
     
   )
