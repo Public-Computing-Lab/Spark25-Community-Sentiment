@@ -6,7 +6,6 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { processShotsData } from '../../public/data/process_911';
 import { process311Data } from '../../public/data/process_311';
-import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
 import FilterDialog from '../components/FilterDialog';
 
 //besure to install mapbox-gl 
@@ -15,8 +14,9 @@ function Map() {
   const mapRef = useRef();
   const mapContainerRef = useRef(); //.current assigns it a value
   const [layers, setLayers] = useState([]);
+  const [selectedLayers, setSelectedLayer] = useState<string[]>([]);
 
-
+  //loading all data
   useEffect(() => {
     mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; //using personal access token for now
     
@@ -70,9 +70,12 @@ function Map() {
       });
 
       mapRef.current.addLayer({
-        id: 'shots_vector',
+        id: 'Gun Violence Incidents',
         type: 'circle',
         source: 'shots_data',
+        layout: {
+          visibility: 'none'
+        },
         paint: {
           'circle-radius': 3,
           'circle-color': '#880808',
@@ -86,9 +89,12 @@ function Map() {
       });
 
       mapRef.current.addLayer({
-        id: '311_vector',
+        id: '311 Requests',
         type: 'circle',
         source: '311_data',
+        layout: {
+          visibility: 'none'
+        },
         paint: {
           'circle-radius': 3,
           'circle-color': '#FFC300',
@@ -105,9 +111,12 @@ function Map() {
           });
 
           mapRef.current.addLayer({
-            id: 'community-assets',
+            id: 'Community Assets',
             type: 'circle',
             source: 'assets',
+            layout: {
+              visibility: 'none'
+            },
             paint: {
               'circle-radius': 5,
               'circle-color': '#228B22',
@@ -153,13 +162,21 @@ function Map() {
 
     })
     
-    
 
     return () => {
       mapRef.current.remove() //removes map after unmounting
     }
   }, []);
 
+  //changing visibility of layers depending on what is checked in filters or not.
+  useEffect(() => {
+    if (mapRef.current) {
+      layers.forEach((layerId) => {
+        const visibility = selectedLayers.includes(layerId) ? 'visible' : 'none';
+        mapRef.current.setLayoutProperty(layerId, 'visibility', visibility);
+      });
+    }
+  }, [selectedLayers, layers]);
 
   return (
     <Box
@@ -192,7 +209,7 @@ function Map() {
       <Box sx={{mb: 3, position: 'absolute', left: '5', top: '4em'}}>
           <Key />
       </Box>
-      <FilterDialog layers={layers}/>
+      <FilterDialog layers={layers} onSelectionChange={setSelectedLayer}/>
       
     </Box>
     
