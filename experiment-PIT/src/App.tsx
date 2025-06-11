@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router-dom";
-import { CssBaseline, Box } from "@mui/material";
+import { CssBaseline, Box, ThemeProvider } from "@mui/material";
+import { customTheme } from "./assets/theme";
 import Navbar from "./components/Navbar";
 import Chat from "./pages/Chat";
 // import Home from "./pages/Home";
@@ -7,7 +8,8 @@ import Map from "./pages/Map";
 
 function App() {
   return (
-    <>
+    
+      <ThemeProvider theme={customTheme}>
       <CssBaseline />
       <Box
         sx={{
@@ -30,7 +32,8 @@ function App() {
         {/* Navbar sticks at bottom */}
         <Navbar />
       </Box>
-    </>
+      </ThemeProvider>
+   
   );
 }
 
