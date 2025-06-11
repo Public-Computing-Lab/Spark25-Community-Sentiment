@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import BottomNavigation from "@mui/material/BottomNavigation";
 import BottomNavigationAction from "@mui/material/BottomNavigationAction";
 import Paper from "@mui/material/Paper";
+import { colorPalette } from "../assets/palette";
 
 // import HomeIcon from '@mui/icons-material/Home';
 import LocationOnIcon from "@mui/icons-material/LocationOn";
@@ -43,11 +44,28 @@ function Navbar() {
       }}
       elevation={3}
     >
-      <BottomNavigation showLabels value={value} onChange={handleChange}>
-        {navLinks.map(({ label, icon }, index) => (
-          <BottomNavigationAction key={index} label={label} icon={icon} />
-        ))}
-      </BottomNavigation>
+      <BottomNavigation
+  showLabels
+  value={value}
+  onChange={handleChange}
+  sx={{
+    bgcolor: colorPalette.background, // light blue background
+    "& .Mui-selected": {
+      color: colorPalette.dark, // navy blue when selected
+    },
+    "& .MuiBottomNavigationAction-root": {
+      color: colorPalette.dark, // default black
+      transition: "color 5s ease",
+      "&:hover": {
+        color: "#026BC4" // bright blue on hover
+      },
+    },
+  }}
+>
+  {navLinks.map(({ label, icon }, index) => (
+    <BottomNavigationAction key={index} label={label} icon={icon} />
+  ))}
+</BottomNavigation>
     </Paper>
   );
 }
