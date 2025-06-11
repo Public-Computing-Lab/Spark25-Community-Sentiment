@@ -18,7 +18,7 @@ function Map() {
 
   //loading all data
   useEffect(() => {
-    mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; //using personal access token for now
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN; //using personal access token for now
     
     mapRef.current = new mapboxgl.Map({ //creating map
       container: mapContainerRef.current,
@@ -135,8 +135,6 @@ function Map() {
           console.error('Error fetching community assets:', error);
         });
 
-      
-
     });
 
     //use mapbox.Popup() for tooltips [ON CLICK]
@@ -144,7 +142,7 @@ function Map() {
       closeOnClick: true
     })
 
-    mapRef.current.on('click', 'community-assets', (e) => { //getting popup text
+    mapRef.current.on('click', 'Community Assets', (e) => { //getting popup text
         const name = e.features[0].properties['Name'];
         const alternates = e.features[0].properties['Alternate Names'];
         const coordinates = e.features[0].geometry['coordinates'].slice();
