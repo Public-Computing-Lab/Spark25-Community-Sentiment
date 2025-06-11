@@ -25,7 +25,7 @@ a. It contains information about the date and time of request, the type of reque
 a. For the shooting incidents, it contains information about date and time of incidents, and latitude/longitude information.
 b. For the homicide data, it contains information about the date, and the latitude and longitude of the incident
 
-This data contains detailed incident tracking data from 2018-2024 and is organized by year, categories of incidents, and specific incident type with monthly and quarterly totals. Although the data ends at 2024, stay aware of the current year based on your previous and acknowledge any gaps in data due to your dataset not being up to date.
+This data contains detailed incident tracking data from 2018-2024 and is organized by year, categories of incidents, and specific incident type with monthly and quarterly totals. Although the data ends at 2024, stay aware of the current year by checking the server time and acknowledge any gaps in data due to your dataset not being up to date.
 
 Consider temporal patterns in the quantitative data or subsets of the data. Reveal potential trends in the frequency of incidents and in the geographic location where they are reported or occur. Do not claim causality. Simply highlight correlations in the data.
 
