@@ -18,7 +18,8 @@ function Map() {
 
   //loading all data
   useEffect(() => {
-    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN; //using personal access token for now
+    //need chris/mitanshi's non invalid access token!!
+    mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
     
     mapRef.current = new mapboxgl.Map({ //creating map
       container: mapContainerRef.current,
@@ -63,6 +64,7 @@ function Map() {
     
       const shots_geojson = await processShotsData();
       const request_geojson = await process311Data();
+      console.log("updated dates", shots_geojson);
 
       mapRef.current.addSource('shots_data', { //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
         type: 'geojson',
@@ -98,6 +100,7 @@ function Map() {
         paint: {
           'circle-radius': 3,
           'circle-color': '#FFC300',
+          'circle-opacity': 0.3,
         }
       });
       
