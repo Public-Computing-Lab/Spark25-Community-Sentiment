@@ -30,7 +30,7 @@ function Key() {
                     marginRight: '0.4em',
                 }} />
                 <Typography sx={{ fontSize: "12px" }}>
-                    Shootings
+                    Gun Violence Incidents
                 </Typography>
             </Box>
     
