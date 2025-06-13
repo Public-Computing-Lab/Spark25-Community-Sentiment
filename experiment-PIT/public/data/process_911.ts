@@ -5,6 +5,7 @@ interface GeoJSONFeature {
     properties: {
         id: number;
         date: string;
+        year: number;
     };
     geometry: {
         type: string;
@@ -25,7 +26,8 @@ export const processShotsData = async () => {
             const shot_id = instance.id;
             const shot_latitude = instance.latitude;
             const shot_longitude = instance.longitude;
-            const shot_date = instance.date;
+            const shot_date = new Date(instance.date);
+            const shot_year = shot_date.getFullYear();
             //const shot_ballistics = instance.ballistics_evidence
             //include ballistics evidence?
 
@@ -33,7 +35,8 @@ export const processShotsData = async () => {
                 "type": "Feature",
                 "properties": {
                     id: shot_id,
-                    date: shot_date,
+                    date: shot_date.toLocaleString("en"),
+                    year: shot_year,
                     //ballistics: shot_ballistics,
                 },
                 "geometry": {
