@@ -13,7 +13,7 @@ function FilterDialog({
     onSliderChange : (selectedYears: number[]) => void
 }) {
   const [open, setOpen] = useState(false);
-  const [selectedData, setSelectedData] = useState<string[]>([]);
+  const [selectedData, setSelectedData] = useState<string[]>(["Community Assets"]);
   const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
 
 

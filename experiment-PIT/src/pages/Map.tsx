@@ -14,7 +14,7 @@ function Map() {
   const mapRef = useRef();
   const mapContainerRef = useRef(); //.current assigns it a value
   const [layers, setLayers] = useState([]);
-  const [selectedLayers, setSelectedLayer] = useState<string[]>([]);
+  const [selectedLayers, setSelectedLayer] = useState<string[]>(["Community Assets"]);
   const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
 
   
