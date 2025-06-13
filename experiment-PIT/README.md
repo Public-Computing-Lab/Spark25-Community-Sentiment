@@ -37,12 +37,12 @@ The project uses a mix of structured and geospatial public data:
 - Cleaned up in Google Sheets
 - Geocoded in a Jupyter notebook pipeline
 - Converted into GeoJSON using [geojson.io](https://geojson.io/)
-- Final output file: `map_2.geojson`
+- Final output file: `map_2.geojson` in `public/data/`
 
 ### 911 Call and 311 Request Data
 - Loaded from a **MySQL database**
 - Exported to a local GeoJSON format for use in the app
-- Final output files: `process_911.tsx` and `process_311.tsx`
+- Final output files: `process_911.tsx` and `process_311.tsx` in `public/data/`
 
 ### Additional Public Datasets
 
