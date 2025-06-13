@@ -20,7 +20,7 @@ function Map() {
   
   //loading all data
   useEffect(() => {
-    //need chris/mitanshi's non invalid access token!!
+
     mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN; 
     
     mapRef.current = new mapboxgl.Map({ //creating map
