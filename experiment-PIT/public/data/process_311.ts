@@ -6,6 +6,7 @@ interface GeoJSONFeature {
         id: number;
         request_type: string,
         date: string;
+        year: number;
     };
     geometry: {
         type: string;
@@ -25,14 +26,16 @@ export const process311Data = async () => {
             const request_type = instance.type;
             const request_latitude = instance.latitude;
             const request_longitude = instance.longitude;
-            const request_date = instance.date;
+            const request_date = new Date(instance.date);
+            const request_year = request_date.getFullYear();
 
             request_geojson.features.push({
                 "type": "Feature",
                 "properties": {
                     id: request_id,
                     request_type: request_type,
-                    date: request_date,
+                    date: request_date.toLocaleString("en"),
+                    year: request_year,
                 },
                 "geometry": {
                     "type": "Point",
