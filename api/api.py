@@ -796,6 +796,7 @@ def create_gemini_context(
     preamble: str = "",
     generate_cache: bool = True,
     app_version: str = "",
+    is_spatial: bool = False,
 ) -> Union[str, int, bool]:
     # test if cache exists
     if generate_cache:
@@ -831,7 +832,7 @@ def create_gemini_context(
             or context_request == "get_summary"
         ):
             files_list = get_files("txt")
-            query = build_311_query(data_request="311_summary_context")
+            query = build_311_query(data_request="311_summary_context", is_spatial=is_spatial)
             response = get_query_results(query=query, output_type="csv")
 
             content["parts"].append({"text": response.getvalue()})
@@ -1031,6 +1032,7 @@ def route_data_query():
     request_date = request.args.get("date", "")
     data_request = request.args.get("request", "")
     output_type = request.args.get("output_type", "")
+    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
 
     if not data_request:
         return jsonify({"✖ Error": "Missing data_request parameter"}), 400
@@ -1072,10 +1074,11 @@ def route_data_query():
                 request_date=request_date,
                 request_zipcode=request_zipcode,
                 event_ids=event_ids,
+                is_spatial=is_spatial,
             )
 
         elif data_request.startswith("911"):
-            query = build_911_query(data_request=data_request)
+            query = build_911_query(data_request=data_request, is_spatial=is_spatial)
         elif data_request == "zip_geo":
             query = f"""
             SELECT JSON_OBJECT(
@@ -1138,6 +1141,7 @@ def route_data_query():
 def route_chat():
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
+    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
 
     context_request = request.args.get(
         "context_request", request.args.get("request", "")
@@ -1157,6 +1161,7 @@ def route_chat():
         preamble=prompt_preamble,
         generate_cache=True,
         app_version=app_version,
+        is_spatial=is_spatial,
     )
 
     full_prompt = f"User question: {client_query}"
@@ -1216,6 +1221,7 @@ def route_chat():
 def route_chat_context():
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
+    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
 
     context_request = request.args.get(
         "context_request", request.args.get("request", "")
@@ -1234,6 +1240,7 @@ def route_chat_context():
                 preamble="",
                 generate_cache=False,
                 app_version=app_version,
+                is_spatial=is_spatial,
             )
 
             if isinstance(token_count, int):
@@ -1282,6 +1289,7 @@ def route_chat_context():
                 preamble=prompt_preamble,
                 generate_cache=True,
                 app_version=app_version,
+                is_spatial=is_spatial,
             )
 
             log_event(
@@ -1298,6 +1306,8 @@ def chat_summary():
     data = request.get_json()
     messages = data.get("messages", [])
     app_version = request.args.get("app_version", "0")
+    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
+
 
     if not messages:
         return jsonify({"error": "No messages provided."}), 400
@@ -1312,6 +1322,7 @@ def chat_summary():
         preamble="",
         generate_cache=True,
         app_version=app_version,
+        is_spatial=is_spatial,
     )
 
     try:
