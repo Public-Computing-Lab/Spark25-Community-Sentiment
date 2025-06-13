@@ -64,8 +64,8 @@ function Map() {
         }
       });
     
-      const shots_geojson = await processShotsData(undefined, true); //loading shots data from api and converting to geojson
-      const request_geojson = await process311Data(undefined, undefined, true); //loading 311 data from api and converting to geojson
+      const shots_geojson = await processShotsData(); //loading shots data from api and converting to geojson
+      const request_geojson = await process311Data(); //loading 311 data from api and converting to geojson
 
       mapRef.current.addSource('shots_data', { //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
         type: 'geojson',
