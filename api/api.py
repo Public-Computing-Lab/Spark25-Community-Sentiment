@@ -401,6 +401,11 @@ def build_311_query(
             """
         return query
     elif data_request == "311_summary" and event_ids:
+        
+        # Quote each event_id if not already quoted
+        id_list = [f"'{x.strip()}'" for x in event_ids.split(",") if x.strip()]
+        id_str = ",".join(id_list)
+
         query = f"""
         SELECT
         CASE
@@ -412,7 +417,7 @@ def build_311_query(
         type AS subcategory,
         COUNT(*) AS total
         FROM bos311_data
-        WHERE id IN ({event_ids})
+        WHERE id IN ({id_str})
         GROUP BY category, subcategory
         UNION ALL
         SELECT
@@ -425,7 +430,7 @@ def build_311_query(
         'TOTAL' AS subcategory,
         COUNT(*) AS total
         FROM bos311_data
-        WHERE id IN ({event_ids})
+        WHERE id IN ({id_str})
         GROUP BY
         category
         ORDER BY
@@ -534,6 +539,8 @@ def build_311_query(
 
 
 def build_911_query(data_request: str, is_spatial = False) -> str:
+    Bos911_where_clause = SQLConstants.BOS911_SPATIAL_WHERE if is_spatial else SQLConstants.BOS911_BASE_WHERE
+    
     if data_request == "911_shots_fired":
         query = f"""
         SELECT
@@ -543,14 +550,7 @@ def build_911_query(data_request: str, is_spatial = False) -> str:
             latitude,
             longitude
         FROM shots_fired_data
-        WHERE """
-
-        if is_spatial:
-            query += SQLConstants.BOS911_SPATIAL_WHERE
-        else:
-            query += SQLConstants.BOS911_BASE_WHERE
-
-        query += """ 
+        WHERE {Bos911_where_clause}
             AND latitude IS NOT NULL
             AND longitude IS NOT NULL
         GROUP BY id, date, ballistics_evidence, latitude, longitude;
@@ -573,7 +573,10 @@ def build_911_query(data_request: str, is_spatial = False) -> str:
             AND s.district = h.district
         WHERE
             s.ballistics_evidence = 1
-            AND {SQLConstants.BOS911_BASE_WHERE}
+            AND h.district IN ('B3', 'C11', 'B2')
+            AND h.neighborhood = 'Dorchester'
+            AND s.year >= 2018
+            AND s.year < 2025
         """
     return ""
 
