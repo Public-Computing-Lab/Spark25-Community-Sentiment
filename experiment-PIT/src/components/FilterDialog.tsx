@@ -5,13 +5,17 @@ import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
 
 function FilterDialog({ 
     layers,
-    onSelectionChange //callback function
+    onSelectionChange, //callback function
+    onSliderChange
 } : {
     layers: string[]
     onSelectionChange : (selectedLayers: string[]) => void
+    onSliderChange : (selectedYears: number[]) => void
 }) {
   const [open, setOpen] = useState(false);
   const [selectedData, setSelectedData] = useState<string[]>([]);
+  const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
+
 
   const toggleFilter = (newOpen: boolean) => () => {
     setOpen(newOpen);
@@ -26,6 +30,15 @@ function FilterDialog({
         return filteredData;
     });
   };
+
+  const handleSelectYears = (event: Event, newValues: number[]) => {
+    setSelectedYears(() => {
+      onSliderChange(newValues);
+      console.log(newValues);
+      return newValues;
+    });
+    
+  }
 
   return (
     <div>
@@ -56,6 +69,8 @@ function FilterDialog({
                 min={2018}
                 valueLabelDisplay="auto"
                 max={2024}
+                value={selectedYears}
+                onChange={handleSelectYears}
                 sx={{
                   marginLeft: '1em',
                   marginRight: '1em'
