@@ -34,15 +34,15 @@ The app now consists of two main pages:
 The project uses a mix of structured and geospatial public data:
 
 ### Community Assets
+- Cleaned up in Google Sheets
 - Geocoded in a Jupyter notebook pipeline
 - Converted into GeoJSON using [geojson.io](https://geojson.io/)
 - Final output file: `map_2.geojson`
 
-### 911 Call Data
+### 911 Call and 311 Request Data
 - Loaded from a **MySQL database**
 - Exported to a local GeoJSON format for use in the app
-- Converted into a **Mapbox vector tileset**
-- Tileset is used as a Mapbox URL to power one of the map layers
+- Final output files: `process_911.tsx` and `process_311.tsx`
 
 ### Additional Public Datasets
 
