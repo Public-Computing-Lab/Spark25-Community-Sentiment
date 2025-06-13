@@ -15,7 +15,9 @@ function Map() {
   const mapContainerRef = useRef(); //.current assigns it a value
   const [layers, setLayers] = useState([]);
   const [selectedLayers, setSelectedLayer] = useState<string[]>([]);
+  const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
 
+  
   //loading all data
   useEffect(() => {
     //need chris/mitanshi's non invalid access token!!
@@ -64,7 +66,6 @@ function Map() {
     
       const shots_geojson = await processShotsData();
       const request_geojson = await process311Data();
-      console.log("updated dates", shots_geojson);
 
       mapRef.current.addSource('shots_data', { //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
         type: 'geojson',
@@ -75,9 +76,6 @@ function Map() {
         id: 'Gun Violence Incidents',
         type: 'circle',
         source: 'shots_data',
-        layout: {
-          visibility: 'none'
-        },
         paint: {
           'circle-radius': 3,
           'circle-color': '#880808',
@@ -94,9 +92,6 @@ function Map() {
         id: '311 Requests',
         type: 'circle',
         source: '311_data',
-        layout: {
-          visibility: 'none'
-        },
         paint: {
           'circle-radius': 3,
           'circle-color': '#FFC300',
@@ -117,15 +112,12 @@ function Map() {
             id: 'Community Assets',
             type: 'circle',
             source: 'assets',
-            layout: {
-              visibility: 'none'
-            },
             paint: {
               'circle-radius': 5,
               'circle-color': '#228B22',
             },
           });
-
+          
           // Retrieve all layers after community-assets is added
           const mapLayers = mapRef.current.getStyle().layers;
           const layerIds = mapLayers
@@ -137,13 +129,12 @@ function Map() {
         .catch((error) => {
           console.error('Error fetching community assets:', error);
         });
-
     });
 
-    //use mapbox.Popup() for tooltips [ON CLICK]
+    //use tooltips [ON CLICK]
     const popup = new mapboxgl.Popup({
       closeOnClick: true
-    })
+    });
 
     mapRef.current.on('click', 'Community Assets', (e) => { //getting popup text
         const name = e.features[0].properties['Name'];
@@ -162,14 +153,49 @@ function Map() {
           .addTo(mapRef.current);
 
     })
-    
 
+    mapRef.current.on('click', 'Gun Violence Incidents', (e) => { //getting popup text
+        const name = e.features[0].properties['year'];
+        const coordinates = e.features[0].geometry['coordinates'].slice();
+
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+          coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360; //adjusting X coordinate of popup
+        } //may need to give more wiggle room for mobile 
+
+        const description = `<strong>${name}</strong>` //need to figure out better styling for popup
+
+        new mapboxgl.Popup()
+          .setLngLat(coordinates)
+          .setHTML(description)
+          .addTo(mapRef.current);
+
+    })
+
+    mapRef.current.on('click', '311 Requests', (e) => { //getting popup text
+        const year = e.features[0].properties['year'];
+        const type = e.features[0].properties['request_type'];
+        const coordinates = e.features[0].geometry['coordinates'].slice();
+
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+          coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360; //adjusting X coordinate of popup
+        } //may need to give more wiggle room for mobile 
+
+        const description = `<strong>${year}</strong><br>${type}` //need to figure out better styling for popup
+
+        new mapboxgl.Popup()
+          .setLngLat(coordinates)
+          .setHTML(description)
+          .addTo(mapRef.current);
+
+    })
+    
     return () => {
       mapRef.current.remove() //removes map after unmounting
     }
   }, []);
 
   //changing visibility of layers depending on what is checked in filters or not.
+  //NEED TO DETERMINE WHY VISIBILITY FOR COMMUNITY ASSETS ISN'T WORKING
   useEffect(() => {
     if (mapRef.current) {
       layers.forEach((layerId) => {
@@ -178,6 +204,23 @@ function Map() {
       });
     }
   }, [selectedLayers, layers]);
+
+
+  //filtering by years
+  useEffect(() => {
+    if (mapRef.current) {
+      layers.forEach((layerId) => {
+        if (layerId !== "Community Assets"){ //excluding filtering on community assets
+          mapRef.current.setFilter(layerId, [
+            "all",
+            [">=", "year", selectedYears[0]],
+            ["<=", "year", selectedYears[selectedYears.length - 1]],
+          ]);
+        }
+      })
+    }
+  }, [selectedYears, layers])
+
 
   return (
     <Box
@@ -210,7 +253,7 @@ function Map() {
       <Box sx={{mb: 3, position: 'absolute', left: '5', top: '4em'}}>
           <Key />
       </Box>
-      <FilterDialog layers={layers} onSelectionChange={setSelectedLayer}/>
+      <FilterDialog layers={layers} onSelectionChange={setSelectedLayer} onSliderChange={setSelectedYears}/>
       
     </Box>
     
