@@ -6,8 +6,8 @@ const header = {
     "Content-Type": "application/json",
   }
 
-export async function sendChatMessage(message: string, history: Message[]) {
-  const url = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False`
+export async function sendChatMessage(message: string, history: Message[], is_spatial: boolean = false) {
+  const url = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False&is_spatial=${is_spatial ? 'true' : 'false'}`
   
   const formattedHistory = history.map(message => JSON.stringify(message)).join('\n');
   console.log("history: ", formattedHistory);
@@ -43,8 +43,8 @@ export async function sendChatMessage(message: string, history: Message[]) {
   }
 }
 
-export async function getChatSummary(messages: Message[]) {
-  const url = `${import.meta.env.VITE_BASE_URL}/chat/summary?app_version=0.7.0`
+export async function getChatSummary(messages: Message[], is_spatial: boolean = false) {
+  const url = `${import.meta.env.VITE_BASE_URL}/chat/summary?app_version=0.7.0&is_spatial=${is_spatial ? 'true' : 'false'}`
   
   try {
     const response = await axios.post(url, {messages}, {headers: header});
@@ -55,7 +55,7 @@ export async function getChatSummary(messages: Message[]) {
   }
 }
 
-export async function getShotsData(filtered_date?: string){//must make sure it is in correct format
+export async function getShotsData(filtered_date?: string, is_spatial: boolean = false){//must make sure it is in correct format
   const url = `${import.meta.env.VITE_BASE_URL}/data/query`
 
   const params = {
@@ -63,6 +63,7 @@ export async function getShotsData(filtered_date?: string){//must make sure it i
     request: '911_shots_fired',
     output_type:'json',
     date: filtered_date,
+    is_spatial: is_spatial ? 'true' : 'false',
   }
 
   const headers = {
@@ -93,7 +94,7 @@ export async function getShotsData(filtered_date?: string){//must make sure it i
   }
 } 
 
-export async function get311Data(filtered_date?: number, category?: string){
+export async function get311Data(filtered_date?: number, category?: string, is_spatial: boolean = false){
   const url = `${import.meta.env.VITE_BASE_URL}/data/query` //should output type be
   const params = {
     request: '311_by_geo',
@@ -101,6 +102,7 @@ export async function get311Data(filtered_date?: number, category?: string){
     date: filtered_date,
     app_version: '0.7.0',
     output_type: 'stream',
+    is_spatial: is_spatial ? 'true' : 'false', // check for spatial filtering
   }
 
   const headers = {
