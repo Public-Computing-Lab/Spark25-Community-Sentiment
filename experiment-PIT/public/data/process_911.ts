@@ -18,7 +18,7 @@ export const processShotsData = async () => {
    
     try {
          //loading 
-        const shots_data = await getShotsData();
+        const shots_data = await getShotsData(undefined, true);
         const shots_geojson = { type: "FeatureCollection", features: [] as GeoJSONFeature[] }; //defining type of array
 
         //converting to GeoJSON
