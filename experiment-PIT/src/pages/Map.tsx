@@ -11,8 +11,8 @@ import FilterDialog from '../components/FilterDialog';
 //besure to install mapbox-gl 
 
 function Map() {
-  const mapRef = useRef();
-  const mapContainerRef = useRef(); //.current assigns it a value
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null); //.current assigns it a value
   const [layers, setLayers] = useState([]);
   const [selectedLayers, setSelectedLayer] = useState<string[]>(["Community Assets"]);
   const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
@@ -24,17 +24,19 @@ function Map() {
     mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN; 
     
     mapRef.current = new mapboxgl.Map({ //creating map
-      container: mapContainerRef.current,
+      container: mapContainerRef.current as HTMLElement,
       center: [-71.076543, 42.288386], //centered based on 4 rectangle coordinates of TNT
       zoom: 14.5,
       minZoom: 12,
       style: "mapbox://styles/mapbox/light-v11", //should decide on style
     });
+    
+    if (!mapRef.current) return; //if mapRef.current is null, return
 
     //adding initial map annotations
     mapRef.current.on('load', async () => { //made async in order to be able to load shots data
       //adding rect borders of TNT
-      mapRef.current.addSource('TNT', {
+      mapRef.current?.addSource('TNT', {
         type: 'geojson',
         data: {
           type: 'Feature',
@@ -53,7 +55,7 @@ function Map() {
         }
       });
 
-      mapRef.current.addLayer({
+      mapRef.current?.addLayer({
         id: 'tnt-outline',
         type: 'line',
         source: 'TNT',
@@ -67,12 +69,12 @@ function Map() {
       const shots_geojson = await processShotsData();
       const request_geojson = await process311Data();
 
-      mapRef.current.addSource('shots_data', { //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
+      mapRef.current?.addSource('shots_data', { //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
         type: 'geojson',
         data: shots_geojson
       });
 
-      mapRef.current.addLayer({
+      mapRef.current?.addLayer({
         id: 'Gun Violence Incidents',
         type: 'circle',
         source: 'shots_data',
@@ -83,12 +85,12 @@ function Map() {
       })
 
       //adding 311 data
-      mapRef.current.addSource('311_data', { //takes even longer than 911 data...
+      mapRef.current?.addSource('311_data', { //takes even longer than 911 data...
         type: 'geojson',
         data: request_geojson //change to non-personal account
       });
 
-      mapRef.current.addLayer({
+      mapRef.current?.addLayer({
         id: '311 Requests',
         type: 'circle',
         source: '311_data',
@@ -103,12 +105,12 @@ function Map() {
       fetch('/data/map_2.geojson')
         .then((response) => response.json())
         .then((geojsonData) => {
-          mapRef.current.addSource('assets', {
+          mapRef.current?.addSource('assets', {
             type: 'geojson',
             data: geojsonData,
           });
 
-          mapRef.current.addLayer({
+          mapRef.current?.addLayer({
             id: 'Community Assets',
             type: 'circle',
             source: 'assets',
@@ -119,7 +121,7 @@ function Map() {
           });
           
           // Retrieve all layers after community-assets is added
-          const mapLayers = mapRef.current.getStyle().layers;
+          const mapLayers = mapRef.current?.getStyle().layers;
           const layerIds = mapLayers
             .filter(layer => layer.type === 'circle') //getting only the layers i've added
             .map(layer => layer.id);
@@ -136,10 +138,19 @@ function Map() {
     //   closeOnClick: true
     // });
 
-    mapRef.current.on('click', 'Community Assets', (e) => { //getting popup text
-        const name = e.features[0].properties['Name'];
-        const alternates = e.features[0].properties['Alternate Names'];
-        const coordinates = e.features[0].geometry['coordinates'].slice();
+    mapRef.current?.on('click', 'Community Assets', (e) => { //getting popup text
+        if (!e.features || e.features.length === 0) return;
+      
+        const name = e.features[0].properties?.['Name'];
+        const alternates = e.features[0].properties?.['Alternate Names'];
+        const geometry = e.features[0].geometry;
+        let coordinates: number[] | undefined;
+
+        if (geometry.type === 'Point') {
+          coordinates = (geometry as GeoJSON.Point).coordinates.slice();
+        }
+
+        if (!name || !coordinates || coordinates.length !== 2) return;
 
         while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
           coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360; //adjusting X coordinate of popup
@@ -148,15 +159,26 @@ function Map() {
         const description = `<strong>${name}</strong><br>${alternates}` //need to figure out better styling for popup
 
         new mapboxgl.Popup()
-          .setLngLat(coordinates)
+          .setLngLat([coordinates[0], coordinates[1]])
           .setHTML(description)
-          .addTo(mapRef.current);
+          .addTo(mapRef.current!);
 
     })
 
-    mapRef.current.on('click', 'Gun Violence Incidents', (e) => { //getting popup text
-        const name = e.features[0].properties['year'];
-        const coordinates = e.features[0].geometry['coordinates'].slice();
+    if (!mapRef.current) return; //if mapRef.current is null, return
+
+    mapRef.current?.on('click', 'Gun Violence Incidents', (e) => { //getting popup text
+        if (!e.features || e.features.length === 0) return;
+
+        const name = e.features[0].properties?.['year'];
+        const geometry = e.features[0].geometry;
+        let coordinates: number[] | undefined;
+
+        if (geometry.type === 'Point') {
+          coordinates = (geometry as GeoJSON.Point).coordinates.slice();
+        }
+
+        if (!name || !coordinates || coordinates.length !== 2) return;
 
         while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
           coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360; //adjusting X coordinate of popup
@@ -165,10 +187,9 @@ function Map() {
         const description = `<strong>${name}</strong>` //need to figure out better styling for popup
 
         new mapboxgl.Popup()
-          .setLngLat(coordinates)
+          .setLngLat([coordinates[0], coordinates[1]])
           .setHTML(description)
-          .addTo(mapRef.current);
-
+          .addTo(mapRef.current!);
     })
 
     mapRef.current.on('click', '311 Requests', (e) => { //getting popup text
