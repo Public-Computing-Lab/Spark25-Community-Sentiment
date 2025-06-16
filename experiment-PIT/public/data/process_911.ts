@@ -1,14 +1,19 @@
 import { getShotsData } from '../../src/api/api.ts';
 
+interface GeoJSON {
+    type: "FeatureCollection",
+    features: GeoJSONFeature[]
+}
+
 interface GeoJSONFeature {
-    type: string,
+    type: "Feature",
     properties: {
         id: number;
         date: string;
         year: number;
     };
     geometry: {
-        type: string;
+        type: "Point";
         coordinates: number[];
     }
 }
@@ -19,7 +24,7 @@ export const processShotsData = async () => {
     try {
          //loading 
         const shots_data = await getShotsData();
-        const shots_geojson = { type: "FeatureCollection", features: [] as GeoJSONFeature[] }; //defining type of array
+        const shots_geojson: GeoJSON = { type: "FeatureCollection", features: [] as GeoJSONFeature[] }; //defining type of array
 
         //converting to GeoJSON
         for (const instance of shots_data){ //using for of instead of for in
