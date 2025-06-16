@@ -1,4 +1,4 @@
-import { Box, Typography, Button } from '@mui/material'
+import { Box, Typography } from '@mui/material'
 import Key from '../components/Key';
 import {useRef, useEffect, useState} from 'react';
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
@@ -132,9 +132,9 @@ function Map() {
     });
 
     //use tooltips [ON CLICK]
-    const popup = new mapboxgl.Popup({
-      closeOnClick: true
-    });
+    // const popup = new mapboxgl.Popup({
+    //   closeOnClick: true
+    // });
 
     mapRef.current.on('click', 'Community Assets', (e) => { //getting popup text
         const name = e.features[0].properties['Name'];
