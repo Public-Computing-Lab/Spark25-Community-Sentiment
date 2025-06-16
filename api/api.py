@@ -805,11 +805,7 @@ def create_gemini_context(
 
         #  add budget data dictionary, filtered budget data, and community assets to the structured context
         if context_request == "structured":
-            files_list = get_files("csv", [
-                "budget_data_dictionary_v1.csv",
-                "budget_filtered.csv",
-                "geocoding-community-assets.csv",
-                ])
+            files_list = get_files("csv")
             preamble_file = context_request + ".txt"
 
         elif context_request == "unstructured":
