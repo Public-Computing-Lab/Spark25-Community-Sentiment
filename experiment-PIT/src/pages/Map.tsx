@@ -21,7 +21,7 @@ function Map() {
   //loading all data
   useEffect(() => {
 
-    mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN; 
     
     if (mapContainerRef.current){
         mapRef.current = new mapboxgl.Map({ //creating map
@@ -68,8 +68,8 @@ function Map() {
         }
       });
     
-      const shots_geojson = await processShotsData();
-      const request_geojson = await process311Data();
+      const shots_geojson = await processShotsData(); //loading shots data from api and converting to geojson
+      const request_geojson = await process311Data(); //loading 311 data from api and converting to geojson
 
       mapRef.current?.addSource('shots_data', { //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
         type: 'geojson',
