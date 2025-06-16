@@ -12,7 +12,7 @@ export async function sendChatMessage(message: string, history: Message[]) {
   const formattedHistory = history.map(message => JSON.stringify(message)).join('\n');
   console.log("history: ", formattedHistory);
   const json = {
-    "client_query": message + "\n Here's the message history to provide context to this request: " + JSON.stringify(formattedHistory),
+    "client_query": JSON.stringify([...formattedHistory, { text: message, sender: "user" }]),
   };
 
   try {
