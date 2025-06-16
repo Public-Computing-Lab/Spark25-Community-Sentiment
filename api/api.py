@@ -169,24 +169,27 @@ class SQLConstants:
     SUM(CASE WHEN MONTH(open_dt) = 12 THEN 1 ELSE 0 END) AS dec_total
     """
 
-    # 311 specific constants
-    BOS311_BASE_WHERE = f"""
+    ##### 311 specific constants #####
+
+    BOS311_BASE_WHERE = "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
+
+    BOS311_SPATIAL_WHERE = f"""
     ST_Contains(
         ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
         coordinates
-    )
+    ) = 1
     """
 
-    # 911 specific constants
-    BOS911_BASE_WHERE_HOMOCIDES = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
+    ##### 911 specific constants #####
 
-    # Only works when coordinates exist (shots fired data)
-    BOS911_BASE_WHERE = f"""
+    BOS911_BASE_WHERE = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
+
+    BOS911_SPATIAL_WHERE = f"""
     year >= 2018 AND year < 2025
     AND ST_Contains(
         ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
         coordinates
-    )
+    ) = 1
     """
 
 
@@ -199,7 +202,15 @@ def build_311_query(
     request_date: str = "",
     request_zipcode: str = "",
     event_ids: str = "",
+    is_spatial = False,
 ) -> str:
+    if is_spatial:
+        Bos311_where_clause = SQLConstants.BOS311_SPATIAL_WHERE
+        Bos911_where_clause = SQLConstants.BOS911_SPATIAL_WHERE
+    else:
+        Bos311_where_clause = SQLConstants.BOS311_BASE_WHERE
+        Bos911_where_clause = SQLConstants.BOS911_BASE_WHERE
+
     if data_request == "311_by_geo" and request_options:
         query = f"""
         SELECT
@@ -216,10 +227,11 @@ def build_311_query(
             END AS normalized_type
         FROM
             bos311_data
-        WHERE
-            type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+        WHERE 
+            type IN ({SQLConstants.CATEGORY_TYPES[request_options]}) 
+            AND {Bos311_where_clause}
         """
+        
         if request_date:
             query += f"""AND DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'"""
 
@@ -234,7 +246,7 @@ def build_311_query(
                 'Category' AS level_type,
                 NULL AS category
             FROM shots_fired_data
-            WHERE {SQLConstants.BOS911_BASE_WHERE}
+            WHERE {Bos911_where_clause}
             AND ballistics_evidence = 1
             GROUP BY year, incident_type
             UNION ALL
@@ -245,7 +257,7 @@ def build_311_query(
                 'Category' AS level_type,
                 NULL AS category
             FROM shots_fired_data
-            WHERE {SQLConstants.BOS911_BASE_WHERE}
+            WHERE {Bos911_where_clause}
             AND ballistics_evidence = 0
             GROUP BY year, incident_type
             UNION ALL
@@ -256,7 +268,7 @@ def build_311_query(
                 'Category' AS level_type,
                 NULL AS category
             FROM homicide_data
-            WHERE {SQLConstants.BOS911_BASE_WHERE_HOMOCIDES}
+            WHERE {SQLConstants.BOS911_BASE_WHERE} # Always uses base where clause because it's pulling from homicide_data, which doesn't have coordinates
             GROUP BY year, incident_type
             UNION ALL
             SELECT
@@ -267,7 +279,7 @@ def build_311_query(
                 NULL AS category
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['trash']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, incident_type
             UNION ALL
             SELECT
@@ -278,7 +290,7 @@ def build_311_query(
                 NULL AS category
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, incident_type
             UNION ALL
             SELECT
@@ -289,7 +301,7 @@ def build_311_query(
                 NULL AS category
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['streets']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, incident_type
             UNION ALL
             SELECT
@@ -300,7 +312,7 @@ def build_311_query(
                 NULL AS category
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['parking']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, incident_type
         ),
         type_details AS (
@@ -312,7 +324,7 @@ def build_311_query(
                 'Type' AS level_type
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['trash']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, type
             UNION ALL
             SELECT
@@ -323,7 +335,7 @@ def build_311_query(
                 'Type' AS level_type
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, type
             UNION ALL
             SELECT
@@ -334,7 +346,7 @@ def build_311_query(
                 'Type' AS level_type
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['streets']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, type
             UNION ALL
             SELECT
@@ -345,7 +357,7 @@ def build_311_query(
                 'Type' AS level_type
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['parking']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, type
         )
         SELECT
@@ -389,6 +401,11 @@ def build_311_query(
             """
         return query
     elif data_request == "311_summary" and event_ids:
+        
+        # Quote each event_id if not already quoted
+        id_list = [f"'{x.strip()}'" for x in event_ids.split(",") if x.strip()]
+        id_str = ",".join(id_list)
+
         query = f"""
         SELECT
         CASE
@@ -400,7 +417,7 @@ def build_311_query(
         type AS subcategory,
         COUNT(*) AS total
         FROM bos311_data
-        WHERE id IN ({event_ids})
+        WHERE id IN ({id_str})
         GROUP BY category, subcategory
         UNION ALL
         SELECT
@@ -413,7 +430,7 @@ def build_311_query(
         'TOTAL' AS subcategory,
         COUNT(*) AS total
         FROM bos311_data
-        WHERE id IN ({event_ids})
+        WHERE id IN ({id_str})
         GROUP BY
         category
         ORDER BY
@@ -440,7 +457,7 @@ def build_311_query(
         WHERE
             DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
             AND type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
         GROUP BY category, subcategory
         UNION ALL
         SELECT
@@ -456,7 +473,7 @@ def build_311_query(
         WHERE
             DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
             AND type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
         GROUP BY
         category
         ORDER BY
@@ -487,7 +504,7 @@ def build_311_query(
         FROM bos311_data
         WHERE
             type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
         GROUP BY category, subcategory
         UNION ALL
         SELECT
@@ -502,7 +519,7 @@ def build_311_query(
         FROM bos311_data
         WHERE
             type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
         GROUP BY
         category
         ORDER BY
@@ -521,9 +538,11 @@ def build_311_query(
         return ""
 
 
-def build_911_query(data_request: str) -> str:
+def build_911_query(data_request: str, is_spatial = False) -> str:
+    Bos911_where_clause = SQLConstants.BOS911_SPATIAL_WHERE if is_spatial else SQLConstants.BOS911_BASE_WHERE
+    
     if data_request == "911_shots_fired":
-        return f"""
+        query = f"""
         SELECT
             id,
             incident_date_time AS date,
@@ -531,13 +550,15 @@ def build_911_query(data_request: str) -> str:
             latitude,
             longitude
         FROM shots_fired_data
-        WHERE {SQLConstants.BOS911_BASE_WHERE}
-        AND latitude IS NOT NULL
-        AND longitude IS NOT NULL
+        WHERE {Bos911_where_clause}
+            AND latitude IS NOT NULL
+            AND longitude IS NOT NULL
         GROUP BY id, date, ballistics_evidence, latitude, longitude;
         """
+        
+        return query
     elif data_request == "911_homicides_and_shots_fired":
-        return """
+        return f"""
         SELECT
             s.id as id,
             h.homicide_date as date,
@@ -788,6 +809,7 @@ def create_gemini_context(
     preamble: str = "",
     generate_cache: bool = True,
     app_version: str = "",
+    is_spatial: bool = False,
 ) -> Union[str, int, bool]:
     # test if cache exists
     if generate_cache:
@@ -822,8 +844,9 @@ def create_gemini_context(
             or context_request == "experiment_pit"
             or context_request == "get_summary"
         ):
-            files_list = get_files("txt") 
-            query = build_311_query(data_request="311_summary_context")
+
+            files_list = get_files("txt")
+            query = build_311_query(data_request="311_summary_context", is_spatial=is_spatial)
             response = get_query_results(query=query, output_type="csv")
 
             content["parts"].append({"text": response.getvalue()})
@@ -1024,6 +1047,7 @@ def route_data_query():
     request_date = request.args.get("date", "")
     data_request = request.args.get("request", "")
     output_type = request.args.get("output_type", "")
+    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
 
     if not data_request:
         return jsonify({"✖ Error": "Missing data_request parameter"}), 400
@@ -1065,10 +1089,11 @@ def route_data_query():
                 request_date=request_date,
                 request_zipcode=request_zipcode,
                 event_ids=event_ids,
+                is_spatial=is_spatial,
             )
 
         elif data_request.startswith("911"):
-            query = build_911_query(data_request=data_request)
+            query = build_911_query(data_request=data_request, is_spatial=is_spatial)
         elif data_request == "zip_geo":
             query = f"""
             SELECT JSON_OBJECT(
@@ -1131,6 +1156,7 @@ def route_data_query():
 def route_chat():
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
+    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
 
     context_request = request.args.get(
         "context_request", request.args.get("request", "")
@@ -1150,6 +1176,7 @@ def route_chat():
         preamble=prompt_preamble,
         generate_cache=True,
         app_version=app_version,
+        is_spatial=is_spatial,
     )
 
     full_prompt = f"User question: {client_query}"
@@ -1209,6 +1236,7 @@ def route_chat():
 def route_chat_context():
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
+    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
 
     context_request = request.args.get(
         "context_request", request.args.get("request", "")
@@ -1227,6 +1255,7 @@ def route_chat_context():
                 preamble="",
                 generate_cache=False,
                 app_version=app_version,
+                is_spatial=is_spatial,
             )
 
             if isinstance(token_count, int):
@@ -1275,6 +1304,7 @@ def route_chat_context():
                 preamble=prompt_preamble,
                 generate_cache=True,
                 app_version=app_version,
+                is_spatial=is_spatial,
             )
 
             log_event(
@@ -1291,6 +1321,8 @@ def chat_summary():
     data = request.get_json()
     messages = data.get("messages", [])
     app_version = request.args.get("app_version", "0")
+    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
+
 
     if not messages:
         return jsonify({"error": "No messages provided."}), 400
@@ -1305,6 +1337,7 @@ def chat_summary():
         preamble="",
         generate_cache=True,
         app_version=app_version,
+        is_spatial=is_spatial,
     )
 
     try:
