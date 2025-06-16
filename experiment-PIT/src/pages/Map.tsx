@@ -21,7 +21,7 @@ function Map() {
   //loading all data
   useEffect(() => {
 
-    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN; 
+    mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
     
     mapRef.current = new mapboxgl.Map({ //creating map
       container: mapContainerRef.current,
