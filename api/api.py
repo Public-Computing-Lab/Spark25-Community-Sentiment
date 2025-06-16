@@ -586,12 +586,15 @@ def get_files(
     file_type: Optional[str] = None, specific_files: Optional[List[str]] = None
 ) -> List[str]:
     """Get a list of files from the datastore directory."""
+    #changing get_files as it was only getting the .txt files, to ensured it would also get community assets csv
     try:
         if not Config.DATASTORE_PATH.exists():
             return []
 
+        files = []
+
         if specific_files:
-            return [
+            files = [
                 f.name
                 for f in Config.DATASTORE_PATH.iterdir()
                 if f.is_file()
@@ -599,8 +602,8 @@ def get_files(
                 and not f.name.startswith(".")
             ]
 
-        if file_type:
-            return [
+        elif file_type:
+            files = [
                 f.name
                 for f in Config.DATASTORE_PATH.iterdir()
                 if f.is_file()
@@ -608,11 +611,18 @@ def get_files(
                 and not f.name.startswith(".")
             ]
 
-        return [
-            f.name
-            for f in Config.DATASTORE_PATH.iterdir()
-            if f.is_file() and not f.name.startswith(".")
-        ]
+        else:
+            files = [
+                f.name
+                for f in Config.DATASTORE_PATH.iterdir()
+                if f.is_file() and not f.name.startswith(".")
+            ]
+        
+        # Ensure geocoding-community-assets.csv is always included
+        if "geocoding-community-assets.csv" not in files:
+            files.append("geocoding-community-assets.csv")
+
+        return files
 
     except Exception as e:
         print(
@@ -812,7 +822,7 @@ def create_gemini_context(
             or context_request == "experiment_pit"
             or context_request == "get_summary"
         ):
-            files_list = get_files("txt")
+            files_list = get_files("txt") 
             query = build_311_query(data_request="311_summary_context")
             response = get_query_results(query=query, output_type="csv")
 
@@ -822,6 +832,7 @@ def create_gemini_context(
 
         # Read contents of found files
         for file in files_list:
+            print("specific file", file)
             file_content = get_file_content(file)
             if file_content is not None:
                 content["parts"].append({"text": file_content})

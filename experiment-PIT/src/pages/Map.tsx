@@ -1,20 +1,27 @@
-import { Box, Typography } from '@mui/material'
+import { Box, Typography, Button } from '@mui/material'
 import Key from '../components/Key';
-import {useRef, useEffect} from 'react';
+import {useRef, useEffect, useState} from 'react';
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { processShotsData } from '../../public/data/process_911';
 import { process311Data } from '../../public/data/process_311';
+import FilterDialog from '../components/FilterDialog';
 
 //besure to install mapbox-gl 
 
 function Map() {
   const mapRef = useRef();
   const mapContainerRef = useRef(); //.current assigns it a value
+  const [layers, setLayers] = useState([]);
+  const [selectedLayers, setSelectedLayer] = useState<string[]>(["Community Assets"]);
+  const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
 
+  
+  //loading all data
   useEffect(() => {
-    mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; //using personal access token for now
+
+    mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
     
     mapRef.current = new mapboxgl.Map({ //creating map
       container: mapContainerRef.current,
@@ -56,8 +63,6 @@ function Map() {
           'line-width': 3,
         }
       });
-
-     
     
       const shots_geojson = await processShotsData();
       const request_geojson = await process311Data();
@@ -68,7 +73,7 @@ function Map() {
       });
 
       mapRef.current.addLayer({
-        id: 'shots_vector',
+        id: 'Gun Violence Incidents',
         type: 'circle',
         source: 'shots_data',
         paint: {
@@ -84,12 +89,13 @@ function Map() {
       });
 
       mapRef.current.addLayer({
-        id: '311_vector',
+        id: '311 Requests',
         type: 'circle',
         source: '311_data',
         paint: {
           'circle-radius': 3,
-          'circle-color': '#FBEC5D',
+          'circle-color': '#FFC300',
+          'circle-opacity': 0.3,
         }
       });
       
@@ -103,7 +109,7 @@ function Map() {
           });
 
           mapRef.current.addLayer({
-            id: 'community-assets',
+            id: 'Community Assets',
             type: 'circle',
             source: 'assets',
             paint: {
@@ -111,16 +117,26 @@ function Map() {
               'circle-color': '#228B22',
             },
           });
-        })
+          
+          // Retrieve all layers after community-assets is added
+          const mapLayers = mapRef.current.getStyle().layers;
+          const layerIds = mapLayers
+            .filter(layer => layer.type === 'circle') //getting only the layers i've added
+            .map(layer => layer.id);
+          setLayers(layerIds);
 
+        })
+        .catch((error) => {
+          console.error('Error fetching community assets:', error);
+        });
     });
 
-    //use mapbox.Popup() for tooltips [ON CLICK]
+    //use tooltips [ON CLICK]
     const popup = new mapboxgl.Popup({
       closeOnClick: true
-    })
+    });
 
-    mapRef.current.on('click', 'community-assets', (e) => { //getting popup text
+    mapRef.current.on('click', 'Community Assets', (e) => { //getting popup text
         const name = e.features[0].properties['Name'];
         const alternates = e.features[0].properties['Alternate Names'];
         const coordinates = e.features[0].geometry['coordinates'].slice();
@@ -137,12 +153,73 @@ function Map() {
           .addTo(mapRef.current);
 
     })
-    
+
+    mapRef.current.on('click', 'Gun Violence Incidents', (e) => { //getting popup text
+        const name = e.features[0].properties['year'];
+        const coordinates = e.features[0].geometry['coordinates'].slice();
+
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+          coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360; //adjusting X coordinate of popup
+        } //may need to give more wiggle room for mobile 
+
+        const description = `<strong>${name}</strong>` //need to figure out better styling for popup
+
+        new mapboxgl.Popup()
+          .setLngLat(coordinates)
+          .setHTML(description)
+          .addTo(mapRef.current);
+
+    })
+
+    mapRef.current.on('click', '311 Requests', (e) => { //getting popup text
+        const year = e.features[0].properties['year'];
+        const type = e.features[0].properties['request_type'];
+        const coordinates = e.features[0].geometry['coordinates'].slice();
+
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+          coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360; //adjusting X coordinate of popup
+        } //may need to give more wiggle room for mobile 
+
+        const description = `<strong>${year}</strong><br>${type}` //need to figure out better styling for popup
+
+        new mapboxgl.Popup()
+          .setLngLat(coordinates)
+          .setHTML(description)
+          .addTo(mapRef.current);
+
+    })
     
     return () => {
       mapRef.current.remove() //removes map after unmounting
     }
   }, []);
+
+  //changing visibility of layers depending on what is checked in filters or not.
+  //NEED TO DETERMINE WHY VISIBILITY FOR COMMUNITY ASSETS ISN'T WORKING
+  useEffect(() => {
+    if (mapRef.current) {
+      layers.forEach((layerId) => {
+        const visibility = selectedLayers.includes(layerId) ? 'visible' : 'none';
+        mapRef.current.setLayoutProperty(layerId, 'visibility', visibility);
+      });
+    }
+  }, [selectedLayers, layers]);
+
+
+  //filtering by years
+  useEffect(() => {
+    if (mapRef.current) {
+      layers.forEach((layerId) => {
+        if (layerId !== "Community Assets"){ //excluding filtering on community assets
+          mapRef.current.setFilter(layerId, [
+            "all",
+            [">=", "year", selectedYears[0]],
+            ["<=", "year", selectedYears[selectedYears.length - 1]],
+          ]);
+        }
+      })
+    }
+  }, [selectedYears, layers])
 
 
   return (
@@ -176,6 +253,8 @@ function Map() {
       <Box sx={{mb: 3, position: 'absolute', left: '5', top: '4em'}}>
           <Key />
       </Box>
+      <FilterDialog layers={layers} onSelectionChange={setSelectedLayer} onSliderChange={setSelectedYears}/>
+      
     </Box>
     
   )
