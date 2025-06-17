@@ -63,7 +63,7 @@ function Chat() {
     setIsSending(true);
 
     try {
-      const data = await sendChatMessage(userMsg, messages);
+      const data = await sendChatMessage(userMsg, messages, true);
       setMessages((prev) => [
         ...prev,
         {
@@ -95,7 +95,8 @@ function Chat() {
   };
 
   const handleExportSummary = async () => {
-    const summary = await getChatSummary(messages);
+    const summary = await getChatSummary(messages, true);
+
     if (summary === "Summary generation failed.") {
       setSummaryError(true);
       return;
