@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useRef } from 'react';
-import mapboxgl from 'mapbox-gl';
 
 interface MapContextType {
     mapRef: React.RefObject<mapboxgl.Map | null>;
