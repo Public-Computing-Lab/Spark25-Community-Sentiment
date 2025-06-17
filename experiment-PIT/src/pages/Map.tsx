@@ -1,21 +1,27 @@
-import { Box, Typography } from '@mui/material'
+import { Box, Typography, IconButton } from '@mui/material'
 import Key from '../components/Key';
-import {useRef, useEffect, useState} from 'react';
+import { useMap } from "../components/MapProvider";
+import { useEffect, useState} from 'react';
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { processShotsData } from '../../public/data/process_911';
 import { process311Data } from '../../public/data/process_311';
 import FilterDialog from '../components/FilterDialog';
-
+import LayersClearIcon from '@mui/icons-material/LayersClear';
 //besure to install mapbox-gl 
 
 function Map() {
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const mapContainerRef = useRef<HTMLDivElement | null>(null); //.current assigns it a value
+  const { mapRef, mapContainerRef } = useMap(); // Access mapRef and mapContainerRef from context
+
   const [layers, setLayers] = useState<string[]>([]);
   const [selectedLayers, setSelectedLayer] = useState<string[]>(["Community Assets"]);
   const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
+
+  const handleMapClear = () => {
+    //need to implement, what do we want to see?
+    
+  }
 
   
   //loading all data
@@ -32,7 +38,6 @@ function Map() {
         style: "mapbox://styles/mapbox/light-v11", //should decide on style
       });
     }
-    
 
     //adding initial map annotations
     mapRef.current?.on('load', async () => { //made async in order to be able to load shots data
@@ -198,9 +203,17 @@ function Map() {
     })
     
     return () => {
-      mapRef.current?.remove() //removes map after unmounting
+
     }
   }, []);
+
+  useEffect(() => {
+    if(mapRef){
+       setTimeout(()=> {
+      mapRef.current?.resize()
+    }, 10)
+    }
+  })
 
   //changing visibility of layers depending on what is checked in filters or not.
   useEffect(() => {
@@ -243,16 +256,31 @@ function Map() {
         p: 2,
       }}
     >
-      <Typography variant="h4" component="h1" mb={2}> 
-          Map View
-      </Typography>
+      <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 2,
+          }}
+        >
+          <Typography variant="h4" component="h1">
+            Map
+          </Typography>
+          <IconButton
+            aria-label="Clear Map"
+            onClick={handleMapClear}
+          >
+            <LayersClearIcon/>
+          </IconButton>
+      </Box>
       
       <Box sx={{ //element rendering the map
         left: '0', 
         top: '0', 
         flex: 1, 
         width: '100%',
-        height: '100%',
+        height: `calc(100vh - ${BOTTOM_NAV_HEIGHT}px)`,
         position: 'relative',
       }}
         ref={mapContainerRef}
