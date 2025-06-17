@@ -1,13 +1,19 @@
 import { getShotsData } from '../../src/api/api.ts';
 
+interface GeoJSON {
+    type: "FeatureCollection",
+    features: GeoJSONFeature[]
+}
+
 interface GeoJSONFeature {
-    type: string,
+    type: "Feature",
     properties: {
         id: number;
         date: string;
+        year: number;
     };
     geometry: {
-        type: string;
+        type: "Point";
         coordinates: number[];
     }
 }
@@ -17,15 +23,16 @@ export const processShotsData = async () => {
    
     try {
          //loading 
-        const shots_data = await getShotsData();
-        const shots_geojson = { type: "FeatureCollection", features: [] as GeoJSONFeature[] }; //defining type of array
+        const shots_data = await getShotsData(undefined, true);
+        const shots_geojson: GeoJSON = { type: "FeatureCollection", features: [] as GeoJSONFeature[] }; //defining type of array
 
         //converting to GeoJSON
         for (const instance of shots_data){ //using for of instead of for in
             const shot_id = instance.id;
             const shot_latitude = instance.latitude;
             const shot_longitude = instance.longitude;
-            const shot_date = instance.date;
+            const shot_date = new Date(instance.date);
+            const shot_year = shot_date.getFullYear();
             //const shot_ballistics = instance.ballistics_evidence
             //include ballistics evidence?
 
@@ -33,7 +40,8 @@ export const processShotsData = async () => {
                 "type": "Feature",
                 "properties": {
                     id: shot_id,
-                    date: shot_date,
+                    date: shot_date.toLocaleString("en"),
+                    year: shot_year,
                     //ballistics: shot_ballistics,
                 },
                 "geometry": {

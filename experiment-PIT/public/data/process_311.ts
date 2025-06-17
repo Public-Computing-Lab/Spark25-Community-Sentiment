@@ -1,14 +1,20 @@
 import { get311Data } from '../../src/api/api.ts';
 
+interface GeoJSON {
+    type: "FeatureCollection",
+    features: GeoJSONFeature[]
+}
+
 interface GeoJSONFeature {
-    type: string,
+    type: "Feature",
     properties: {
         id: number;
         request_type: string,
         date: string;
+        year: number;
     };
     geometry: {
-        type: string;
+        type: "Point";
         coordinates: number[];
     }
 }
@@ -16,8 +22,8 @@ interface GeoJSONFeature {
 export const process311Data = async () => {
     try {
          //loading 
-        const request_data = await get311Data();
-        const request_geojson = { type: "FeatureCollection", features: [] as GeoJSONFeature[] }; //defining type of array
+        const request_data = await get311Data(undefined, undefined, true);
+        const request_geojson: GeoJSON = { type: "FeatureCollection", features: [] as GeoJSONFeature[] }; //defining type of array
 
         //converting to geojson
         for (const instance of request_data){
@@ -25,14 +31,16 @@ export const process311Data = async () => {
             const request_type = instance.type;
             const request_latitude = instance.latitude;
             const request_longitude = instance.longitude;
-            const request_date = instance.date;
+            const request_date = new Date(instance.date);
+            const request_year = request_date.getFullYear();
 
             request_geojson.features.push({
                 "type": "Feature",
                 "properties": {
                     id: request_id,
                     request_type: request_type,
-                    date: request_date,
+                    date: request_date.toLocaleString("en"),
+                    year: request_year,
                 },
                 "geometry": {
                     "type": "Point",
