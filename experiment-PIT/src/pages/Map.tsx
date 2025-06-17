@@ -21,7 +21,7 @@ function Map() {
   //loading all data
   useEffect(() => {
 
-    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN; 
+    mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
     
     if (mapContainerRef.current){
         mapRef.current = new mapboxgl.Map({ //creating map
@@ -67,6 +67,30 @@ function Map() {
           'line-width': 3,
         }
       });
+
+        // Fetching and adding community assets
+      fetch(`${import.meta.env.BASE_URL}data/map_2.geojson`)
+        .then((response) => response.json())
+        .then((geojsonData) => {
+          mapRef.current?.addSource('assets', {
+            type: 'geojson',
+            data: geojsonData,
+          });
+
+          mapRef.current?.addLayer({
+            id: 'Community Assets',
+            type: 'circle',
+            source: 'assets',
+            paint: {
+              'circle-radius': 5,
+              'circle-color': '#228B22',
+            },
+          });
+          
+        })
+        .catch((error) => {
+          console.error('Error fetching community assets:', error);
+        });
     
       const shots_geojson = await processShotsData(); //loading shots data from api and converting to geojson
       const request_geojson = await process311Data(); //loading 311 data from api and converting to geojson
@@ -103,38 +127,15 @@ function Map() {
         }
       });
       
-       // Fetching and adding community assets
-      fetch('/data/map_2.geojson')
-        .then((response) => response.json())
-        .then((geojsonData) => {
-          mapRef.current?.addSource('assets', {
-            type: 'geojson',
-            data: geojsonData,
-          });
 
-          mapRef.current?.addLayer({
-            id: 'Community Assets',
-            type: 'circle',
-            source: 'assets',
-            paint: {
-              'circle-radius': 5,
-              'circle-color': '#228B22',
-            },
-          });
-          
-          // Retrieve all layers after community-assets is added
-          const mapLayers = mapRef.current?.getStyle().layers;
-          const layerIds = mapLayers
-            ? mapLayers
-                .filter(layer => layer.type === 'circle') //getting only the layers i've added
-                .map(layer => layer.id)
-            : [];
-          setLayers(layerIds);
-
-        })
-        .catch((error) => {
-          console.error('Error fetching community assets:', error);
-        });
+      // Retrieve all layers after community-assets is added
+      const mapLayers = mapRef.current?.getStyle().layers;
+      const layerIds = mapLayers
+        ? mapLayers
+            .filter(layer => layer.type === 'circle') //getting only the layers i've added
+            .map(layer => layer.id)
+        : [];
+      setLayers(layerIds);
     });
 
     mapRef.current?.on('click', 'Community Assets', (e) => { //getting popup text
@@ -202,7 +203,6 @@ function Map() {
   }, []);
 
   //changing visibility of layers depending on what is checked in filters or not.
-  //NEED TO DETERMINE WHY VISIBILITY FOR COMMUNITY ASSETS ISN'T WORKING
   useEffect(() => {
     if (mapRef.current) {
       layers.forEach((layerId) => {
