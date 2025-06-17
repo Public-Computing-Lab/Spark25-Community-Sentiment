@@ -6,5 +6,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '127.0.0.1'
-  }
+  },
+  base: '/experimenting/8/', // Set the base path for deployed app
+  build: {
+    outDir: process.env.BUILD_PATH || 'dist', // Use BUILD_PATH from .env or default to 'dist'
+  },
 })
