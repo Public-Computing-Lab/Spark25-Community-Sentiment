@@ -1,58 +1,61 @@
-import { Box, Typography } from "@mui/material";
+import React from "react";
+import Box from "@mui/material/Box";
 import MapBase from "./MapBase";
-import { Link } from "react-router-dom";
+import type {
+  Feature,
+  Geometry,
+  GeoJsonProperties,
+  FeatureCollection,
+} from "geojson";
+import type { Layer } from "mapbox-gl";
 
-type ChatMapPreviewProps = {
-  streetName: string;
-  lat: number;
-  lon: number;
-  showLayers: {
-    shots?: boolean;
-    data311?: boolean;
-    assets?: boolean;
-  };
-};
-
-function ChatMapPreview({
-  streetName,
-  lat,
-  lon,
-  showLayers,
-}: ChatMapPreviewProps) {
-  return (
-    <Link
-      to={`/map?lat=${lat}&lon=${lon}&layers=${Object.keys(showLayers).join(
-        ","
-      )}`}
-      style={{ textDecoration: "none" }}
-    >
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          p: 1,
-          bgcolor: "background.paper",
-          borderRadius: 2,
-          boxShadow: 1,
-          maxWidth: "300px",
-          cursor: "pointer",
-          "&:hover": {
-            boxShadow: 4,
-          },
-        }}
-      >
-        <Typography variant="caption" sx={{ mb: 0.5 }}>
-          Map preview: {streetName}
-        </Typography>
-        <MapBase
-          center={[lon, lat]}
-          zoom={15}
-          showLayers={showLayers}
-          height="200px"
-        />
-      </Box>
-    </Link>
-  );
+interface ChatMapPreviewProps {
+  center: [number, number];
+  layers: Feature<Geometry, GeoJsonProperties>[]; // raw features passed from chat response
 }
+
+const ChatMapPreview: React.FC<ChatMapPreviewProps> = ({ center, layers }) => {
+  const featureCollection: FeatureCollection<Geometry, GeoJsonProperties> = {
+    type: "FeatureCollection",
+    features: layers,
+  };
+
+  const previewLayer: Layer = {
+    id: "chat-preview-layer",
+    type: "circle",
+    source: "chat-preview",
+    paint: {
+      "circle-radius": 6,
+      "circle-color": "#1976d2",
+      "circle-stroke-color": "#fff",
+      "circle-stroke-width": 2,
+    },
+  };
+
+  const mapLayers = [
+    {
+      id: "chat-preview",
+      data: featureCollection,
+      layer: previewLayer,
+    },
+  ];
+
+  return (
+    <Box
+      sx={{
+        width: "100%",
+        height: 300,
+        borderRadius: 2,
+        overflow: "hidden",
+        mt: 1,
+        boxShadow: 2,
+        border: "1px solid",
+        borderColor: "divider",
+      }}
+    >
+      <MapBase center={center} layers={mapLayers} />
+    </Box>
+  );
+};
 
 export default ChatMapPreview;
