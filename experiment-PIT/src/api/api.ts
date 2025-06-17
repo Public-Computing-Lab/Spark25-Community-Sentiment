@@ -21,14 +21,15 @@ export async function sendChatMessage(message: string, history: Message[], is_sp
       headers: header
     });
     
-    console.log("✅ Response status:", response.status);
-    console.log("🧾 Response data:", response.data);
-
     if (response.data != "No locations found.") {
       const locations = response.data
     } else {
       const locations = {}
     }
+
+    console.log("✅ Response status:", response.status);
+    console.log("🧾 Response data:", response.data);
+
 
   } catch (error: any) {
     if (axios.isAxiosError(error)) {
@@ -86,6 +87,7 @@ export async function getChatSummary(messages: Message[], is_spatial: boolean = 
   
   try {
     const response = await axios.post(url, {messages}, {headers: header});
+    console.log(response.data.summary);
     return response.data.summary;
   } catch (error) {
     console.error("Failed to get chat summary:", error);

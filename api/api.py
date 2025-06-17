@@ -825,7 +825,11 @@ def create_gemini_context(
                 == "APP_VERSION_" + app_version + "_REQUEST_" + context_request
                 and cache.model == Config.GEMINI_MODEL
             ):
-                return cache.name
+                if context_request == "identify_places":
+                    genai_client.caches.delete(name=cache.name)
+                    print("cache deleted")
+                else:
+                    return cache.name
 
     try:
         files_list = []
@@ -848,8 +852,6 @@ def create_gemini_context(
             or context_request == "experiment_6"
             or context_request == "experiment_7"
             or context_request == "experiment_pit"
-            or context_request == "get_summary"
-            or context_request == "identify_places"
         ):
 
             files_list = get_files("txt")
@@ -860,6 +862,8 @@ def create_gemini_context(
 
             content["parts"].append({"text": response.getvalue()})
 
+            preamble_file = context_request + ".txt"
+        elif context_request == "identify_places" or context_request == "get_summary":
             preamble_file = context_request + ".txt"
 
         # Read contents of found files
@@ -1377,7 +1381,8 @@ def identify_places():
 
     try:
         places = get_gemini_response(prompt=message, cache_name=cache_name)
-        return places
+        print(places)
+        return jsonify(places)
 
     except Exception as e:
         print(f"✖ Error identifying places: {e}")

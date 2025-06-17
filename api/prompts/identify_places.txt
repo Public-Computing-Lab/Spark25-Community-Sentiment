@@ -6,7 +6,7 @@ For each location, return a JSON object containing:
 - type: either "specific" (a known place that can be directly geocoded) or "vague" (a general or relative reference that requires contextual resolution)
 - reference (optional): for vague locations, include a nearby reference point mentioned in the phrase (e.g., “Ashmont” in “the park near Ashmont”)
 
-Format your response as JSON, like this:
+Format your response like this:
 
 {
   "locations": [
@@ -22,5 +22,6 @@ Format your response as JSON, like this:
   ]
 }
 
+Don't wrap with backticks or use markdown to create a code block, just use this formatting in plaintext.
 Do not generate coordinates or any other metadata. Only extract and classify location names from the user message.
 If there are no locations, say "No locations found." Nothing else, just this phrase.
