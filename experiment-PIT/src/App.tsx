@@ -4,10 +4,12 @@ import Navbar from "./components/Navbar";
 import Chat from "./pages/Chat";
 // import Home from "./pages/Home";
 import Map from "./pages/Map";
+import { MapProvider } from './components/MapProvider'
 
 function App() {
+
   return (
-    <>
+    <MapProvider>
       <CssBaseline />
       <Box
         sx={{
@@ -21,16 +23,16 @@ function App() {
         {/* Main content grows to fill available space */}
         <Box component="main" sx={{ flexGrow: 1 }}>
           <Routes>
-            {/* <Route path="/" element={<Template />} /> */}
+            {/* <Route path="/" element={<Navigate to="/experimenting/8" replace />} /> */}
             <Route path="/" element={<Chat />} />
             <Route path="/map" element={<Map />} />
           </Routes>
         </Box>
-
         {/* Navbar sticks at bottom */}
         <Navbar />
       </Box>
-    </>
+    </MapProvider>
+    
   );
 }
 
