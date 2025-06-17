@@ -31,7 +31,7 @@ function FilterDialog({
     });
   };
 
-  const handleSelectYears = (_event: Event, newValues: number[]) => {
+  const handleSelectYears = (event: Event, newValues: number[]) => {
     setSelectedYears(() => {
       onSliderChange(newValues);
       console.log(newValues);

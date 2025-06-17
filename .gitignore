@@ -90,5 +90,7 @@ api/datastore/*
 **/data/.gitkeep
 !api/datastore/.gitkeep 
 !api/datastore/geocoding-community-assets.csv
+!api/datastore/budget_data_dictionary_v1.txt
+!api/datastore/budget_filtered.txt
 !api/*.sql
 !setup/*.sql
