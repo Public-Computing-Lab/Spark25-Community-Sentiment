@@ -7,15 +7,53 @@ const header = {
   }
 
 export async function sendChatMessage(message: string, history: Message[], is_spatial: boolean = false) {
-  const url = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False&is_spatial=${is_spatial ? 'true' : 'false'}`
-  
-  const formattedHistory = history.map(message => JSON.stringify(message)).join('\n');
-  console.log("history: ", formattedHistory);
-  const json = {
-    "client_query": JSON.stringify([...formattedHistory, { text: message, sender: "user" }]),
-  };
 
+  // Get all locations 
   try {
+    const url = `${import.meta.env.VITE_BASE_URL}/chat/identify_places?request=identify_places&app_version=0.7.0&structured_response=False&is_spatial=${is_spatial ? 'true' : 'false'}`
+    const payload = {"message": message}
+
+    console.log("➡️ Sending POST to:", url);
+    console.log("📦 Payload:", payload);
+    console.log("header: ", header);
+    
+    const response = await axios.post(url, payload, {
+      headers: header
+    });
+    
+    console.log("✅ Response status:", response.status);
+    console.log("🧾 Response data:", response.data);
+
+    if (response.data != "No locations found.") {
+      const locations = response.data
+    } else {
+      const locations = {}
+    }
+
+  } catch (error: any) {
+    if (axios.isAxiosError(error)) {
+      console.error("❌ Axios error sending chat message:", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+    } else {
+      console.error("❌ Unknown error sending chat message:", error);
+    }
+
+    throw error;
+  }
+
+  // Send chat message with history
+  try {
+    const url = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False&is_spatial=${is_spatial ? 'true' : 'false'}`
+  
+    const formattedHistory = history.map(message => JSON.stringify(message)).join('\n');
+    console.log("history: ", formattedHistory);
+    const json = {
+      "client_query": JSON.stringify([...formattedHistory, { text: message, sender: "user" }]),
+    };
+  
     console.log("➡️ Sending POST to:", url);
     console.log("📦 Payload:", json);
     console.log("header: ", header);
