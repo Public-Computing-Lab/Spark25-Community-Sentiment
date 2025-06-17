@@ -4,14 +4,14 @@ function Key() {
     return (
         <Box sx={{
             maxWidth: "40vw",
-            width: "30vw",
-            height: "15vh",
+            width: "40vw",
+            height: "20vh",
             bgcolor: 'white',
             boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
             '&:hover': {
                  boxShadow: "0 2px 4px rgba(0, 0, 0, 0.4)",
             },
-            borderRadius: 3,
+            borderRadius: 7,
             borderWidth: 3,
             margin: '1em',
         }}>
