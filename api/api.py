@@ -171,7 +171,9 @@ class SQLConstants:
 
     ##### 311 specific constants #####
 
-    BOS311_BASE_WHERE = "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
+    BOS311_BASE_WHERE = (
+        "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
+    )
 
     BOS311_SPATIAL_WHERE = f"""
     ST_Contains(
@@ -202,7 +204,7 @@ def build_311_query(
     request_date: str = "",
     request_zipcode: str = "",
     event_ids: str = "",
-    is_spatial = False,
+    is_spatial=False,
 ) -> str:
     if is_spatial:
         Bos311_where_clause = SQLConstants.BOS311_SPATIAL_WHERE
@@ -231,7 +233,7 @@ def build_311_query(
             type IN ({SQLConstants.CATEGORY_TYPES[request_options]}) 
             AND {Bos311_where_clause}
         """
-        
+
         if request_date:
             query += f"""AND DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'"""
 
@@ -401,7 +403,7 @@ def build_311_query(
             """
         return query
     elif data_request == "311_summary" and event_ids:
-        
+
         # Quote each event_id if not already quoted
         id_list = [f"'{x.strip()}'" for x in event_ids.split(",") if x.strip()]
         id_str = ",".join(id_list)
@@ -538,9 +540,13 @@ def build_311_query(
         return ""
 
 
-def build_911_query(data_request: str, is_spatial = False) -> str:
-    Bos911_where_clause = SQLConstants.BOS911_SPATIAL_WHERE if is_spatial else SQLConstants.BOS911_BASE_WHERE
-    
+def build_911_query(data_request: str, is_spatial=False) -> str:
+    Bos911_where_clause = (
+        SQLConstants.BOS911_SPATIAL_WHERE
+        if is_spatial
+        else SQLConstants.BOS911_BASE_WHERE
+    )
+
     if data_request == "911_shots_fired":
         query = f"""
         SELECT
@@ -555,7 +561,7 @@ def build_911_query(data_request: str, is_spatial = False) -> str:
             AND longitude IS NOT NULL
         GROUP BY id, date, ballistics_evidence, latitude, longitude;
         """
-        
+
         return query
     elif data_request == "911_homicides_and_shots_fired":
         return f"""
@@ -607,7 +613,7 @@ def get_files(
     file_type: Optional[str] = None, specific_files: Optional[List[str]] = None
 ) -> List[str]:
     """Get a list of files from the datastore directory."""
-    #changing get_files as it was only getting the .txt files, to ensured it would also get community assets csv
+    # changing get_files as it was only getting the .txt files, to ensured it would also get community assets csv
     try:
         if not Config.DATASTORE_PATH.exists():
             return []
@@ -638,7 +644,7 @@ def get_files(
                 for f in Config.DATASTORE_PATH.iterdir()
                 if f.is_file() and not f.name.startswith(".")
             ]
-        
+
         # Ensure geocoding-community-assets.csv is always included
         if "geocoding-community-assets.csv" not in files:
             files.append("geocoding-community-assets.csv")
@@ -843,10 +849,13 @@ def create_gemini_context(
             or context_request == "experiment_7"
             or context_request == "experiment_pit"
             or context_request == "get_summary"
+            or context_request == "identify_places"
         ):
 
             files_list = get_files("txt")
-            query = build_311_query(data_request="311_summary_context", is_spatial=is_spatial)
+            query = build_311_query(
+                data_request="311_summary_context", is_spatial=is_spatial
+            )
             response = get_query_results(query=query, output_type="csv")
 
             content["parts"].append({"text": response.getvalue()})
@@ -1323,7 +1332,6 @@ def chat_summary():
     app_version = request.args.get("app_version", "0")
     is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
 
-
     if not messages:
         return jsonify({"error": "No messages provided."}), 400
 
@@ -1346,6 +1354,33 @@ def chat_summary():
 
     except Exception as e:
         print(f"✖ Error summarizing chat: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/chat/identify_places", methods=["POST"])
+def identify_places():
+    data = request.get_json()
+    message = data.get("message", [])
+    app_version = request.args.get("app_version", "0")
+    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
+
+    if not message:
+        return jsonify({"error": "No message provided."}), 400
+
+    cache_name = create_gemini_context(
+        context_request="identify_places",
+        preamble="",
+        generate_cache=True,
+        app_version=app_version,
+        is_spatial=is_spatial,
+    )
+
+    try:
+        places = get_gemini_response(prompt=message, cache_name=cache_name)
+        return places
+
+    except Exception as e:
+        print(f"✖ Error identifying places: {e}")
         return jsonify({"error": str(e)}), 500
 
 
