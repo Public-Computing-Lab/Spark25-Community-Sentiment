@@ -23,7 +23,6 @@ function Map() {
     
   }
 
-  
   //loading all data
   useEffect(() => {
 
@@ -206,14 +205,6 @@ function Map() {
 
     }
   }, []);
-
-  useEffect(() => {
-    if(mapRef){
-       setTimeout(()=> {
-      mapRef.current?.resize()
-    }, 10)
-    }
-  })
 
   //changing visibility of layers depending on what is checked in filters or not.
   useEffect(() => {
