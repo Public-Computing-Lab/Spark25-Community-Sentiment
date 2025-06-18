@@ -71,7 +71,10 @@ def _find_location_in_message(message: str, all_locations: list) -> Optional[Dic
     message_normalized = _normalize_text(message)
     proximity_triggers = ['near', 'around', 'nearby', 'by', 'close to', 'within']
     is_near_query = any(tok in message_normalized for tok in proximity_triggers)
-
+    
+    best_match = None
+    best_score = 0
+    
     for loc in all_locations:
         raw_name = loc['name']
         loc_norm = _normalize_text(raw_name)
@@ -80,14 +83,19 @@ def _find_location_in_message(message: str, all_locations: list) -> Optional[Dic
         for n in range(len(tokens), 0, -1):
             prefix = ' '.join(tokens[:n])
             if prefix in message_normalized:
-                return {
-                    'name': raw_name,
-                    'lat': loc['lat'],
-                    'lon': loc['lon'],
-                    'is_near_query': is_near_query
-                }
-
-    return None
+                # Score based on how much of the location name matched
+                score = len(prefix) / len(loc_norm)
+                if score > best_score:
+                    best_score = score
+                    best_match = {
+                        'name': raw_name,
+                        'lat': loc['lat'],
+                        'lon': loc['lon'],
+                        'is_near_query': is_near_query
+                    }
+                break  # Don't check shorter prefixes for this location
+    
+    return best_match
 
 def _extract_intent(message: str) -> str:
     try:
