@@ -137,7 +137,7 @@ function Chat() {
           }}
         >
           <Typography variant="h4" component="h1">
-            Chat with Us
+            On The Porch
           </Typography>
           <Box>
             <IconButton
