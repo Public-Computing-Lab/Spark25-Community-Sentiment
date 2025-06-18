@@ -171,7 +171,10 @@ class SQLConstants:
 
     ##### 311 specific constants #####
 
-    BOS311_BASE_WHERE = "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
+    BOS311_BASE_WHERE = (
+        "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
+    )
+
 
     BOS311_SPATIAL_WHERE = f"""
     ST_Contains(
@@ -202,7 +205,9 @@ def build_311_query(
     request_date: str = "",
     request_zipcode: str = "",
     event_ids: str = "",
-    is_spatial = False,
+
+    is_spatial=False,
+
 ) -> str:
     if is_spatial:
         Bos311_where_clause = SQLConstants.BOS311_SPATIAL_WHERE
@@ -231,7 +236,8 @@ def build_311_query(
             type IN ({SQLConstants.CATEGORY_TYPES[request_options]}) 
             AND {Bos311_where_clause}
         """
-        
+
+
         if request_date:
             query += f"""AND DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'"""
 
@@ -401,7 +407,9 @@ def build_311_query(
             """
         return query
     elif data_request == "311_summary" and event_ids:
-        
+
+
+
         # Quote each event_id if not already quoted
         id_list = [f"'{x.strip()}'" for x in event_ids.split(",") if x.strip()]
         id_str = ",".join(id_list)
@@ -538,9 +546,14 @@ def build_311_query(
         return ""
 
 
-def build_911_query(data_request: str, is_spatial = False) -> str:
-    Bos911_where_clause = SQLConstants.BOS911_SPATIAL_WHERE if is_spatial else SQLConstants.BOS911_BASE_WHERE
-    
+
+def build_911_query(data_request: str, is_spatial=False) -> str:
+    Bos911_where_clause = (
+        SQLConstants.BOS911_SPATIAL_WHERE
+        if is_spatial
+        else SQLConstants.BOS911_BASE_WHERE
+    )
+
     if data_request == "911_shots_fired":
         query = f"""
         SELECT
@@ -555,7 +568,7 @@ def build_911_query(data_request: str, is_spatial = False) -> str:
             AND longitude IS NOT NULL
         GROUP BY id, date, ballistics_evidence, latitude, longitude;
         """
-        
+
         return query
     elif data_request == "911_homicides_and_shots_fired":
         return f"""
@@ -607,7 +620,7 @@ def get_files(
     file_type: Optional[str] = None, specific_files: Optional[List[str]] = None
 ) -> List[str]:
     """Get a list of files from the datastore directory."""
-    #changing get_files as it was only getting the .txt files, to ensured it would also get community assets csv
+    # changing get_files as it was only getting the .txt files, to ensured it would also get community assets csv
     try:
         if not Config.DATASTORE_PATH.exists():
             return []
@@ -638,7 +651,7 @@ def get_files(
                 for f in Config.DATASTORE_PATH.iterdir()
                 if f.is_file() and not f.name.startswith(".")
             ]
-        
+
         # Ensure geocoding-community-assets.csv is always included
         if "geocoding-community-assets.csv" not in files:
             files.append("geocoding-community-assets.csv")
@@ -782,12 +795,14 @@ def get_gemini_response(
         model = Config.GEMINI_MODEL
         if structured_response is True:
             config = types.GenerateContentConfig(
-                cached_content=cache_name,
+                cached_content=cache_name if cache_name else None,
                 response_schema=list[Structured_Data],
                 response_mime_type="application/json",
             )
         else:
-            config = types.GenerateContentConfig(cached_content=cache_name)
+            config = types.GenerateContentConfig(
+                cached_content=cache_name if cache_name else None
+            )
 
         # Direct synchronous call instead of asyncio.to_thread
         response = genai_client.models.generate_content(
@@ -819,6 +834,7 @@ def create_gemini_context(
                 == "APP_VERSION_" + app_version + "_REQUEST_" + context_request
                 and cache.model == Config.GEMINI_MODEL
             ):
+
                 return cache.name
 
     try:
@@ -842,10 +858,14 @@ def create_gemini_context(
             or context_request == "experiment_6"
             or context_request == "experiment_7"
             or context_request == "experiment_pit"
-            or context_request == "get_summary"
         ):
+
+
             files_list = get_files("txt")
-            query = build_311_query(data_request="311_summary_context", is_spatial=is_spatial)
+            query = build_311_query(
+                data_request="311_summary_context", is_spatial=is_spatial
+            )
+
             response = get_query_results(query=query, output_type="csv")
 
             content["parts"].append({"text": response.getvalue()})
@@ -1319,32 +1339,76 @@ def route_chat_context():
 def chat_summary():
     data = request.get_json()
     messages = data.get("messages", [])
-    app_version = request.args.get("app_version", "0")
-    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
+
 
 
     if not messages:
         return jsonify({"error": "No messages provided."}), 400
 
+    # Create chat_transcript from messages
     chat_transcript = "\n".join(
         f"{'User' if msg['sender'] == 'user' else 'Chat'}: {msg['text']}"
         for msg in messages
     )
 
-    cache_name = create_gemini_context(
-        context_request="get_summary",
-        preamble="",
-        generate_cache=True,
-        app_version=app_version,
-        is_spatial=is_spatial,
-    )
+    summary_file_path = "./prompts/get_summary.txt"
 
+    # Read the content from the get_summary.txt file
     try:
-        summary = get_gemini_response(prompt=chat_transcript, cache_name=cache_name)
+        with open(summary_file_path, "r") as file:
+            file_content = file.read()
+
+
+        # Combine the file content with the chat transcript to form the full prompt
+        full_prompt = f"{file_content}\n{chat_transcript}"
+
+    except FileNotFoundError:
+        return jsonify({"error": "Summary prompt not found."}), 404
+    except Exception as e:
+        print(f"✖ Error reading summary prompt file: {e}")
+        return jsonify({"error": str(e)}), 500
+
+    # Call the Gemini response function with the combined full_prompt
+    try:
+        summary = get_gemini_response(prompt=full_prompt, cache_name=None)
         return jsonify({"summary": summary})
 
     except Exception as e:
         print(f"✖ Error summarizing chat: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/chat/identify_places", methods=["POST"])
+def identify_places():
+    data = request.get_json()
+    message = data.get("message", [])
+
+    if not message:
+        return jsonify({"error": "No message provided."}), 400
+
+    prompt_file_path = "./prompts/identify_places.txt"
+
+    # Read the content from identify_places.txt
+    try:
+        with open(prompt_file_path, "r") as file:
+            file_content = file.read()
+
+        # Combine the file content with the message to form the full prompt
+        full_prompt = f"{file_content}\n{message}"
+
+    except FileNotFoundError:
+        return jsonify({"error": "Prompt file not found."}), 404
+    except Exception as e:
+        print(f"✖ Error reading prompt file: {e}")
+        return jsonify({"error": str(e)}), 500
+
+    # Call the Gemini response function with the combined full_prompt
+    try:
+        places = get_gemini_response(prompt=full_prompt, cache_name=None)
+        return jsonify(places)
+
+    except Exception as e:
+        print(f"✖ Error identifying places: {e}")
         return jsonify({"error": str(e)}), 500
 
 

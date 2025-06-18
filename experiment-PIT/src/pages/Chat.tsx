@@ -63,15 +63,23 @@ function Chat() {
     setIsSending(true);
 
     try {
+
+      // Call backend API helper to get AI response
       const data = await sendChatMessage(userMsg, messages, true);
-      setMessages((prev) => [
-        ...prev,
-        {
-          text: data.response ?? "Sorry, no response from server.",
-          sender: "Gemini",
-        },
-      ]);
-    } catch {
+
+      // Append backend response to messages
+      if (data.response) {
+        setMessages((prev) => [
+          ...prev,
+          { text: data.response, sender: "Gemini" },
+        ]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          { text: "Sorry, no response from server.", sender: "Gemini" },
+        ]);
+      }
+    } catch (error) {
       setMessages((prev) => [
         ...prev,
         {
@@ -138,12 +146,14 @@ function Chat() {
             color: "#fff",
           }}
         >
+
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <RoomIcon fontSize="small" />
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
               Chat with Us
             </Typography>
           </Box>
+
           <Box>
             <IconButton
               onClick={() => setConfirmExportOpen(true)}
