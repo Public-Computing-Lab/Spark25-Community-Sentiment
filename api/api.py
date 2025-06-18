@@ -827,11 +827,8 @@ def create_gemini_context(
                 == "APP_VERSION_" + app_version + "_REQUEST_" + context_request
                 and cache.model == Config.GEMINI_MODEL
             ):
-                if context_request == "identify_places":
-                    genai_client.caches.delete(name=cache.name)
-                    print("cache deleted")
-                else:
-                    return cache.name
+
+                return cache.name
 
     try:
         files_list = []
@@ -864,8 +861,6 @@ def create_gemini_context(
 
             content["parts"].append({"text": response.getvalue()})
 
-            preamble_file = context_request + ".txt"
-        elif context_request == "identify_places" or context_request == "get_summary":
             preamble_file = context_request + ".txt"
 
         # Read contents of found files
@@ -1375,23 +1370,29 @@ def chat_summary():
 def identify_places():
     data = request.get_json()
     message = data.get("message", [])
-    app_version = request.args.get("app_version", "0")
-    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
 
     if not message:
         return jsonify({"error": "No message provided."}), 400
 
-    cache_name = create_gemini_context(
-        context_request="identify_places",
-        preamble="",
-        generate_cache=True,
-        app_version=app_version,
-        is_spatial=is_spatial,
-    )
+    prompt_file_path = "./prompts/identify_places.txt"
 
+    # Read the content from identify_places.txt
     try:
-        places = get_gemini_response(prompt=message, cache_name=cache_name)
-        print(places)
+        with open(prompt_file_path, "r") as file:
+            file_content = file.read()
+
+        # Combine the file content with the message to form the full prompt
+        full_prompt = f"{file_content}\n{message}"
+
+    except FileNotFoundError:
+        return jsonify({"error": "Prompt file not found."}), 404
+    except Exception as e:
+        print(f"✖ Error reading prompt file: {e}")
+        return jsonify({"error": str(e)}), 500
+
+    # Call the Gemini response function with the combined full_prompt
+    try:
+        places = get_gemini_response(prompt=full_prompt, cache_name=None)
         return jsonify(places)
 
     except Exception as e:
