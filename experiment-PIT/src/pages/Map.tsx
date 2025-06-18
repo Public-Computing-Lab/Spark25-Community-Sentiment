@@ -1,6 +1,6 @@
 import { Box, Typography, IconButton } from '@mui/material'
 import Key from '../components/Key';
-import { useMap } from "../components/MapProvider";
+import { useMap } from "../components/useMap.tsx";
 import { useEffect, useState} from 'react';
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
@@ -12,11 +12,8 @@ import LayersClearIcon from '@mui/icons-material/LayersClear';
 //besure to install mapbox-gl 
 
 function Map() {
-  const { mapRef, mapContainerRef } = useMap(); // Access mapRef and mapContainerRef from context
-
+  const { mapRef, mapContainerRef, selectedLayers, selectedYearsSlider, setSelectedLayer, setSelectedYearsSlider } = useMap(); // Access mapRef and mapContainerRef from context
   const [layers, setLayers] = useState<string[]>([]);
-  const [selectedLayers, setSelectedLayer] = useState<string[]>(["Community Assets"]);
-  const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
 
   const handleMapClear = () => {
     //need to implement, what do we want to see?
@@ -34,7 +31,8 @@ function Map() {
         center: [-71.076543, 42.288386], //centered based on 4 rectangle coordinates of TNT
         zoom: 14.5,
         minZoom: 12,
-        style: "mapbox://styles/mapbox/light-v11", //should decide on style
+        maxZoom: 18,
+        style: "mapbox://styles/mapbox/light-v11?optimize=true", //should decide on style
       });
     }
 
@@ -224,13 +222,13 @@ function Map() {
         if (layerId !== "Community Assets"){ //excluding filtering on community assets
           mapRef.current?.setFilter(layerId, [
             "all",
-            [">=", "year", selectedYears[0]],
-            ["<=", "year", selectedYears[selectedYears.length - 1]],
+            [">=", "year", selectedYearsSlider[0]],
+            ["<=", "year", selectedYearsSlider[selectedYearsSlider.length - 1]],
           ]);
         }
       })
     }
-  }, [selectedYears, layers])
+  }, [selectedYearsSlider, layers])
 
 
   return (
@@ -279,7 +277,7 @@ function Map() {
       <Box sx={{mb: 3, position: 'absolute', left: '5', top: '4em'}}>
           <Key />
       </Box>
-      <FilterDialog layers={layers} onSelectionChange={setSelectedLayer} onSliderChange={setSelectedYears}/>
+      <FilterDialog layers={layers} onSelectionChange={setSelectedLayer} onSliderChange={setSelectedYearsSlider}/>
       
     </Box>
     

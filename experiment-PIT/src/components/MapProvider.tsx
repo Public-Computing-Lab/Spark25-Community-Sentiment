@@ -1,29 +1,33 @@
-import React, { createContext, useContext, useRef } from 'react';
+import React, { useRef, useState } from 'react';
+import { MapContext } from '../components/MapContext';
 
-interface MapContextType {
-    mapRef: React.RefObject<mapboxgl.Map | null>;
-    mapContainerRef: React.RefObject<HTMLDivElement | null>;
-}
-
-//“teleporting” data to the components that need it without passing props
-const MapContext = createContext<MapContextType | null>(null);
-
-//MapProvider wraps its children components and provides them access to the mapRef and mapContainerRef via the context.
-//children prop represents all the React components nested inside the MapProvider when it is used.
-export const MapProvider = ({ children }: { children: React.ReactNode }) => {
+export default function MapProvider({ children }: { children: React.ReactNode }) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  return (
-    <MapContext.Provider value={{mapRef, mapContainerRef}}>
-        {children}
-    </MapContext.Provider>
-  );
-};
+  
+  // Add state management
+  const [selectedLayers, setSelectedLayer] = useState<string[]>(["Community Assets"]);
+  const [selectedYearsSlider, setSelectedYearsSlider] = useState<number[]>([2018, 2024]);
 
-export const useMap = () => {
-    const context = useContext(MapContext);
-    if (!context) {
-        throw new Error('useMap must be used within a MapProvider');
-    }
-  return context;
+  const [selectedData, setSelectedData] = useState<string[]>(["Community Assets"]);
+  const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
+
+  //map provider works! it just takes time for the data to load...
+
+  return (
+    <MapContext.Provider value={{
+        mapRef,
+        mapContainerRef,
+        selectedLayers,
+        setSelectedLayer,
+        selectedYears,
+        setSelectedYears,
+        selectedData,
+        setSelectedData,
+        selectedYearsSlider,
+        setSelectedYearsSlider
+        }}>
+        {children}
+    </MapContext.Provider> 
+  );
 }

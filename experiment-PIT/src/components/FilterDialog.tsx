@@ -1,6 +1,7 @@
 import { Box, Typography, Button, Drawer, Stack, Slider, FormGroup, FormControlLabel, Checkbox } from '@mui/material';
 import { useState } from 'react';
 import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
+import { useMap } from "../components/useMap.tsx";
 
 
 function FilterDialog({ 
@@ -10,12 +11,11 @@ function FilterDialog({
 } : {
     layers: string[]
     onSelectionChange : (selectedLayers: string[]) => void
-    onSliderChange : (selectedYears: number[]) => void
+    onSliderChange : (selectedYearsSlider: number[]) => void
 }) {
   const [open, setOpen] = useState(false);
-  const [selectedData, setSelectedData] = useState<string[]>(["Community Assets"]);
-  const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
-
+  const { selectedData, selectedYears, setSelectedData, setSelectedYears } = useMap(); // Access mapRef and mapContainerRef from context
+  
 
   const toggleFilter = (newOpen: boolean) => () => {
     setOpen(newOpen);
