@@ -1,0 +1,172 @@
+# **Boston's Neighborhood Slow Streets Policy: What Talbot-Norfolk Triangle Residents Need to Know**
+
+## **Program Overview**
+
+### **Definition and Purpose**
+
+The City of Boston's Neighborhood Slow Streets program is designated as its "comprehensive traffic calming program".1 The initiative is fundamentally designed to "slow traffic speeds and improve safety on residential streets within a specific area".1 A core component of this program is the establishment of a 20 mph speed limit on residential streets within designated "Slow Streets zones".1 This approach moves beyond traditional speed enforcement by focusing on "street designs that self-enforce slower speeds and safer behaviors".4 By altering the physical environment of the streets, the program aims to passively guide driver behavior towards greater caution and reduced speeds, representing a proactive stance on road safety.
+
+### **Evolution of the Program**
+
+The Neighborhood Slow Streets program commenced with pilot communities in 2016, including the Talbot-Norfolk Triangle in Dorchester.4 Following these initial pilots, the program expanded, with new zones being selected through an application process in subsequent years.1 This phased rollout allowed the city to refine its approach based on early experiences. Recognizing the demand for these safety measures and potentially the lengthy timelines involved in comprehensive zone construction, Mayor Wu announced an evolution of the program in 2023\. This new initiative aims to "bring safety tools to more neighborhoods more quickly by focusing just on speed hump installation".1 This strategic shift is intended to reduce the time required for planning, design, engineering, and construction, thereby accelerating the deployment of traffic calming measures across the city.1 This adaptation suggests a learning process, where the city seeks to balance the thoroughness of interventions with the need for broader and more rapid implementation to meet community needs.
+
+### **Common Tools and Treatments Employed**
+
+The program utilizes a variety of "visual and physical cues" to achieve its traffic calming objectives.2 These interventions are designed to work together to create a safer street environment. The selection of specific tools is often tailored to the needs of the particular neighborhood.
+
+**Table 1: Common Neighborhood Slow Streets Tools and Treatments**
+
+| Tool/Treatment | Official Description/Purpose | Source Document(s) |
+| :---- | :---- | :---- |
+| Speed Humps | "To self-enforce driver speeds on each route through the neighborhood." Typically 4 inches at their highest point and 12-14 feet long. | 4 |
+| Raised Crosswalks | "To help emphasize pedestrians crossing the street" and slow vehicle speeds. | 1 |
+| Parking Restrictions / Daylighting | To "improve visibility of crosswalks and other drivers at intersections" by enforcing no-parking zones, often implemented with curb extensions. | 1 |
+| Curb Extensions | Physical extensions of the curb that narrow the roadway, shorten pedestrian crossing distances, and improve visibility. | 1 |
+| Signage | "To alert people that they are entering a Neighborhood Slow Streets area with a speed limit of 20 mph and ahead of any traffic calming devices." | 4 |
+| Pavement Markings | "To help organize the streets and indicate traffic calming devices." | 4 |
+| Neighborhood Traffic Circles / Mini-Roundabouts | Used in some locations to manage traffic flow at intersections and encourage slower speeds. | 1 |
+| Street Direction Changes | May be implemented to reduce cut-through traffic. | 1 |
+
+It is important to note that stop signs are not primarily considered traffic-calming measures within this program, though they may be included if an intersection meets specific engineering standards based on traffic volume, pedestrian/bicycle activity, and crash history.1 The implementation of these physical changes, such as speed humps, is coordinated with city services like snow plowing to ensure continued functionality.1
+
+### **Neighborhood Selection and Application Process**
+
+Participation in the Neighborhood Slow Streets program is initiated by communities themselves. Applications are not accepted from individuals but must originate from "a group of residents," which can include "neighborhood associations, community groups, faith-based institutions, and other organized groups of neighbors".1 This requirement underscores the city's approach of partnering with residents and fostering local ownership of safety initiatives, which can be instrumental for the sustained success and acceptance of such changes.
+
+Applicants are required to demonstrate a "baseline of community support" by collecting signatures (e.g., a minimum of 24 signatures on two full pages) and providing at least three letters of support from local organizations, key stakeholders, or officials.1 While the number of signatures shows initial support, it does not directly influence the application's score.1
+
+The City of Boston employs "objective evaluation criteria" to select participating communities, ensuring that resources are directed transparently and equitably.1 These criteria prioritize areas demonstrating the greatest need, including those with:
+
+* Higher percentages of vulnerable populations such as youth, older adults, and people with disabilities.1  
+* Higher rates of traffic crashes per mile that result in an Emergency Medical Services (EMS) response.1  
+* Proximity to or inclusion of community gathering places like public libraries, community centers, schools, and parks.1  
+* Support for existing and planned opportunities for walking, bicycling, and access to transit.1  
+* The feasibility for the City to implement the proposed improvements.1
+
+This data-driven and equity-focused selection process reflects a commitment to addressing safety disparities and prioritizing interventions where they can have the most significant impact on vulnerable road users and communities with documented safety concerns. The city anticipates that demand for the program will often "outpace the resources available each year," typically planning to work with three to five new communities per application cycle.1
+
+## **City-Wide Goal**
+
+The overarching purpose of the Neighborhood Slow Streets policy extends beyond mere traffic management, aiming for a comprehensive enhancement of residential areas. Official city documents consistently articulate a multi-faceted set of objectives. The program seeks "to reduce the number of crashes on residential streets, lessen the impact of cut-through traffic and add to the quality of life in our neighborhoods".2 More specifically, the goals include reducing both the "number and severity of crashes on residential streets".4
+
+A significant emphasis is placed on transforming the experience of being on these streets. The policy aims to make residential streets "feel more inviting for people of all ages who are walking, playing, or bicycling".2 This highlights an understanding of streets as vital public spaces that contribute to community interaction and well-being, rather than solely as conduits for vehicular movement. The repeated mention of improving "quality of life" 2 underscores this broader, people-centric vision for neighborhood streets.
+
+Furthermore, the Neighborhood Slow Streets program is explicitly positioned as a "critical component of the City of Boston's Vision Zero agenda".6 Vision Zero is a strategic initiative with the ambitious goal to "eliminate all fatal and serious injuries by 2030" on Boston's streets.10 By implementing physical changes designed to reduce speeds and conflicts, the Slow Streets program serves as a key tactical element in achieving these larger, long-term transportation safety objectives. This connection also aligns the program with the Go Boston 2030 strategic plan, which encompasses broader traffic safety and transportation initiatives.9 Such strategic alignment indicates a coordinated, city-wide commitment to creating a safer and more livable urban environment.
+
+## **Implementation in Dorchester's Talbot-Norfolk Triangle**
+
+The Talbot-Norfolk Triangle (TNT) neighborhood in Dorchester holds a significant place in the history of Boston's Neighborhood Slow Streets program, serving as one of its two inaugural "pilot communities".4 The City began its engagement with TNT residents in 2016 4, with the pilot program formally implemented in late 2017\.9 This pioneering role meant that the TNT project was, in many ways, a "guinea pig" initiative, providing a crucial learning experience for the city as it developed and refined its approach to neighborhood-wide traffic calming.4 The iterative nature of this pilot, including its timeline and phased implementation, offered valuable lessons that likely informed the subsequent city-wide expansion of the program and later adaptations, such as the more streamlined speed hump installation initiative.1
+
+A pivotal factor in the selection and prioritization of the TNT neighborhood was a "near tragedy when a 10-year-old boy was hit by a driver on Elmhurst Street while crossing to get to the park there".13 This distressing event became a "catalyzing moment for the entire neighborhood," transforming existing safety concerns into focused community action and amplifying the urgency for intervention.13 Even before this incident, neighbors had been advocating for safety measures, such as a speed hump in front of the Elmhurst Street park.13 The collision, however, provided a stark illustration of the risks present and likely increased the city's willingness to select TNT for the pilot program.
+
+### **Project Timeline**
+
+The journey of the Talbot-Norfolk Triangle Slow Streets project spanned several years, from initial community discussions to the final installation of traffic calming measures. This extended timeline reflects the comprehensive nature of the pilot project and the iterative process of design, community feedback, and construction.
+
+**Table 2: Talbot-Norfolk Triangle Slow Streets Project Key Milestones**
+
+| Date/Period | Activity/Milestone | Source Document(s) |
+| :---- | :---- | :---- |
+| October 6, 2015 | Neighborhood walk conducted with Vision Zero Boston, TNT Neighbors United, Codman Square Neighborhood Development Corporation (NDC), and community members to review concerns and the August 2015 Eco-Teens TNT Walk Audit Report. | 4 |
+| December 1, 2015 | Introductory community meeting held; Vision Zero Boston explained program concepts and gathered initial feedback. | 4 |
+| 2016 | City began working with residents in the Talbot-Norfolk-Triangle neighborhood; TNT selected as one of two pilot communities. | 4 |
+| September 27, 2016 | Public meeting at Prayer Tower Apostolic Church to present proposed designs; comments accepted via email through October 11, 2016\. | 4 |
+| December 22, 2016 | Update provided: plans for TNT and Stonybrook Neighborhoods were being revised based on community feedback; updated plans expected in spring. | 4 |
+| May 1, 2017 | Updated plan discussed with the community. | 4 |
+| September 2017 | Final design and construction timeline discussed at the September 26 TNT Neighbors United meeting. | 4 |
+| Late 2017 | Neighborhood Slow Streets formally implemented as a pilot program in TNT. | 9 |
+| Winter 2017-2018 | Implementation phase "well underway"; construction paused for winter. Finishing touches (markings, temporary elements, some signage) planned for spring. | 4 |
+| March 26, 2019 | Meeting held to share designs for "gateway treatments," including a raised crosswalk at Elmhurst Park, improvements at Colonial/Talbot, and a mini-roundabout at Southern/Whitfield. | 4 |
+| Spring 2021 | Planned installation of changes to slow speeds and improve crossings at Southern Avenue/Whitfield Street and Talbot Avenue/Colonial Avenue. | 4 |
+| Beginning April 5, 2021 | Construction crews scheduled to build specific treatments: Elmhurst Park raised crosswalk, Talbot/Colonial curb extension & raised crossing, and Southern/Whitfield mini-roundabout. | 4 |
+| By Summer 2021 | Major improvements, including the roundabout on Southern Avenue, were "fully completed." | 13 |
+
+This detailed chronology illustrates the multi-year commitment required for such a comprehensive pilot, involving stages of assessment, community engagement, design iteration, and phased construction. The deliberate pauses and revisions based on feedback underscore the learning aspect inherent in a pilot initiative.
+
+### **Specific Street Treatments Implemented**
+
+The interventions in the Talbot-Norfolk Triangle were designed to create a cohesive traffic-calmed zone, utilizing "visual and physical cues to slow drivers to 20 mph".3 Key specific treatments included:
+
+* **Southern Avenue and Whitfield Street 'Traffic Comma':** A distinctive feature of the TNT project was the installation of a mini-roundabout, referred to as a 'Traffic Comma'. "Shaped like a 'comma,' the mini-roundabout and curb extensions at Southern Avenue and Whitfield Street will guide safer, slower movements through the intersection".4 At the time of its installation, this was described as a "rare roundabout" for the city, indicating an innovative approach to intersection management within the pilot.13  
+* **Talbot Avenue and Colonial Avenue Improvements:** At this location, "a wide intersection with visibility issues will become a regular, 'T-intersection' with curb extensions and a raised crossing".4 This redesign aimed to simplify the intersection, improve sightlines, and reinforce pedestrian priority.  
+* **Elmhurst Park Raised Crosswalk:** A raised crosswalk was constructed at Elmhurst Park.4 This specific location was highly significant, as it was near the site of the accident involving a child that had catalyzed community demand for the Slow Streets program.13 The raised design serves both to slow vehicles and increase pedestrian visibility.  
+* **General Treatments:** Complementing these site-specific interventions, the TNT zone incorporated a suite of standard Slow Streets tools:  
+  * **Speed Humps/Tables:** Widely implemented to "self-enforce driver speeds" throughout the neighborhood.4  
+  * **Signage:** Prominently displayed to alert drivers that they were entering a Neighborhood Slow Streets zone with an enforced 20 mph speed limit and to warn of upcoming traffic calming devices.4  
+  * **Pavement Markings:** Applied to "help organize the streets and indicate traffic calming devices," providing clear visual guidance for drivers and pedestrians.4  
+  * **Daylighting and Curb Extensions:** Utilized at various intersections "to enforce no-parking restrictions and improve visibility of crosswalks and other drivers".4  
+  * **Bollards:** Also mentioned as part of the toolkit deployed in the area.13  
+* **Gateway Treatments:** Particular attention was paid to entry points into the Slow Streets zone. Designs were developed for "gateway treatments" intended to "slow traffic and improve crossings" at these key locations.4 Such treatments are crucial for signaling to drivers that they are entering an area with different speed expectations and a heightened awareness of pedestrian activity.
+
+These physical alterations collectively aimed to transform the streetscape of the Talbot-Norfolk Triangle, making it inherently safer and more conducive to slower vehicle speeds.
+
+### **Stated Goals for the TNT Project**
+
+The objectives for implementing the Neighborhood Slow Streets program in the Talbot-Norfolk Triangle were closely aligned with the broader city-wide goals, but tailored to the specific context and needs of the neighborhood. The primary aim was to "design safer crossings and intersections that encourage slower turns and safer speeds".4 This involved a comprehensive effort to "calm traffic in the Talbot-Norfolk Triangle neighborhood" through the strategic deployment of "visual and physical cues to slow drivers to 20 mph".3
+
+Beyond the direct impact on vehicle behavior, a key desired outcome was to enhance the lived experience of residents. The project endeavored to "make each street feel safer and more comfortable for people who live, walk, bike, or play in the neighborhood".3 This focus on comfort and safety for all road users, particularly pedestrians and cyclists, reflects the program's commitment to improving the overall quality of life and fostering a more people-friendly environment within the TNT area.4
+
+### **Community Engagement Process**
+
+The implementation of the Slow Streets program in the Talbot-Norfolk Triangle was characterized by a significant and sustained community engagement process. This collaborative approach was vital, particularly for a pilot project that was, by nature, experimental.
+
+* **Early Collaboration and Mobilization:** Following the incident on Elmhurst Street, the "Boston Transportation Department (BTD) and even some youth organizations began working with neighbors".13 The entire process involved "repeated meetings between officials and neighbors to brainstorm innovative ideas for the entire TNT area".13 This early and continuous dialogue set the stage for a partnership-based approach.  
+* **Neighborhood Walks and Audits:** A practical step in understanding on-the-ground conditions and resident concerns was a neighborhood walk conducted on October 6, 2015\. This involved representatives from Vision Zero Boston, TNT Neighbors United, the Codman Square NDC, and community members, who reviewed local concerns and an Eco-Teens TNT Walk Audit Report.4 This type of engagement allows for direct observation and shared understanding of issues.  
+* **Public Meetings and Presentations:** Several formal public meetings were held to disseminate information and gather feedback:  
+  * An introductory community meeting on December 1, 2015, where Vision Zero Boston explained the program's concepts and goals and solicited initial input.4  
+  * A public meeting on September 27, 2016, held at the Prayer Tower Apostolic Church, where proposed designs were presented to the community.4  
+  * A meeting on March 26, 2019, to share designs for specific "gateway treatments".4  
+* **Feedback Mechanisms and Iteration:** The city actively solicited feedback on its proposals. For instance, after the September 2016 meeting, comments on the designs were accepted via email.4 Official documents note that "Residents provided lots of thoughtful feedback and posed many questions," and the City aimed to "address each one through the revisions process".4 This iterative loop of proposal, feedback, and revision was crucial to tailoring the project to community needs.  
+* **Ongoing Dialogue with Community Groups:** The engagement was not limited to large public meetings. The final design and construction timeline were discussed at a TNT Neighbors United meeting in September 2017, indicating ongoing dialogue with established community organizations.4  
+* **Empowerment and Resident Expertise:** The value of this deep engagement was articulated by Talbot-Norfolk Triangle resident Tiffany Cogell, who stated that the Neighborhood Slow Streets program "puts the power of safe infrastructure changes into the hands of residents while allowing them the opportunity to interact directly with the City. It creates opportunities for deeper engagement between the local government and residents, and gives residents the chance to voice their opinions and lived expertise".9 This perspective highlights how the process itself can foster civic participation and ensure that local knowledge informs project design.  
+* **City Responsiveness:** The city's efforts to engage were noted by community members. It was reported that the city was "very responsive to ideas that came up later on" during the project's development.13
+
+This multi-faceted engagement strategy, encompassing walks, meetings, feedback channels, and collaboration with local groups, appears to have been central to the TNT pilot. While the process was lengthy, this sustained interaction was likely key to navigating the complexities of a pilot project and building community acceptance for the changes. The experience in TNT also seems to have had a positive effect on community cohesion, with reports that the Slow Streets program "has been a catalyst for more community involvement".13 This suggests that the benefits of such projects can extend beyond physical infrastructure to strengthening social fabric.
+
+### **Reported Community Impact and Outcomes in TNT**
+
+While comprehensive quantitative data on crash reduction was reported as still pending analysis as of September 2021 13, available information, primarily from official city communications and community feedback, points to several positive impacts stemming from the Neighborhood Slow Streets implementation in the Talbot-Norfolk Triangle:
+
+* **Perceived Traffic Calming:** Anecdotal evidence strongly suggests a reduction in vehicle speeds. Residents reported that their "neighborhood feels slower and safer".13 One community member explicitly stated, "traffic has slowed down".13 This aligns with pre-project observations where teens using a speed gun on Elmhurst Street "routinely clocking cars driving 50 to 60 mph on the small street" 13, indicating a significant baseline problem of excessive speed that the project aimed to address.  
+* **Improved Perception of Safety:** The changes appeared to enhance feelings of safety among residents. While specific data for TNT was part of the broader evaluation, experiences in a nearby Slow Streets zone (the WOW neighborhood) indicated that parents of small children and older adults "now feel safer walking on the sidewalk or crossing the street".13 Such outcomes were the intended effects for TNT as well.  
+* **Catalyst for Community Involvement:** The collaborative process of planning and implementing the Slow Streets project reportedly "has been a catalyst for more community involvement" within TNT.13 This observation is significant, as it points to the program's ability to foster civic engagement and strengthen neighborhood ties beyond its primary traffic safety goals. A similar effect was noted in the nearby WOW neighborhood, where the Slow Streets initiative helped "bring the neighborhood together".13  
+* **Resident Satisfaction:** Despite the extended timeline inherent in a pilot project, community leaders expressed positive sentiments. Paul Malkemes, a member of the TNT Steering Committee, stated, "I'm a huge fan of Slow Streets. I know what it's done for our neighborhood in TNT".13 It was also noted that residents were "really grateful" for the city's responsiveness, even if the process "took a little longer than neighbors wanted".13  
+* **Data Collection for Future Assessment:** The City of Boston confirmed that it "collected data so that we can better understand the impacts of the changes" made in the TNT neighborhood.4 This commitment to data collection is crucial for objectively evaluating the program's effectiveness over the long term and for refining future traffic calming efforts.
+
+The experience in TNT, as a pilot, provided a real-world test bed. The tension between the desire for thorough, comprehensive interventions and the need for timely implementation was evident. The multi-year process in TNT 4, while allowing for careful planning and community input, likely contributed to the city's later development of a more streamlined, speed-hump-focused program option designed for faster deployment in other neighborhoods.1
+
+### **Connection to Other City Plans**
+
+The Neighborhood Slow Streets project in Talbot-Norfolk Triangle was not an isolated initiative but was connected to broader city-wide strategies and local community assets:
+
+* **Vision Zero and Go Boston 2030:** The most direct and explicit connection is to the City of Boston's overarching transportation and safety frameworks. The Neighborhood Slow Streets program, including the TNT pilot, is consistently identified as a key component of the Vision Zero agenda, which aims to eliminate traffic fatalities and serious injuries.6 It also aligns with the goals of Go Boston 2030, the city's long-term transportation plan that prioritizes safety and multimodal transportation options.9  
+* **Fairmount Indigo Line Improvements:** While a direct programmatic link between the *specific* TNT Slow Streets project and the Fairmount Indigo Line improvements is not explicitly detailed in the available information for TNT, there are strong thematic alignments. The Fairmount Indigo Planning Initiative, which began in 2012, focused on improving capital investment, public realm enhancements, transit access, and job access along the 9.2-mile rail corridor that passes through Dorchester.14 The goals of the Slow Streets program, such as enhancing walkability and supporting access to transit 1, are complementary to the objectives of improving the areas around Fairmount Line stations. Furthermore, the Fairmount Line serves communities with high concentrations of socially vulnerable residents 15, a demographic also prioritized by the Slow Streets selection criteria.1 Thus, improvements in street safety and walkability within TNT could enhance access to and the overall utility of improved Fairmount Line services for local residents.  
+* **Elmhurst Park:** A very tangible connection was made to local community infrastructure through the installation of a raised crosswalk at Elmhurst Park.4 This park was a focal point of community concern, as the incident that catalyzed the Slow Streets project in TNT occurred when a child was crossing to this park.13 Integrating the park access directly into the safety improvements underscores the program's aim to make community assets safer and more accessible for residents.
+
+These connections demonstrate that the TNT Slow Streets project was conceived and implemented within a larger context of city-wide safety goals and neighborhood revitalization efforts, aiming to create synergies with other investments and plans affecting the Dorchester community.
+
+## **Conclusion**
+
+The City of Boston's Neighborhood Slow Streets policy represents a strategic, evolving approach to enhancing residential street safety and livability. Its city-wide goals focus on reducing crash frequency and severity, mitigating the negative impacts of traffic, and improving the overall quality of life by making streets more inviting for all users, particularly pedestrians and cyclists.2 The program's selection process prioritizes neighborhoods based on objective criteria, including demographic vulnerability and crash history, reflecting an equitable approach to resource allocation.1
+
+The implementation in Dorchester's Talbot-Norfolk Triangle, as one of the program's initial pilot projects starting in 2016, provides a detailed case study of the policy in action.4 Catalyzed by a specific traffic incident involving a child 13, the TNT project involved a multi-year process of community engagement, design, and phased construction, culminating in the installation of various traffic calming measures by summer 2021\.4 These included innovative treatments like the 'Traffic Comma' mini-roundabout, raised crosswalks at key locations such as Elmhurst Park, speed humps, and improved signage and pavement markings.4
+
+The community engagement process in TNT was extensive, involving neighborhood walks, public meetings, and iterative feedback loops, which were reported to have fostered deeper engagement between residents and the city.4 While formal data on crash reduction was pending, initial reports indicated positive community impacts, including perceptions of slower traffic, enhanced feelings of safety, and increased community involvement.13 The TNT pilot served as a critical learning experience for the city, informing the broader rollout and subsequent adaptations of the Neighborhood Slow Streets program.4 This foundational work in TNT has contributed to a city-wide effort that continues to adapt, aiming to create safer, more livable residential streets across Boston.
+
+#### **Works cited**
+
+1. Neighborhood Slow Streets | Boston.gov, accessed June 10, 2025, [https://www.boston.gov/departments/transportation/neighborhood-slow-streets](https://www.boston.gov/departments/transportation/neighborhood-slow-streets)  
+2. Learn about the new “Slow Streets” neighborhood program | The Dorchester Post, accessed June 10, 2025, [https://dorchesterpost.com/2017/02/17/learn-about-the-new-slow-streets-neighborhood-program/](https://dorchesterpost.com/2017/02/17/learn-about-the-new-slow-streets-neighborhood-program/)  
+3. www.boston.gov, accessed June 10, 2025, [https://www.boston.gov/departments/transportation/talbot-norfolk-triangle\#:\~:text=The%20City%20of%20Boston%20has,or%20play%20in%20the%20neighborhood.](https://www.boston.gov/departments/transportation/talbot-norfolk-triangle#:~:text=The%20City%20of%20Boston%20has,or%20play%20in%20the%20neighborhood.)  
+4. Talbot-Norfolk Triangle | Boston.gov, accessed June 10, 2025, [https://www.boston.gov/departments/transportation/talbot-norfolk-triangle](https://www.boston.gov/departments/transportation/talbot-norfolk-triangle)  
+5. New Rotary in Dorchester \- Caught In Dot, accessed June 10, 2025, [https://caughtindot.com/new-rotary-in-dorchester/](https://caughtindot.com/new-rotary-in-dorchester/)  
+6. Boston Transportation Department launches safe driving initiative \- The Daily Free Press, accessed June 10, 2025, [https://dailyfreepress.com/01/29/23/126589/](https://dailyfreepress.com/01/29/23/126589/)  
+7. Our Streets Already Slow? Officials Reject Slow Streets Application \- Patriot-Bridge, accessed June 10, 2025, [https://charlestownbridge.com/2017/08/05/our-streets-already-slow-officials-reject-slow-streets-application/](https://charlestownbridge.com/2017/08/05/our-streets-already-slow-officials-reject-slow-streets-application/)  
+8. Boston Transportation Department Accepting Applications for Neighborhood Slow Streets Program, accessed June 10, 2025, [https://www.southbostontoday.com/boston-transportation-department-accepting-applications-neighborhood-slow-streets-program/](https://www.southbostontoday.com/boston-transportation-department-accepting-applications-neighborhood-slow-streets-program/)  
+9. Applications now open for 2018 Neighborhood Slow Streets program | Boston.gov, accessed June 10, 2025, [https://www.boston.gov/news/applications-now-open-2018-neighborhood-slow-streets-program](https://www.boston.gov/news/applications-now-open-2018-neighborhood-slow-streets-program)  
+10. neighborhood slow streets: \- redefining our community \- Boston.gov, accessed June 10, 2025, [https://www.boston.gov/sites/default/files/imce-uploads/2019-06/2019-0620\_roc\_presentation\_final\_1.pdf](https://www.boston.gov/sites/default/files/imce-uploads/2019-06/2019-0620_roc_presentation_final_1.pdf)  
+11. One minute, one slide: Neighborhood Slow Streets – WalkMassachusetts \- Walkboston.org, accessed June 10, 2025, [https://walkmass.org/2018/04/04/one-minute-one-slide-neighborhood-slow-streets/](https://walkmass.org/2018/04/04/one-minute-one-slide-neighborhood-slow-streets/)  
+12. Boston "Slow Streets" Program to Prevent Car Accidents, accessed June 10, 2025, [https://www.boston-car-accident-lawyer-blog.com/boston-slow-streets-program-prevent-car-accidents/](https://www.boston-car-accident-lawyer-blog.com/boston-slow-streets-program-prevent-car-accidents/)  
+13. For neighborhood with Slow Streets pilot in place, 'It has been a blessing' | Dorchester Reporter, accessed June 10, 2025, [https://www.dotnews.com/2021/neighborhood-slow-streets-pilot-place-it-has-been-blessing](https://www.dotnews.com/2021/neighborhood-slow-streets-pilot-place-it-has-been-blessing)  
+14. Fairmount Indigo Planning Initiative | Bostonplans.org, accessed June 10, 2025, [http://www.bostonplans.org/planning-zoning/planning-initiatives/fairmount-indigo-planning-initiative](http://www.bostonplans.org/planning-zoning/planning-initiatives/fairmount-indigo-planning-initiative)  
+15. Fairmount Line Service Enhancement \- Boston.gov, accessed June 10, 2025, [https://www.boston.gov/departments/transportation/fairmount-line-service-enhancement](https://www.boston.gov/departments/transportation/fairmount-line-service-enhancement)
