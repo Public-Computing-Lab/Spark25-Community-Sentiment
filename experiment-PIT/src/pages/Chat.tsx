@@ -96,7 +96,7 @@ function Chat() {
 
   const handleExportSummary = async () => {
     const summary = await getChatSummary(messages, true);
-    const summary = await getChatSummary(messages, true);
+    
 
     if (summary === "Summary generation failed.") {
       setSummaryError(true);
@@ -142,7 +142,7 @@ function Chat() {
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <RoomIcon fontSize="small" />
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Chat with Us
+              On The Porch
             </Typography>
           </Box>
           <Box>
