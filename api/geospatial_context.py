@@ -1,0 +1,469 @@
+import pandas as pd
+import re
+from pathlib import Path
+from typing import Dict, Optional
+import nltk
+from collections import Counter
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.tag import pos_tag
+import requests
+import math
+from pathlib import Path
+from typing import Dict, List
+import datetime
+from collections import defaultdict
+
+
+_geocoding_data = None
+
+def _load_geocoding_data(datastore_path: Path) -> pd.DataFrame:
+    global _geocoding_data
+    
+    if _geocoding_data is None:
+        try:
+            csv_path = datastore_path / "geocoding-community-assets.csv"
+            if csv_path.exists():
+                _geocoding_data = pd.read_csv(csv_path)
+            else:
+                _geocoding_data = pd.DataFrame()
+        except Exception as e:
+            _geocoding_data = pd.DataFrame()
+    
+    return _geocoding_data
+
+def _normalize_text(text: str) -> str:
+    # handle common street variations
+    text = text.lower().strip()
+    text = re.sub(r'\bavenue\b', 'ave', text)
+    text = re.sub(r'\bstreet\b', 'st', text)
+    text = re.sub(r'\broad\b', 'rd', text)
+    text = re.sub(r'\bboulevard\b', 'blvd', text)
+    return text
+
+def _get_all_location_names(geocoding_data: pd.DataFrame) -> list:
+    all_locations = []
+    
+    for _, row in geocoding_data.iterrows():
+        primary_name = str(row['Name']).strip()
+        if primary_name and primary_name != 'nan':
+            all_locations.append({
+                'name': primary_name,
+                'lat': row['Latitude'],
+                'lon': row['Longitude']
+            })
+
+        alt_names = str(row['Alternate Names']).strip()
+        if alt_names and alt_names != 'nan':
+            for alt_name in alt_names.split(','):
+                alt_name = alt_name.strip()
+                if alt_name:
+                    all_locations.append({
+                        'name': alt_name,
+                        'lat': row['Latitude'],
+                        'lon': row['Longitude']
+                    })
+
+    all_locations.sort(key=lambda x: len(x['name']), reverse=True)
+    return all_locations
+
+def _find_location_in_message(message: str, all_locations: list) -> Optional[Dict]:
+    message_normalized = _normalize_text(message)
+    proximity_triggers = ['near', 'around', 'nearby', 'by', 'close to', 'within']
+    is_near_query = any(tok in message_normalized for tok in proximity_triggers)
+
+    for loc in all_locations:
+        raw_name = loc['name']
+        loc_norm = _normalize_text(raw_name)
+        tokens = loc_norm.split()
+
+        for n in range(len(tokens), 0, -1):
+            prefix = ' '.join(tokens[:n])
+            if prefix in message_normalized:
+                return {
+                    'name': raw_name,
+                    'lat': loc['lat'],
+                    'lon': loc['lon'],
+                    'is_near_query': is_near_query
+                }
+
+    return None
+
+def _extract_intent(message: str) -> str:
+    try:
+        tokens = word_tokenize(message.lower())
+        pos_tags = pos_tag(tokens)
+        stop_words = set(stopwords.words('english'))
+        
+        important_words = []
+        for word, pos in pos_tags:
+            if (pos.startswith('NN') or pos.startswith('JJ') or pos.startswith('VB')) and \
+               word not in stop_words and \
+               len(word) > 2 and \
+               word.isalpha():
+                important_words.append(word)
+                
+        if important_words:
+            return important_words[0]
+        
+        return 'general'
+        
+    except Exception as e:
+        print(f"Error in NLP intent extraction, falling back to simple method: {e}")
+        # Simple fallback if NLTK fails
+        words = [w.lower() for w in message.split() if len(w) > 3 and w.isalpha()]
+        common_words = {'what', 'where', 'when', 'there', 'this', 'that', 'about'}
+        for word in words:
+            if word not in common_words:
+                return word
+        return 'general'
+
+def extract_location_and_intent(message: str, datastore_path: Path) -> Optional[Dict]:
+
+    try:
+        geocoding_data = _load_geocoding_data(datastore_path)
+        
+        if geocoding_data.empty:
+            return None
+
+        all_locations = _get_all_location_names(geocoding_data)
+        location_info = _find_location_in_message(message, all_locations)
+        
+        if not location_info:
+            return None
+
+        intent = _extract_intent(message)
+        
+        return {
+            "location": location_info['name'],
+            "location_coords": {
+                "lat": location_info['lat'],
+                "lon": location_info['lon']
+            },
+            "intent": intent,
+            "showMap": True,
+            "is_near_query": location_info['is_near_query']
+        }
+        
+    except Exception as e:
+        print(f"Error in extract_location_and_intent: {e}")
+        return None
+
+def build_local_context(location: str, intent: str, location_coords: Dict, is_near_query: bool, api_base_url: str, api_key: str, datastore_path: Path, message: str = "") -> List[str]:
+
+    context = []
+    
+    radius = None
+    if message:
+        # look for “within <number> <unit>”
+        pattern = re.compile(
+            r'\bwithin\s*([\d\.]+)\s*'                 
+            r'(kilometers?|km|meters?|m|yards?|yd|feet|foot|ft)\b',
+            re.IGNORECASE
+        )
+
+        m = pattern.search(message)
+        if m:
+            val = float(m.group(1))
+            unit = m.group(2).lower()
+            if unit.startswith('km') or 'kilometer' in unit:
+                radius = val * 1000
+            elif unit.startswith('m') and unit != 'mi': 
+                radius = val
+            elif 'yd' in unit or 'yard' in unit or 'yards' in unit:
+                radius = val * 0.9144
+            elif unit in ('ft', 'foot', 'feet'):
+                radius = val * 0.3048
+
+    if radius is None:
+        lower = location.lower()
+        if any(w in lower for w in ['ave', 'avenue', 'st', 'street']):
+            radius = 300 if is_near_query else 100
+        elif any(w in lower for w in ['square', 'plaza']):
+            radius = 200 if is_near_query else 50
+        else:
+            radius = 100 if is_near_query else 30
+
+    radius = int(radius)
+    print("Radius:", radius)
+    lat = location_coords['lat']
+    lon = location_coords['lon']
+    
+    context.append(f"EXACT DATA for {location} within {radius} meters - this is the complete dataset for your query:")
+    
+    try:
+        headers = {'RethinkAI-API-Key': api_key}
+        
+        # Get 911 shots fired data
+        response_911 = requests.get(
+            f"{api_base_url}/data/query",
+            params={'request': '911_shots_fired', 'output_type': 'json'},
+            headers=headers
+        )
+        
+        if response_911.status_code == 200:
+            shots_data = response_911.json()
+            local_shots = []
+            for shot in shots_data:
+                if 'latitude' in shot and 'longitude' in shot:
+                    shot_lat, shot_lon = float(shot['latitude']), float(shot['longitude'])
+                    lat1, lon1, lat2, lon2 = map(math.radians, [lat, lon, shot_lat, shot_lon])
+                    dlat, dlon = lat2 - lat1, lon2 - lon1
+                    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+                    distance = 6371000 * 2 * math.asin(math.sqrt(a))  # meters
+                    
+                    if distance <= radius:
+                        local_shots.append(shot)
+            
+            if local_shots:
+                shots_by_year = defaultdict(lambda: {'total': 0, 'confirmed': 0})
+                for s in local_shots:
+                    date_str = s.get('date', '')
+                    try:
+                        dt = datetime.datetime.fromisoformat(date_str)
+                    except ValueError:
+                        try:
+                            dt = datetime.datetime.strptime(date_str, '%a, %d %b %Y %H:%M:%S GMT')
+                        except ValueError:
+                            continue
+                    yr = dt.year
+                    shots_by_year[yr]['total'] += 1
+                    if s.get('ballistics_evidence') == 1:
+                        shots_by_year[yr]['confirmed'] += 1
+
+                context.append("Shots fired breakdown by year:")
+                for yr in sorted(shots_by_year):
+                    data = shots_by_year[yr]
+                    context.append(f"- {yr}: {data['total']} incidents, {data['confirmed']} confirmed")
+            else:
+                context.append(f"No shots fired incidents found within {radius}m of {location}.")
+        
+        response_hom = requests.get(
+            f"{api_base_url}/data/query",
+            params={'request': '911_homicides_and_shots_fired', 'output_type': 'json'},
+            headers=headers
+        )
+        if response_hom.status_code == 200:
+            hom_data = response_hom.json()
+            # only keep those within our radius
+            local_homs = []
+            for ev in hom_data:
+                if 'latitude' in ev and 'longitude' in ev and 'date' in ev:
+                    lat2, lon2 = float(ev['latitude']), float(ev['longitude'])
+                    # haversine
+                    φ1, λ1, φ2, λ2 = map(math.radians, [lat, lon, lat2, lon2])
+                    dφ, dλ = φ2-φ1, λ2-λ1
+                    a = math.sin(dφ/2)**2 + math.cos(φ1)*math.cos(φ2)*math.sin(dλ/2)**2
+                    dist = 6371000 * 2 * math.asin(math.sqrt(a))
+                    if dist <= radius:
+                        local_homs.append(ev)
+
+            if local_homs:
+                # group by year
+                homs_by_year = defaultdict(int)
+                for h in local_homs:
+                    dt = None
+                    try:
+                        dt = datetime.datetime.fromisoformat(h['date'])
+                    except ValueError:
+                        try:
+                            dt = datetime.datetime.strptime(h['date'], '%a, %d %b %Y %H:%M:%S GMT')
+                        except:
+                            continue
+                    homs_by_year[dt.year] += 1
+
+                context.append("Homicides breakdown by year:")
+                for yr in sorted(homs_by_year):
+                    context.append(f"- {yr}: {homs_by_year[yr]} homicides")
+
+            else:
+                context.append(f"No homicide incidents found within {radius}m of {location}.")
+
+        # Get 311 data
+        response_311 = requests.get(
+            f"{api_base_url}/data/query", 
+            params={'request': '311_by_geo', 'category': 'all', 'output_type': 'json'},
+            headers=headers
+        )
+        
+        if response_311.status_code == 200:
+            data_311 = response_311.json()
+            # Filter by distance
+            local_311 = []
+            for incident in data_311:
+                if 'latitude' in incident and 'longitude' in incident:
+                    inc_lat, inc_lon = float(incident['latitude']), float(incident['longitude'])
+                    # Calculate distance 
+                    lat1, lon1, lat2, lon2 = map(math.radians, [lat, lon, inc_lat, inc_lon])
+                    dlat, dlon = lat2 - lat1, lon2 - lon1
+                    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+                    distance = 6371000 * 2 * math.asin(math.sqrt(a))  # meters
+                    
+                    if distance <= radius:
+                        local_311.append(incident)
+            
+            if local_311:
+                # filter by intent in the incident types
+                intent_lower = intent.lower()
+                intent_related = []
+                
+                for incident in local_311:
+                    incident_type = incident.get('type', '').lower()
+                    if intent_lower in incident_type:
+                        intent_related.append(incident)
+                
+                # show intent related incidents first
+                if intent_related:
+                    type_counts = {}
+                    for incident in intent_related:
+                        incident_type = incident.get('type', 'Unknown')
+                        type_counts[incident_type] = type_counts.get(incident_type, 0) + 1
+                    
+                    context.append(f"311 complaints about {intent} within {radius}m:")
+                    for incident_type, count in sorted(type_counts.items(), key=lambda x: x[1], reverse=True)[:3]:
+                        context.append(f"- {count} reports of {incident_type}")
+                
+                # show other local issues
+                else:
+                    type_counts = {}
+                    for incident in local_311:
+                        incident_type = incident.get('type', 'Unknown')
+                        type_counts[incident_type] = type_counts.get(incident_type, 0) + 1
+                    
+                    context.append(f"Other 311 complaints within {radius}m:")
+                    for incident_type, count in sorted(type_counts.items(), key=lambda x: x[1], reverse=True)[:3]:
+                        context.append(f"- {count} reports of {incident_type}")
+            else:
+                context.append(f"No 311 complaints found within {radius}m of {location}.")
+
+        # get community quotes 
+        if datastore_path.exists():
+            txt_files = [f for f in datastore_path.iterdir() if f.suffix.lower() == '.txt' and not f.name.startswith('.')]
+            
+            location_lower = location.lower()
+            intent_lower = intent.lower()
+            relevant_quotes = []
+            
+            for txt_file in txt_files:
+                try:
+                    content = txt_file.read_text(encoding='utf-8')
+                    lines = [line.strip() for line in content.split('\n') if line.strip()]
+                    
+                    for line in lines:
+                        line_lower = line.lower()
+                        if location_lower in line_lower and intent_lower in line_lower:
+                            relevant_quotes.append(line)
+                        elif location_lower in line_lower:
+                            relevant_quotes.append(line)
+                        
+                except Exception as e:
+                    print(f"Error reading {txt_file}: {e}")
+            
+            if relevant_quotes:
+                context.append("Community feedback:")
+                priority_quotes = [q for q in relevant_quotes if location_lower in q.lower() and intent_lower in q.lower()]
+                if priority_quotes:
+                    context.extend([f"- {q}" for q in priority_quotes[:2]])
+                else:
+                    context.extend([f"- {q}" for q in relevant_quotes[:2]])
+        
+        if len(context) <= 1: 
+            context.append(f"No local incident data found within {radius}m of {location}.")
+            context.append(f"This location appears to have no recorded incidents in the immediate vicinity.")
+            
+    except Exception as e:
+        print(f"Error building local context: {e}")
+        context.append(f"Error retrieving data for {location}")
+    
+    return context
+
+
+def get_map_preview_data(location_coords: Dict, is_near_query: bool, location_name: str = "") -> Dict:
+
+    lat = location_coords['lat']
+    lon = location_coords['lon']
+    
+    # Simple zoom, close for specific locations, wider for near queries
+    zoom = 17 if is_near_query else 18
+    
+    # calculate bounds for the map view (roughly 200m x 200m area)
+    # 1 degree lat = ~111km, 1 degree lon = ~111km * cos(lat)
+    lat_offset = 0.002  # ~220m
+    lon_offset = 0.002 / abs(lat / 90)  # adjust for latitude
+    
+    return {
+        "center": {
+            "lat": lat,
+            "lon": lon
+        },
+        "zoom": zoom,
+        "bounds": {
+            "north": lat + lat_offset,
+            "south": lat - lat_offset, 
+            "east": lon + lon_offset,
+            "west": lon - lon_offset
+        },
+        "marker": {
+            "lat": lat,
+            "lon": lon,
+            "title": location_name or "Location"
+        }
+    }
+
+def construct_prompt(question: str, context: List[str]) -> str:
+    if not context or len(context) <= 1:
+        return question
+
+    prompt_parts = []
+    prompt_parts.append("Location-specific data (use this to answer the question):")
+    for item in context[1:]: 
+        prompt_parts.append(item)
+    
+    prompt_parts.append("")  
+    prompt_parts.append("Question:")
+    prompt_parts.append(question)
+    
+    return "\n".join(prompt_parts)
+
+def process_geospatial_message(message: str, datastore_path: Path, api_base_url: str, api_key: str) -> Dict:
+    try:
+        location_info = extract_location_and_intent(message, datastore_path)
+        print(location_info)
+        if not location_info:
+            return {
+                "enhanced_prompt": message,
+                "map_data": None
+            }
+        
+        map_data = None
+        if location_info.get("showMap"):
+            map_data = get_map_preview_data(
+                location_coords=location_info["location_coords"],
+                is_near_query=location_info["is_near_query"], 
+                location_name=location_info["location"]
+            )
+
+        local_context = build_local_context(
+            location=location_info["location"],
+            intent=location_info["intent"],
+            location_coords=location_info["location_coords"],
+            is_near_query=location_info["is_near_query"],
+            api_base_url=api_base_url,
+            api_key=api_key,
+            datastore_path=datastore_path,
+            message=message
+        )
+
+        enhanced_prompt = construct_prompt(message, local_context)
+        
+        return {
+            "enhanced_prompt": enhanced_prompt,
+            "map_data": map_data
+        }
+        
+    except Exception as e:
+        print(f"Error in geospatial pipeline: {e}")
+        return {
+            "enhanced_prompt": message,
+            "map_data": None
+        }

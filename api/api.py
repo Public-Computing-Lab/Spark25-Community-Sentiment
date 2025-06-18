@@ -1,3 +1,6 @@
+import faulthandler; faulthandler.enable()
+print("=== api.py start ===")
+
 from flask import Flask, request, jsonify, g, session, Response, stream_with_context
 import csv
 from dotenv import load_dotenv
@@ -18,6 +21,8 @@ from pydantic import BaseModel
 
 from flask import Flask
 from flask_cors import CORS
+
+from geospatial_context import process_geospatial_message
 
 # Load environment variables
 load_dotenv()
@@ -76,6 +81,7 @@ CORS(
     supports_credentials=True,
     expose_headers=["RethinkAI-API-Key"],
     resources={r"/*": {"origins": "*"}},
+    allow_headers=["Content-Type", "RethinkAI-API-Key"]
 )
 
 
@@ -641,6 +647,7 @@ def get_file_content(filename: str) -> Optional[str]:
 def get_db_connection():
     # return mysql.connector.connect(**Config.DB_CONFIG)
     return db_pool.get_connection()
+    
 
 
 def json_query_results(query: str) -> Optional[Response]:
@@ -773,106 +780,152 @@ def get_gemini_response(
         return f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}"
 
 
+
 def create_gemini_context(
     context_request: str,
     preamble: str = "",
     generate_cache: bool = True,
     app_version: str = "",
-) -> Union[str, int, bool]:
-    # test if cache exists
+    spatial_context: str = ""
+) -> Union[str, int]:
+    """
+    - On generate_cache=True:
+        • If spatial_context is non-empty, delete any existing static cache
+          so we rebuild with *only* the true static parts.
+        • Build (if missing) a static cache per context_request with your CSV/TXTs + prompt.
+        • If spatial_context is empty: return static_cache.name.
+        • If spatial_context non-empty: create a tiny dynamic cache that
+          prepends just that snippet to the same static contents → return its name.
+    - On generate_cache=False:
+        • Assemble spatial + static + prompt in memory and return total token count.
+    """
+    display_base = f"APP_VERSION_{app_version}_REQUEST_{context_request}"
+    static_cache = None
+
+    print(f"[create_gemini_context] start  request={context_request!r}, "
+          f"app_version={app_version!r}, generate_cache={generate_cache}, "
+          f"spatial_context length={len(spatial_context)}")
+
+    # 1) Look for an existing static cache
     if generate_cache:
-        for cache in genai_client.caches.list():
-            if (
-                cache.display_name
-                == "APP_VERSION_" + app_version + "_REQUEST_" + context_request
-                and cache.model == Config.GEMINI_MODEL
-            ):
-                return cache.name
+        for c in genai_client.caches.list():
+            if c.display_name == display_base and c.model == Config.GEMINI_MODEL:
+                static_cache = c
+                print("[create_gemini_context] FOUND static_cache:", c.name)
+                break
 
-    try:
-        files_list = []
-        content = {"parts": []}
+    # 2) **If** we already have a static cache but you're about to inject
+    #    a spatial snippet, **delete** it so we rebuild cleanly.
+    if generate_cache and spatial_context and static_cache:
+        print("[create_gemini_context] deleting stale static_cache to rebuild fresh")
+        genai_client.caches.delete(name=static_cache.name)
+        static_cache = None
 
-        # adding community assets to context (ignoring potential other csv in datastore)
-        if context_request == "structured":
-            files_list = get_files("csv", ["geocoding-community-assets.csv"])
-            preamble_file = context_request + ".txt"
+    # 3) Load file list & preamble name exactly as before
+    if context_request == "structured":
+        files_list  = get_files("csv", ["geocoding-community-assets.csv"])
+        prompt_file = "structured.txt"
+        extra_csv   = None
+    elif context_request == "unstructured":
+        files_list  = get_files("txt")
+        prompt_file = "unstructured.txt"
+        extra_csv   = None
+    elif context_request == "all":
+        files_list  = get_files()
+        prompt_file = "all.txt"
+        extra_csv   = None
+    elif context_request in {
+        "experiment_5","experiment_6","experiment_7","experiment_pit","get_summary"
+    }:
+        files_list  = get_files("txt")
+        prompt_file = f"{context_request}.txt"
+        print(f"[create_gemini_context] running 311-summary query for {context_request}")
+        resp        = get_query_results(
+                        query=build_311_query(data_request="311_summary_context"),
+                        output_type="csv"
+                     )
+        extra_csv   = resp.getvalue()
+        print("[create_gemini_context] 311-summary CSV size:", len(extra_csv))
+    else:
+        files_list, prompt_file, extra_csv = [], f"{context_request}.txt", None
 
-        elif context_request == "unstructured":
-            files_list = get_files("txt")
-            preamble_file = context_request + ".txt"
+    # 4) Read in all static parts
+    static_parts: List[dict] = []
+    if extra_csv:
+        static_parts.append({"text": extra_csv})
+    for fname in files_list:
+        txt = get_file_content(fname)
+        if txt:
+            static_parts.append({"text": txt})
+            print(f"[create_gemini_context] loaded file '{fname}', {len(txt)} chars")
 
-        elif context_request == "all":
-            files_list = get_files()
-            preamble_file = context_request + ".txt"
-        elif (
-            context_request == "experiment_5"
-            or context_request == "experiment_6"
-            or context_request == "experiment_7"
-            or context_request == "experiment_pit"
-            or context_request == "get_summary"
-        ):
-            files_list = get_files("txt")
-            query = build_311_query(data_request="311_summary_context")
-            response = get_query_results(query=query, output_type="csv")
+    # 5) Load your system prompt
+    prompt_path = Config.PROMPTS_PATH / prompt_file
+    if not prompt_path.is_file():
+        raise FileNotFoundError(f"Prompt not found: {prompt_path}")
+    system_prompt = prompt_path.read_text(encoding="utf-8")
+    print(f"[create_gemini_context] loaded system_prompt ({prompt_file}), "
+          f"{len(system_prompt)} chars")
 
-            content["parts"].append({"text": response.getvalue()})
-
-            preamble_file = context_request + ".txt"
-
-        # Read contents of found files
-        for file in files_list:
-            file_content = get_file_content(file)
-            if file_content is not None:
-                content["parts"].append({"text": file_content})
-
-        path = Config.PROMPTS_PATH / preamble_file
-        if not path.is_file():
-            raise FileNotFoundError(
-                f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error: File not found:{Font_Colors.ENDC} {path}"
-            )
-        system_prompt = path.read_text(encoding="utf-8")
-
-        display_name = "APP_VERSION_" + app_version + "_REQUEST_" + context_request
-
-        # Generate cache or return token count
-        if generate_cache:
-            # Set cache expiration time
-            cache_ttl = (
-                (
-                    datetime.datetime.now(datetime.timezone.utc)
-                    + datetime.timedelta(days=Config.GEMINI_CACHE_TTL)
-                )
-                .isoformat()
-                .replace("+00:00", "Z")
-            )
-
-            # Create the cache
-            cache = genai_client.caches.create(
-                model=Config.GEMINI_MODEL,
-                config=types.CreateCachedContentConfig(
-                    display_name=display_name,
-                    system_instruction=system_prompt,
-                    expire_time=cache_ttl,
-                    contents=content["parts"],
-                ),
-            )
-
-            return cache.name
-        else:
-            # Return token count for testing
-            content["parts"].append({"text": system_prompt})
-            total_tokens = genai_client.models.count_tokens(
-                model=Config.GEMINI_MODEL, contents=content["parts"]
-            )
-            return total_tokens.total_tokens
-
-    except Exception as e:
-        print(
-            f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating context:{Font_Colors.ENDC} {e}"
+    # 6) If we need to create the static cache (and it doesn’t exist), do it now
+    if generate_cache and static_cache is None:
+        expire_time = (
+            datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(days=Config.GEMINI_CACHE_TTL)
+        ).isoformat().replace("+00:00", "Z")
+        print("[create_gemini_context] creating static cache", display_base)
+        static_cache = genai_client.caches.create(
+            model=Config.GEMINI_MODEL,
+            config=types.CreateCachedContentConfig(
+                display_name=display_base,
+                system_instruction=system_prompt,
+                expire_time=expire_time,
+                contents=static_parts,
+            ),
         )
-        return f"✖ Error generating context: {e}"
+        print("[create_gemini_context] created static_cache:", static_cache.name)
 
+    # 7) Token‐count‐only shortcut
+    if not generate_cache:
+        parts = []
+        if spatial_context:
+            parts.append({"text": spatial_context})
+            print("[create_gemini_context] counting tokens includes spatial_context")
+        parts.extend(static_parts)
+        parts.append({"text": system_prompt})
+        tc = genai_client.models.count_tokens(
+            model=Config.GEMINI_MODEL, contents=parts
+        )
+        print("[create_gemini_context] total_tokens:", tc.total_tokens)
+        return tc.total_tokens
+
+    # 8) generate_cache=True and static_cache ready
+    #    a) no spatial_context? just reuse static
+    if not spatial_context:
+        print("[create_gemini_context] no spatial_context → reusing static_cache")
+        return static_cache.name
+
+    #    b) spatial_context present → build a tiny one‐off dynamic cache
+    dynamic_name = f"{display_base}_{uuid.uuid4().hex}"
+    print("[create_gemini_context] building dynamic cache:", dynamic_name)
+    dynamic_parts = [{"text": spatial_context}] + static_parts
+
+    expire_time = (
+        datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(days=Config.GEMINI_CACHE_TTL)
+    ).isoformat().replace("+00:00", "Z")
+
+    dynamic_cache = genai_client.caches.create(
+        model=Config.GEMINI_MODEL,
+        config=types.CreateCachedContentConfig(
+            display_name=dynamic_name,
+            system_instruction=system_prompt,
+            expire_time=expire_time,
+            contents=dynamic_parts,
+        ),
+    )
+    print("[create_gemini_context] created dynamic_cache:", dynamic_cache.name)
+    return dynamic_cache.name
 
 # Log events
 def log_event(
@@ -967,21 +1020,20 @@ def log_event(
 #
 @app.before_request
 def check_session():
+    # Handle CORS preflight requests
     if request.method == "OPTIONS":
-        # Preflight CORS request – skip auth
-        return None
+        return ("", 204)
 
-    rethinkai_api_client_key = request.headers.get("RethinkAI-API-Key")
+    # API-key authentication
+    api_key = request.headers.get("RethinkAI-API-Key")
     app_version = request.args.get("app_version", "")
 
-    if (
-        not rethinkai_api_client_key
-        or rethinkai_api_client_key not in Config.RETHINKAI_API_KEYS
-    ):
+    if not api_key or api_key not in Config.RETHINKAI_API_KEYS:
         return jsonify({"Error": "Invalid or missing API key"}), 401
 
+    # Ensure session exists
     if "session_id" not in session:
-        session.permanent = True  # Make the session persistent
+        session.permanent = True
         session["session_id"] = str(uuid.uuid4())
         log_event(
             session_id=session["session_id"],
@@ -990,13 +1042,14 @@ def check_session():
             app_response="New session created",
         )
 
-    # Log the request
+    # Log the incoming request
     g.log_entry = log_event(
         session_id=session["session_id"],
         app_version=app_version,
         data_attributes=Config.API_VERSION,
         client_query=f"Request: [{request.method}] {request.url}",
     )
+
 
 
 #
@@ -1116,6 +1169,8 @@ def route_data_query():
         return jsonify({"✖ Error": str(e)}), 500
 
 
+from flask import session
+
 @app.route("/chat", methods=["POST"])
 def route_chat():
     session_id = session.get("session_id")
@@ -1127,23 +1182,45 @@ def route_chat():
     structured_response = request.args.get("structured_response", False)
 
     data = request.get_json()
-
-    # Extract chat data parameters
     data_attributes = data.get("data_attributes", "")
     client_query = data.get("client_query", "")
+    user_message = data.get("user_message", "")
     prompt_preamble = data.get("prompt_preamble", "")
 
-    # data_selected, optional, list of files used when context_request==s
+    print("[GEOSPATIAL] incoming query:", client_query)
+    geospatial_result = process_geospatial_message(
+        user_message,
+        Config.DATASTORE_PATH,
+        f"http://127.0.0.1:{Config.PORT}",
+        Config.RETHINKAI_API_KEYS[0],
+    )
+
+    has_location = geospatial_result["map_data"] is not None
+    map_data = geospatial_result["map_data"]
+
+    spatial_context_data = ""
+    if has_location:
+        enhanced = geospatial_result["enhanced_prompt"]
+        spatial_context_data = enhanced.split("Question:")[0].strip()
+        session["last_spatial_context"] = spatial_context_data
+        print("[GEOSPATIAL] new spatial_context_data:", repr(spatial_context_data))
+    else:
+        spatial_context_data = session.get("last_spatial_context", "")
+        print("[GEOSPATIAL] reusing spatial_context_data:", repr(spatial_context_data))
+
+    print("[CACHE] Calling create_gemini_context(...)")
     cache_name = create_gemini_context(
         context_request=context_request,
         preamble=prompt_preamble,
         generate_cache=True,
         app_version=app_version,
+        spatial_context=spatial_context_data,
     )
+    print("[CACHE] create_gemini_context returned cache_name:", cache_name)
 
     full_prompt = f"User question: {client_query}"
+    print("[PROMPT] full_prompt sent to Gemini:\n", full_prompt)
 
-    # Process chat
     try:
         app_response = get_gemini_response(
             prompt=full_prompt,
@@ -1151,12 +1228,8 @@ def route_chat():
             structured_response=structured_response,
         )
         if "Error" in app_response:
-            print(
-                f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ ERROR from Gemini API:{Font_Colors.ENDC} {app_response}"
-            )
             return jsonify({"Error": app_response}), 500
 
-        # Log the interaction
         log_id = log_event(
             session_id=session_id,
             app_version=app_version,
@@ -1166,11 +1239,14 @@ def route_chat():
             client_query=full_prompt,
             app_response=app_response,
         )
+
         response = {
             "session_id": session_id,
             "response": app_response,
             "log_id": log_id,
         }
+        if map_data:
+            response["mapData"] = map_data
 
         log_event(
             session_id=session_id,
@@ -1185,13 +1261,10 @@ def route_chat():
             session_id=session_id,
             app_version=app_version,
             log_id=g.log_entry,
-            app_response=f"ERROR: {str(e)}",
+            app_response=f"ERROR: {e}",
         )
-        print(f"✖ Exception in /chat: {e}")
-        print(f"✖ context_request: {context_request}")
-        print(f"✖ preamble: {prompt_preamble}")
-        print(f"✖ app_version: {app_version}")
         return jsonify({"Error": f"Internal server error: {e}"}), 500
+
 
 
 @app.route("/chat/context", methods=["GET", "POST"])
@@ -1204,18 +1277,18 @@ def route_chat_context():
     )
 
     if request.method == "GET":
-        # return list of context caches if <request> is ""
+        
         if not context_request:
             response = {cache.name: str(cache) for cache in genai_client.caches.list()}
             return jsonify(response)
 
         else:
-            # test token count for context cache of <request>
             token_count = create_gemini_context(
                 context_request=context_request,
                 preamble="",
                 generate_cache=False,
                 app_version=app_version,
+                spatial_context=""  
             )
 
             if isinstance(token_count, int):
@@ -1225,24 +1298,20 @@ def route_chat_context():
             ):
                 return jsonify({"token_count": token_count.total_tokens})
             else:
-                # Handle the error appropriately, e.g., log the error and return an error response
                 print(
-                    f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error getting token count:{Font_Colors.ENDC} {token_count}"
+                    f"{Font_Colors.FAIL}{Font_Colors.BOLD}Error getting token count:{Font_Colors.ENDC} {token_count}"
                 )  # Log the error
                 return (
                     jsonify({"error": "Failed to get token count"}),
                     500,
                 )  # Return an error response
     if request.method == "POST":
-        # TODO: implement 'specific' context_request with list of files from datastore
-        # FOR NOW: assumes 'structured', 'unstructured', 'all', 'experiment_5', 'experiment_6', 'experiment_7' context_request
-        # Context cache creation appends app_version so caches are versioned.
+
         if not context_request:
             return jsonify({"Error": "Missing context_request parameter"}), 400
 
         context_option = request.args.get("option", "")
         if context_option == "clear":
-            # clear the cache, either by name or all existing caches
             for cache in genai_client.caches.list():
                 if context_request == cache.display_name or context_request == "all":
                     genai_client.caches.delete(name=cache.name)
@@ -1256,7 +1325,6 @@ def route_chat_context():
             return jsonify({"Success": "Context cache cleared."})
         else:
             data = request.get_json()
-            # Extract chat data parameters
             prompt_preamble = data.get("prompt_preamble", "")
 
             response = create_gemini_context(
@@ -1264,6 +1332,7 @@ def route_chat_context():
                 preamble=prompt_preamble,
                 generate_cache=True,
                 app_version=app_version,
+                spatial_context=""  # Pass empty spatial context for manual cache creation
             )
 
             log_event(
@@ -1301,7 +1370,7 @@ def chat_summary():
         return jsonify({"summary": summary})
 
     except Exception as e:
-        print(f"✖ Error summarizing chat: {e}")
+        print(f" Error summarizing chat: {e}")
         return jsonify({"error": str(e)}), 500
 
 
