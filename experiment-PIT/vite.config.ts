@@ -7,6 +7,7 @@ export default defineConfig({
   server: {
     host: '127.0.0.1'
   },
+  base: "experimenting/8/",
   build: {
     outDir: process.env.BUILD_PATH || 'dist', // Use BUILD_PATH from .env or default to 'dist'
   },
