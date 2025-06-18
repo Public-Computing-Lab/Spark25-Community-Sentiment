@@ -5,19 +5,18 @@ import { useEffect, useState} from 'react';
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-// import {
-// 		MapboxExportControl,
-// 		Size,
-// 		PageOrientation,
-// 		Format,
-// 		DPI
-// 	} from '@watergis/mapbox-gl-export';
+import {
+		MapboxExportControl,
+		Size,
+		PageOrientation,
+		Format,
+		DPI
+	} from '@watergis/mapbox-gl-export';
 	import '@watergis/mapbox-gl-export/dist/mapbox-gl-export.css';
 import { processShotsData } from '../../public/data/process_911';
 import { process311Data } from '../../public/data/process_311';
 import FilterDialog from '../components/FilterDialog';
 import LayersClearIcon from '@mui/icons-material/LayersClear';
-import DownloadIcon from "@mui/icons-material/Download";
 //besure to install mapbox-gl 
 
 function Map() {
@@ -25,46 +24,9 @@ function Map() {
   const [layers, setLayers] = useState<string[]>([]);
   
   mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
-  const mapCenter = [-71.076543, 42.288386];
-  const mapStyle = "light-v11";
-  const mapZoom = "14.5";
-  const width = window.innerWidth;
-  const height = window.innerHeight;
 
   const handleMapClear = () => {
     //need to implement, what do we want to see?
-    
-  }
-
-  const handleGenerateMapImage = async () => {
-    //trying to implement the map png download
-    //need to get layer objs match selectedLayers, and put it overlay parameter in imageURL
-    // mapRef.current?.getStyle().layers.forEach((layer) => {
-    //   console.log(layer);
-    // });
-    
-
-    if (mapRef.current) {
-    const imageUrl = `https://api.mapbox.com/styles/v1/mapbox/${mapStyle}/static/${mapCenter[0]},${mapCenter[1]},${mapZoom}/${width}x${height}?access_token=${mapboxgl.accessToken}`;
-    try {
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "TNT-SafetyData.png";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
-      } catch (error) {
-        console.error("Failed to download map image:", error);
-      }
-    } else {
-      console.error("Map is not initialized.");
-    }
     
   }
 
@@ -245,18 +207,18 @@ function Map() {
       }
     })
 
-    // const exportControl = new MapboxExportControl({
-    //   PageSize: Size.A4,
-    //   PageOrientation: PageOrientation.Portrait,
-    //   Format: Format.PNG,
-    //   DPI: DPI[96],
-    //   Crosshair: false,
-    //   PrintableArea: true,
-    //   Local: 'en',
-    //   Filename: "TNT-PublicSafety-Data",
-    //   accessToken: mapboxgl.accessToken,
-    // });
-    // mapRef.current?.addControl(exportControl, 'top-right');
+    const exportControl = new MapboxExportControl({
+      PageSize: Size.A4,
+      PageOrientation: PageOrientation.Portrait,
+      Format: Format.PNG,
+      DPI: DPI[96],
+      Crosshair: false,
+      PrintableArea: true,
+      Local: 'en',
+      Filename: "TNT-PublicSafety-Data",
+      accessToken: mapboxgl.accessToken,
+    });
+    mapRef.current?.addControl(exportControl, 'top-right');
     
     return () => {
 
@@ -321,12 +283,6 @@ function Map() {
               onClick={handleMapClear}
             >
               <LayersClearIcon/>
-            </IconButton>
-            <IconButton
-              aria-label="Clear Map"
-              onClick={handleGenerateMapImage}
-            >
-              <DownloadIcon/>
             </IconButton>
           </Box>
           
