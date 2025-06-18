@@ -13,6 +13,7 @@ export async function sendChatMessage(message: string, history: Message[]) {
   console.log("history: ", formattedHistory);
   const json = {
     "client_query": message + "\n Here's the message history to provide context to this request: " + JSON.stringify(formattedHistory),
+    "user_message": message,
   };
 
   try {
