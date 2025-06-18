@@ -1,6 +1,20 @@
 import axios from "axios";
 import type { Message } from "../constants/chatMessages"
 
+const MAPBOX_ACCESS_TOKEN = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
+const mass_bbox = "-73.5081,41.2379,-69.9286,42.8868";
+
+interface Location {
+  name: string;
+  type: 'specific' | 'vague';
+  reference?: string;
+}
+
+interface GeocodedLocation {
+  name: string;
+  coordinates: [number, number]; // [longitude, latitude]
+}
+
 const header = {
     "RethinkAI-API-Key": import.meta.env.VITE_RETHINKAI_API_CLIENT_KEY,
     "Content-Type": "application/json",
@@ -35,22 +49,11 @@ async function sendPostRequest(url: string, payload: any, headers: any) {
   }
 }
 
-const MAPBOX_ACCESS_TOKEN = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
-
-interface Location {
-  name: string;
-  type: 'specific' | 'vague';
-  reference?: string;
-}
-
-interface GeocodedLocation {
-  name: string;
-  coordinates: [number, number]; // [longitude, latitude]
-}
 
 async function geocodeSpecific(locationName: string): Promise<[number, number] | null> {
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationName)}.json`;
   const params = {
+    bbox: mass_bbox,
     access_token: MAPBOX_ACCESS_TOKEN,
     limit: 1
   };
@@ -80,6 +83,7 @@ async function geocodeVague(locationName: string, referenceLocation: string): Pr
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationName)}.json`;
   const params = {
     access_token: MAPBOX_ACCESS_TOKEN,
+    bbox: mass_bbox,
     proximity: `${referenceCoords[0]},${referenceCoords[1]}`,
     limit: 1
   };
@@ -99,19 +103,19 @@ async function geocodeVague(locationName: string, referenceLocation: string): Pr
 }
 
 async function geocodeLocations(locations: Location[]): Promise<GeocodedLocation[]> {
-  console.log("received locations in geocodeLocations: ", locations, locations.length);
-  console.log("isArray:", Array.isArray(locations));
-  console.log("keys:", Object.keys(locations));
+  // console.log("received locations in geocodeLocations: ", locations, locations.length);
+  // console.log("isArray:", Array.isArray(locations));
+  // console.log("keys:", Object.keys(locations));
 
   const geocodedLocations: GeocodedLocation[] = [];
 
   for (const location of locations) {
     try {
-      console.log("individual location: ", location);
+      // console.log("individual location: ", location);
       let coordinates: [number, number] | null = null;
 
       if (location.type === 'specific') {
-        console.log("location type exists");
+        // console.log("location type exists");
         coordinates = await geocodeSpecific(location.name);
       } else if (location.type === 'vague' && location.reference) {
         coordinates = await geocodeVague(location.name, location.reference);
@@ -160,12 +164,12 @@ export async function sendChatMessage(message: string, history: Message[], is_sp
     const jsonResponse = typeof rawResponse === 'string' ? JSON.parse(rawResponse) : rawResponse;
     locations = jsonResponse.locations;
     locations = Object.values(locations);
-    console.log("received locations: ", locations, typeof locations);
+    // console.log("received locations: ", locations, typeof locations);
 
     const geocodedLocations = await geocodeLocations(locations);
-    console.log("geocoded: ", geocodedLocations);
+    // console.log("geocoded: ", geocodedLocations);
     locationEmbeddedMessage = injectCoordinatesIntoMessage(message, geocodedLocations);
-    console.log(locationEmbeddedMessage);
+    console.log("location embedded message: ", locationEmbeddedMessage);
 
   } catch (error) {
     // Error is already logged in sendPostRequest, so no need to handle here again
