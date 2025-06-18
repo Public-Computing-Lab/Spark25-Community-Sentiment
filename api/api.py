@@ -788,12 +788,14 @@ def get_gemini_response(
         model = Config.GEMINI_MODEL
         if structured_response is True:
             config = types.GenerateContentConfig(
-                cached_content=cache_name,
+                cached_content=cache_name if cache_name else None,
                 response_schema=list[Structured_Data],
                 response_mime_type="application/json",
             )
         else:
-            config = types.GenerateContentConfig(cached_content=cache_name)
+            config = types.GenerateContentConfig(
+                cached_content=cache_name if cache_name else None
+            )
 
         # Direct synchronous call instead of asyncio.to_thread
         response = genai_client.models.generate_content(
@@ -1333,27 +1335,35 @@ def route_chat_context():
 def chat_summary():
     data = request.get_json()
     messages = data.get("messages", [])
-    app_version = request.args.get("app_version", "0")
-    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
 
     if not messages:
         return jsonify({"error": "No messages provided."}), 400
 
+    # Create chat_transcript from messages
     chat_transcript = "\n".join(
         f"{'User' if msg['sender'] == 'user' else 'Chat'}: {msg['text']}"
         for msg in messages
     )
 
-    cache_name = create_gemini_context(
-        context_request="get_summary",
-        preamble="",
-        generate_cache=True,
-        app_version=app_version,
-        is_spatial=is_spatial,
-    )
+    summary_file_path = "./prompts/get_summary.txt"
 
+    # Read the content from the get_summary.txt file
     try:
-        summary = get_gemini_response(prompt=chat_transcript, cache_name=cache_name)
+        with open(summary_file_path, "r") as file:
+            file_content = file.read()
+
+        # Combine the file content with the chat transcript to form the full prompt
+        full_prompt = f"{file_content}\n{chat_transcript}"
+
+    except FileNotFoundError:
+        return jsonify({"error": "Summary prompt not found."}), 404
+    except Exception as e:
+        print(f"✖ Error reading summary prompt file: {e}")
+        return jsonify({"error": str(e)}), 500
+
+    # Call the Gemini response function with the combined full_prompt
+    try:
+        summary = get_gemini_response(prompt=full_prompt, cache_name=None)
         return jsonify({"summary": summary})
 
     except Exception as e:
