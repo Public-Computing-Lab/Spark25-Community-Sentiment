@@ -90,5 +90,10 @@ api/datastore/*
 **/data/.gitkeep
 !api/datastore/.gitkeep 
 !api/datastore/geocoding-community-assets.csv
+!api/datastore/budget_data_dictionary_v1.txt
+!api/datastore/budget_filtered.txt
+!api/datastore/Imagine Boston 2030 Analysis.txt
+!api/datastore/Boston Slow Streets Plan Analysis.txt
+!api/datastore/Boston Anti-Displacement Plan Analysis.txt
 !api/*.sql
 !setup/*.sql
