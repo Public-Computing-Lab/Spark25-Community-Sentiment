@@ -2,7 +2,7 @@ import axios from "axios";
 import type { Message } from "../constants/chatMessages"
 
 const MAPBOX_ACCESS_TOKEN = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
-const mass_bbox = "-73.5081,41.2379,-69.9286,42.8868";
+const tnt_bbox = "-71.081784,42.284182,-71.071601,42.293255";
 
 interface Location {
   name: string;
@@ -53,7 +53,7 @@ async function sendPostRequest(url: string, payload: any, headers: any) {
 async function geocodeSpecific(locationName: string): Promise<[number, number] | null> {
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationName)}.json`;
   const params = {
-    bbox: mass_bbox,
+    bbox: tnt_bbox,
     access_token: MAPBOX_ACCESS_TOKEN,
     limit: 1
   };
@@ -83,7 +83,7 @@ async function geocodeVague(locationName: string, referenceLocation: string): Pr
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationName)}.json`;
   const params = {
     access_token: MAPBOX_ACCESS_TOKEN,
-    bbox: mass_bbox,
+    bbox: tnt_bbox,
     proximity: `${referenceCoords[0]},${referenceCoords[1]}`,
     limit: 1
   };
