@@ -1,10 +1,18 @@
 import { Box, Typography, IconButton } from '@mui/material'
 import Key from '../components/Key';
-import { useMap } from "../components/MapProvider";
+import { useMap } from "../components/useMap.tsx";
 import { useEffect, useState} from 'react';
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import {
+		MapboxExportControl,
+		Size,
+		PageOrientation,
+		Format,
+		DPI
+	} from '@watergis/mapbox-gl-export';
+	import '@watergis/mapbox-gl-export/dist/mapbox-gl-export.css';
 import { processShotsData } from '../../public/data/process_911';
 import { process311Data } from '../../public/data/process_311';
 import FilterDialog from '../components/FilterDialog';
@@ -12,11 +20,10 @@ import LayersClearIcon from '@mui/icons-material/LayersClear';
 //besure to install mapbox-gl 
 
 function Map() {
-  const { mapRef, mapContainerRef } = useMap(); // Access mapRef and mapContainerRef from context
-
+  const { mapRef, mapContainerRef, selectedLayers, selectedYearsSlider, setSelectedLayer, setSelectedYearsSlider } = useMap(); // Access mapRef and mapContainerRef from context
   const [layers, setLayers] = useState<string[]>([]);
-  const [selectedLayers, setSelectedLayer] = useState<string[]>(["Community Assets"]);
-  const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
+  
+  mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
 
   const handleMapClear = () => {
     //need to implement, what do we want to see?
@@ -25,16 +32,14 @@ function Map() {
 
   //loading all data
   useEffect(() => {
-
-    mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
-    
     if (mapContainerRef.current){
         mapRef.current = new mapboxgl.Map({ //creating map
         container: mapContainerRef.current,
         center: [-71.076543, 42.288386], //centered based on 4 rectangle coordinates of TNT
         zoom: 14.5,
         minZoom: 12,
-        style: "mapbox://styles/mapbox/light-v11", //should decide on style
+        maxZoom: 18,
+        style: "mapbox://styles/mapbox/light-v11?optimize=true", //should decide on style
       });
     }
 
@@ -200,11 +205,24 @@ function Map() {
           .addTo(mapRef.current!);
       }
     })
+
+    const exportControl = new MapboxExportControl({
+      PageSize: Size.A4,
+      PageOrientation: PageOrientation.Portrait,
+      Format: Format.PNG,
+      DPI: DPI[96],
+      Crosshair: false,
+      PrintableArea: true,
+      Local: 'en',
+      Filename: "TNT-PublicSafety-Data",
+      accessToken: mapboxgl.accessToken,
+    });
+    mapRef.current?.addControl(exportControl, 'top-right');
     
     return () => {
 
     }
-  }, []);
+  }, [mapRef, mapContainerRef]);
 
   //changing visibility of layers depending on what is checked in filters or not.
   useEffect(() => {
@@ -224,13 +242,13 @@ function Map() {
         if (layerId !== "Community Assets"){ //excluding filtering on community assets
           mapRef.current?.setFilter(layerId, [
             "all",
-            [">=", "year", selectedYears[0]],
-            ["<=", "year", selectedYears[selectedYears.length - 1]],
+            [">=", "year", selectedYearsSlider[0]],
+            ["<=", "year", selectedYearsSlider[selectedYearsSlider.length - 1]],
           ]);
         }
       })
     }
-  }, [selectedYears, layers])
+  }, [selectedYearsSlider, layers])
 
 
   return (
@@ -258,12 +276,15 @@ function Map() {
           <Typography variant="h4" component="h1">
             Map
           </Typography>
-          <IconButton
-            aria-label="Clear Map"
-            onClick={handleMapClear}
-          >
-            <LayersClearIcon/>
-          </IconButton>
+          <Box>
+              <IconButton
+              aria-label="Clear Map"
+              onClick={handleMapClear}
+            >
+              <LayersClearIcon/>
+            </IconButton>
+          </Box>
+          
       </Box>
       
       <Box sx={{ //element rendering the map
@@ -279,7 +300,7 @@ function Map() {
       <Box sx={{mb: 3, position: 'absolute', left: '5', top: '4em'}}>
           <Key />
       </Box>
-      <FilterDialog layers={layers} onSelectionChange={setSelectedLayer} onSliderChange={setSelectedYears}/>
+      <FilterDialog layers={layers} onSelectionChange={setSelectedLayer} onSliderChange={setSelectedYearsSlider}/>
       
     </Box>
     
