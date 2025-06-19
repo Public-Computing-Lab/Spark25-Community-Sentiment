@@ -316,7 +316,7 @@ function Map() {
           left: 0,
           width: '100%',
           height: '100%',
-          backgroundColor: "rgba(10, 10, 10, 0.32)",
+          backgroundColor: "rgba(10, 10, 10, 0.35)",
           zIndex: 3,
         }}
         />
