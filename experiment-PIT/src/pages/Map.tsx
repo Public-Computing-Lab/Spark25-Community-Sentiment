@@ -1,4 +1,4 @@
-import { Box, Typography, IconButton } from '@mui/material'
+import { Box, Typography, IconButton, CircularProgress } from '@mui/material'
 import Key from '../components/Key';
 import { useMap } from "../components/useMap.tsx";
 import { useEffect, useState} from 'react';
@@ -22,6 +22,7 @@ import LayersClearIcon from '@mui/icons-material/LayersClear';
 function Map() {
   const { mapRef, mapContainerRef, selectedLayers, selectedYearsSlider, setSelectedLayer, setSelectedYearsSlider } = useMap(); // Access mapRef and mapContainerRef from context
   const [layers, setLayers] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
 
@@ -45,107 +46,116 @@ function Map() {
 
     //adding initial map annotations
     mapRef.current?.on('load', async () => { //made async in order to be able to load shots data
-      //adding rect borders of TNT
-      mapRef.current?.addSource('TNT', {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          geometry: {
-            type: 'Polygon',
-            coordinates: [
-              [
-                [-71.081913, 42.294138],
-                [-71.071855, 42.293938],
-                [-71.071315, 42.284500],
-                [-71.081440,42.284301],
-                [-71.081913, 42.294138],
-              ]
-            ],
-          },
-          properties: {}
-        }
-      });
-
-      mapRef.current?.addLayer({
-        id: 'tnt-outline',
-        type: 'line',
-        source: 'TNT',
-        layout: {},
-        paint: {
-          'line-color': '#82aae7',
-          'line-width': 3,
-        }
-      });
-
-        // Fetching and adding community assets
-      fetch(`${import.meta.env.BASE_URL}data/map_2.geojson`)
-        .then((response) => response.json())
-        .then((geojsonData) => {
-          mapRef.current?.addSource('assets', {
-            type: 'geojson',
-            data: geojsonData,
-          });
-
-          mapRef.current?.addLayer({
-            id: 'Community Assets',
-            type: 'circle',
-            source: 'assets',
-            paint: {
-              'circle-radius': 5,
-              'circle-color': '#228B22',
+     
+        //adding rect borders of TNT
+        mapRef.current?.addSource('TNT', {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [-71.081913, 42.294138],
+                  [-71.071855, 42.293938],
+                  [-71.071315, 42.284500],
+                  [-71.081440,42.284301],
+                  [-71.081913, 42.294138],
+                ]
+              ],
             },
-          });
-          
-        })
-        .catch((error) => {
-          console.error('Error fetching community assets:', error);
+            properties: {}
+          }
         });
-    
-      const shots_geojson = await processShotsData(); //loading shots data from api and converting to geojson
-      const request_geojson = await process311Data(); //loading 311 data from api and converting to geojson
 
-      mapRef.current?.addSource('shots_data', { //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
-        type: 'geojson',
-        data: shots_geojson
-      });
+        mapRef.current?.addLayer({
+          id: 'tnt-outline',
+          type: 'line',
+          source: 'TNT',
+          layout: {},
+          paint: {
+            'line-color': '#82aae7',
+            'line-width': 3,
+          }
+        });
+        
+          // Fetching and adding community assets
+        fetch(`${import.meta.env.BASE_URL}data/map_2.geojson`)
+          .then((response) => response.json())
+          .then((geojsonData) => {
+            mapRef.current?.addSource('assets', {
+              type: 'geojson',
+              data: geojsonData,
+            });
 
-      mapRef.current?.addLayer({
-        id: 'Gun Violence Incidents',
-        type: 'circle',
-        source: 'shots_data',
-        paint: {
-          'circle-radius': 3,
-          'circle-color': '#880808',
-        }
-      })
-
-      //adding 311 data
-      mapRef.current?.addSource('311_data', { //takes even longer than 911 data...
-        type: 'geojson',
-        data: request_geojson //change to non-personal account
-      });
-
-      mapRef.current?.addLayer({
-        id: '311 Requests',
-        type: 'circle',
-        source: '311_data',
-        paint: {
-          'circle-radius': 3,
-          'circle-color': '#FFC300',
-          'circle-opacity': 0.3,
-        }
-      });
+            mapRef.current?.addLayer({
+              id: 'Community Assets',
+              type: 'circle',
+              source: 'assets',
+              paint: {
+                'circle-radius': 5,
+                'circle-color': '#228B22',
+              },
+            });
+            
+          })
+          .catch((error) => {
+            console.error('Error fetching community assets:', error);
+          });
       
+      setIsLoading(true);
+      try {
+        const shots_geojson = await processShotsData(); //loading shots data from api and converting to geojson
+        const request_geojson = await process311Data(); //loading 311 data from api and converting to geojson
+      
+        mapRef.current?.addSource('shots_data', { //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
+          type: 'geojson',
+          data: shots_geojson
+        });
 
-      // Retrieve all layers after community-assets is added
-      const mapLayers = mapRef.current?.getStyle().layers;
-      const layerIds = mapLayers
-        ? mapLayers
-            .filter(layer => layer.type === 'circle') //getting only the layers i've added
-            .map(layer => layer.id)
-        : [];
-      setLayers(layerIds);
+        mapRef.current?.addLayer({
+          id: 'Gun Violence Incidents',
+          type: 'circle',
+          source: 'shots_data',
+          paint: {
+            'circle-radius': 3,
+            'circle-color': '#880808',
+          }
+        })
+
+        //adding 311 data
+        mapRef.current?.addSource('311_data', { //takes even longer than 911 data...
+          type: 'geojson',
+          data: request_geojson //change to non-personal account
+        });
+
+        mapRef.current?.addLayer({
+          id: '311 Requests',
+          type: 'circle',
+          source: '311_data',
+          paint: {
+            'circle-radius': 3,
+            'circle-color': '#FFC300',
+            'circle-opacity': 0.3,
+          }
+        });
+        
+
+        // Retrieve all layers after community-assets is added
+        const mapLayers = mapRef.current?.getStyle().layers;
+        const layerIds = mapLayers
+          ? mapLayers
+              .filter(layer => layer.type === 'circle') //getting only the layers i've added
+              .map(layer => layer.id)
+          : [];
+        setLayers(layerIds);
+
+        setIsLoading(false);
+      } catch (error) {
+        console.log("Error loading data", error);
+      }
     });
+
 
     mapRef.current?.on('click', 'Community Assets', (e) => { //getting popup text
       if (e.features && e.features[0]) {
@@ -286,7 +296,31 @@ function Map() {
           </Box>
           
       </Box>
-      
+      {isLoading && (
+      <Box
+        sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 1000,
+        }}
+      >
+        <CircularProgress />
+      </Box>
+      )}
+      {isLoading && (
+        <Box sx={{ //element rendering the map
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: "rgba(10, 10, 10, 0.32)",
+          zIndex: 3,
+        }}
+        />
+      )}
       <Box sx={{ //element rendering the map
         left: '0', 
         top: '0', 
