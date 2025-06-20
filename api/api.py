@@ -175,6 +175,7 @@ class SQLConstants:
         "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
     )
 
+
     BOS311_SPATIAL_WHERE = f"""
     ST_Contains(
         ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
@@ -204,7 +205,9 @@ def build_311_query(
     request_date: str = "",
     request_zipcode: str = "",
     event_ids: str = "",
+
     is_spatial=False,
+
 ) -> str:
     if is_spatial:
         Bos311_where_clause = SQLConstants.BOS311_SPATIAL_WHERE
@@ -233,6 +236,7 @@ def build_311_query(
             type IN ({SQLConstants.CATEGORY_TYPES[request_options]}) 
             AND {Bos311_where_clause}
         """
+
 
         if request_date:
             query += f"""AND DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'"""
@@ -404,6 +408,8 @@ def build_311_query(
         return query
     elif data_request == "311_summary" and event_ids:
 
+
+
         # Quote each event_id if not already quoted
         id_list = [f"'{x.strip()}'" for x in event_ids.split(",") if x.strip()]
         id_str = ",".join(id_list)
@@ -538,6 +544,7 @@ def build_311_query(
             f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating query:{Font_Colors.ENDC}: check query args"
         )
         return ""
+
 
 
 def build_911_query(data_request: str, is_spatial=False) -> str:
@@ -853,10 +860,12 @@ def create_gemini_context(
             or context_request == "experiment_pit"
         ):
 
+
             files_list = get_files("txt")
             query = build_311_query(
                 data_request="311_summary_context", is_spatial=is_spatial
             )
+
             response = get_query_results(query=query, output_type="csv")
 
             content["parts"].append({"text": response.getvalue()})
@@ -1331,6 +1340,8 @@ def chat_summary():
     data = request.get_json()
     messages = data.get("messages", [])
 
+
+
     if not messages:
         return jsonify({"error": "No messages provided."}), 400
 
@@ -1346,6 +1357,7 @@ def chat_summary():
     try:
         with open(summary_file_path, "r") as file:
             file_content = file.read()
+
 
         # Combine the file content with the chat transcript to form the full prompt
         full_prompt = f"{file_content}\n{chat_transcript}"
