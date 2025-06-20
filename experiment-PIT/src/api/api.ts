@@ -35,8 +35,8 @@ async function sendPostRequest(url: string, payload: any, headers: any) {
   }
 }
 
+// Send chat message with history
 export async function sendChatMessage(message: string, history: Message[], is_spatial: boolean = false) {
-  // Send chat message with history
   const urlChat = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False&is_spatial=${is_spatial ? 'true' : 'false'}`;
   const formattedHistory = history.map(message => JSON.stringify(message)).join('\n');
   const jsonChat = {
