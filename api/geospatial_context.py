@@ -205,7 +205,7 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
         # Get 911 shots fired data
         response_911 = requests.get(
             f"{api_base_url}/data/query",
-            params={'request': '911_shots_fired', 'output_type': 'json'},
+            params={'request': '911_shots_fired', 'output_type': 'json', 'is_spatial': 'true'},
             headers=headers
         )
         
@@ -248,7 +248,7 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
         
         response_hom = requests.get(
             f"{api_base_url}/data/query",
-            params={'request': '911_homicides_and_shots_fired', 'output_type': 'json'},
+            params={'request': '911_homicides_and_shots_fired', 'output_type': 'json', 'is_spatial': 'true'},
             headers=headers
         )
         if response_hom.status_code == 200:
@@ -290,7 +290,7 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
         # Get 311 data
         response_311 = requests.get(
             f"{api_base_url}/data/query", 
-            params={'request': '311_by_geo', 'category': 'all', 'output_type': 'json'},
+            params={'request': '311_by_geo', 'category': 'all', 'output_type': 'json', 'is_spatial': 'true'},
             headers=headers
         )
         
