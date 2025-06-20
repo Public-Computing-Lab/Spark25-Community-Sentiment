@@ -1,4 +1,4 @@
-import { Box, Typography, IconButton, CircularProgress } from '@mui/material'
+import { Box, Typography, CircularProgress } from '@mui/material'
 import Key from '../components/Key';
 import { useMap } from "../components/useMap.tsx";
 import { useEffect, useState} from 'react';
@@ -19,7 +19,7 @@ import FilterDialog from '../components/FilterDialog';
 //besure to install mapbox-gl 
 
 function Map() {
-  const { mapRef, mapContainerRef, selectedLayers, selectedYearsSlider, setSelectedLayer, setSelectedYearsSlider } = useMap(); // Access mapRef and mapContainerRef from context
+  const { mapRef, mapContainerRef, pendingFitBounds, setPendingFitBounds, selectedLayers, selectedYearsSlider, setSelectedLayer, setSelectedYearsSlider } = useMap(); // Access mapRef and mapContainerRef from context
   const [layers, setLayers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -258,6 +258,16 @@ function Map() {
     }
   }, [mapRef, selectedYearsSlider, layers])
 
+  useEffect(() => {
+    if (mapRef.current && pendingFitBounds) {
+      mapRef.current.fitBounds(new mapboxgl.LngLatBounds(pendingFitBounds), {
+        padding: 40,
+        duration: 1000,
+      });
+      setPendingFitBounds(null); // Reset so it can be triggered again
+      console.log("set new bounds");
+    }
+  }, [pendingFitBounds, mapRef, setPendingFitBounds]);
 
   return (
     <Box

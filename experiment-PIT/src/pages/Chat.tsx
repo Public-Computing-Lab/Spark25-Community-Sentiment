@@ -42,7 +42,7 @@ function Chat() {
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [confirmExportOpen, setConfirmExportOpen] = useState(false);
   const [summaryError, setSummaryError] = useState(false);
-  const { mapRef, setSelectedData, selectedLayers, setSelectedLayer, setSelectedYearsSlider, setSelectedYears, } = useMap(); // Access mapRef and mapContainerRef from context
+  const { mapRef, setSelectedData, selectedLayers, setSelectedLayer, setSelectedYearsSlider, setSelectedYears, setPendingFitBounds} = useMap(); // Access mapRef and mapContainerRef from context
   const sampleData = { //IT WORKS!! changes just aren't reflected in the filter dialog
     "data_type": ["Community Assets", "Gun Violence Incidents"],
     "location": [-71.07379065017204, 42.28608785581647]
@@ -144,23 +144,15 @@ function Chat() {
     const minLon = centerLon - metersToDegreesLon(rMeters, centerLat);
     const maxLon = centerLon + metersToDegreesLon(rMeters, centerLat);
 
-    // Zoom to bounding box
-    mapRef.current.fitBounds(
-      [
-        [minLon, minLat], // Southwest corner [lng, lat]
-        [maxLon, maxLat], // Northeast corner [lng, lat]
-      ],
-      {
-        padding: 40, // Optional: add padding around the box
-        duration: 1000, // Optional: animation duration in ms
-      }
-    );
+    setPendingFitBounds(
+      [[minLon, minLat], [maxLon, maxLat]] // Northeast
+    );  
   }
 
   // Optionally reset pendingMapFilter if you want to allow re-triggering with the same values
   // setPendingMapFilter(null);
 
-  }, [pendingMapFilter, mapRef, selectedLayers, setSelectedData, setSelectedLayer, setSelectedYears, setSelectedYearsSlider]);
+  }, [pendingMapFilter,setPendingFitBounds, mapRef, selectedLayers, setSelectedData, setSelectedLayer, setSelectedYears, setSelectedYearsSlider]);
 
 
   useEffect(() => {
