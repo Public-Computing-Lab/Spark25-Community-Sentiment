@@ -62,27 +62,35 @@
       setInput("");
       setIsSending(true);
 
-      try {
-        const data = await sendChatMessage(userMsg, messages, true);
+    try {
+
+      // Call backend API helper to get AI response
+      const data = await sendChatMessage(userMsg, messages, true);
+
+      // Append backend response to messages
+      if (data.response) {
         setMessages((prev) => [
           ...prev,
-          {
-            text: data.response ?? "Sorry, no response from server.",
-            sender: "Gemini",
-          },
+          { text: data.response, sender: "Gemini" },
         ]);
-      } catch {
+      } else {
         setMessages((prev) => [
           ...prev,
-          {
-            text: "Oops, something went wrong. Please try again.",
-            sender: "Gemini",
-          },
+          { text: "Sorry, no response from server.", sender: "Gemini" },
         ]);
-      } finally {
-        setIsSending(false);
       }
-    };
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: "Oops, something went wrong. Please try again.",
+          sender: "Gemini",
+        },
+      ]);
+    } finally {
+      setIsSending(false);
+    }
+  };
 
     // ─── utils ────────────────────────────────────────────────────────
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -94,18 +102,17 @@
       setMessages(getInitialMessages());
     };
 
-    const handleExportSummary = async () => {
-      const summary = await getChatSummary(messages, true);
-      
+  const handleExportSummary = async () => {
+    const summary = await getChatSummary(messages, true);
 
-      if (summary === "Summary generation failed.") {
-        setSummaryError(true);
-        return;
-      }
-      const doc = new jsPDF();
-      doc.text(doc.splitTextToSize(summary, 180), 10, 20);
-      doc.save("chat-summary.pdf");
-    };
+    if (summary === "Summary generation failed.") {
+      setSummaryError(true);
+      return;
+    }
+    const doc = new jsPDF();
+    doc.text(doc.splitTextToSize(summary, 180), 10, 20);
+    doc.save("chat-summary.pdf");
+  };
 
     // scroll to bottom on new messages
     useEffect(() => {

@@ -23,7 +23,9 @@ export const process311Data = async () => {
     try {
          //loading 
         const request_data = await get311Data(undefined, undefined, true);
+
         const request_geojson: GeoJSON = { type: "FeatureCollection", features: [] as GeoJSONFeature[] }; //defining type of array
+
 
         //converting to geojson
         for (const instance of request_data){
