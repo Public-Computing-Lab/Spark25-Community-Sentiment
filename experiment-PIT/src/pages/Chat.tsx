@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useMap } from "../components/useMap.tsx";
 import type { Message } from "../constants/chatMessages";
 import {
   opening_message,
@@ -24,6 +25,9 @@ import SendIcon from "@mui/icons-material/Send";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DownloadIcon from "@mui/icons-material/Download";
 import CircularProgress from "@mui/material/CircularProgress";
+import ExploreIcon from '@mui/icons-material/Explore';
+import type { mapFilter } from "../types/mapFilter";
+
 
 function Chat() {
   const getInitialMessages = (): Message[] => {
@@ -38,6 +42,12 @@ function Chat() {
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [confirmExportOpen, setConfirmExportOpen] = useState(false);
   const [summaryError, setSummaryError] = useState(false);
+  const { mapRef, setSelectedData, selectedLayers, setSelectedLayer, setSelectedYearsSlider, setSelectedYears, } = useMap(); // Access mapRef and mapContainerRef from context
+  const sampleData = { //IT WORKS!! changes just aren't reflected in the filter dialog
+    "data_type": ["Community Assets", "Gun Violence Incidents"],
+    "location": [-71.07379065017204, 42.28608785581647]
+  }
+  const [pendingMapFilter, setPendingMapFilter] = useState<mapFilter | null>(null);
 
   // Save messages to localStorage when they change
   useEffect(() => {
@@ -110,6 +120,45 @@ function Chat() {
   };
 
   useEffect(() => {
+  if (!pendingMapFilter || !mapRef.current) return;
+
+  const data = pendingMapFilter;
+
+  if (data.data_type) {
+    setSelectedData(data.data_type);
+    setSelectedLayer(data.data_type);
+  }
+  if (data.year) {
+    setSelectedYears(data.year);
+    setSelectedYearsSlider(data.year);
+    console.log("Setting years", data.year);
+  }
+  if (data.location) {
+    const [centerLat, centerLon] = data.location;
+    const r = 0.005;
+    const minLat = centerLat - r;
+    const maxLat = centerLat + r;
+    const minLon = centerLon - r;
+    const maxLon = centerLon + r;
+
+    selectedLayers.forEach((layerId) => {
+      mapRef.current?.setFilter(layerId, [
+        "all",
+        [">=", "latitude", minLat],
+        ["<=", "latitude", maxLat],
+        [">=", "longitude", minLon],
+        ["<=", "longitude", maxLon]
+      ]);
+    });
+  }
+
+  // Optionally reset pendingMapFilter if you want to allow re-triggering with the same values
+  // setPendingMapFilter(null);
+
+  }, [pendingMapFilter, mapRef, selectedLayers, setSelectedData, setSelectedLayer, setSelectedYears, setSelectedYearsSlider]);
+
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -151,6 +200,12 @@ function Chat() {
               onClick={() => setConfirmClearOpen(true)}
             >
               <RefreshIcon />
+            </IconButton>
+            <IconButton
+              aria-label="Testing Map-Chat-Link"
+              onClick={() => setPendingMapFilter(sampleData)}
+            >
+              <ExploreIcon />
             </IconButton>
           </Box>
         </Box>
