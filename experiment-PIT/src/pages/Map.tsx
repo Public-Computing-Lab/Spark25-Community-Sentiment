@@ -17,6 +17,7 @@ import { processShotsData } from '../../public/data/process_911';
 import { process311Data } from '../../public/data/process_311';
 import FilterDialog from '../components/FilterDialog';
 import LayersClearIcon from '@mui/icons-material/LayersClear';
+import { colorPalette } from "../assets/palette";
 //besure to install mapbox-gl 
 
 function Map() {
@@ -261,84 +262,59 @@ function Map() {
   }, [selectedYearsSlider, layers])
 
 
+   /* ─── Render ───────────────────────────────────────────── */
   return (
     <Box
       sx={{
-        display: 'flex',
-        flexDirection: 'column',
+        display: "flex",
+        flexDirection: "column",
         height: `calc(100vh - ${BOTTOM_NAV_HEIGHT}px)`,
-        width: '100%',
-        bgcolor: 'background.paper',
-        color: 'text.primary',
-        overflow: 'hidden',
-        position: 'relative',
-        p: 2,
+        width: "100%",
+        bgcolor: "#E7F4FF",
+        overflow: "hidden",
       }}
     >
-      <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 2,
-          }}
-        >
-          <Typography variant="h4" component="h1">
-            Map
-          </Typography>
-          <Box>
-              <IconButton
-              aria-label="Clear Map"
-              onClick={handleMapClear}
-            >
-              <LayersClearIcon/>
-            </IconButton>
-          </Box>
-          
-      </Box>
-      {isLoading && (
+      {/* ─── Header ─────────────────────────────────────── */}
       <Box
         sx={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          px: 2,
+          height: 75,
+          borderBottomLeftRadius: 16,
+          borderBottomRightRadius: 16,
+          bgcolor: colorPalette.dark,
+          color: "#fff",
         }}
       >
-        <CircularProgress />
+        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+          Map
+        </Typography>
+        <IconButton onClick={handleMapClear} sx={{ color: "#fff" }}>
+          <LayersClearIcon />
+        </IconButton>
       </Box>
-      )}
-      {isLoading && (
-        <Box sx={{ //element rendering the map
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: "rgba(10, 10, 10, 0.32)",
-          zIndex: 3,
-        }}
-        />
-      )}
-      <Box sx={{ //element rendering the map
-        left: '0', 
-        top: '0', 
-        flex: 1, 
-        width: '100%',
-        height: `calc(100vh - ${BOTTOM_NAV_HEIGHT}px)`,
-        position: 'relative',
-      }}
-        ref={mapContainerRef}
-      />
-      <Box sx={{mb: 3, position: 'absolute', left: '5', top: '4em'}}>
+
+      {/* ─── Flexible content area (fills the rest) ─────── */}
+      <Box sx={{ flex: 1, p: 2, position: "relative" }}>
+        {/* Mapbox container fills its parent */}
+        <Box ref={mapContainerRef} sx={{ position: "absolute", inset: 0 }} />
+
+        {/* Legend overlay */}
+        <Box sx={{ position: "absolute", top: "4em", left: 5 }}>
           <Key />
+        </Box>
       </Box>
-      <FilterDialog layers={layers} onSelectionChange={setSelectedLayer} onSliderChange={setSelectedYearsSlider}/>
-      
+
+      {/* Floating filter button & drawer */}
+      <FilterDialog
+        layers={layers}
+        onSelectionChange={setSelectedLayer}
+        onSliderChange={setSelectedYearsSlider}
+      />
     </Box>
-    
-  )
+  );
 }
 
 export default Map;

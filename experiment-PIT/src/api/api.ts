@@ -6,8 +6,10 @@ const header = {
     "Content-Type": "application/json",
   }
 
+
 // Helper function to send the HTTP request and handle errors
 async function sendPostRequest(url: string, payload: any, headers: any) {
+
   try {
     console.log("➡️ Sending POST to:", url);
     console.log("📦 Payload:", payload);

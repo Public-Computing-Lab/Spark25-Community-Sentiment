@@ -1,79 +1,54 @@
-import { Box, Typography} from '@mui/material';
+import { Box, Typography, Stack } from "@mui/material";
 
-function Key() {
-    return (
-        <Box sx={{
-            maxWidth: "40vw",
-            width: "30vw",
-            height: "17vh",
-            bgcolor: 'white',
-            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-            '&:hover': {
-                 boxShadow: "0 2px 4px rgba(0, 0, 0, 0.4)",
-            },
-            borderRadius: 3,
-            borderWidth: 3,
-            margin: '1em',
-        }}>
-            <Typography sx={{
-                padding: '0.5em',
-                fontWeight: 'bold',
-            }}>
-                Legend
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', paddingLeft: '1em' }}>
-                <Box sx={{
-                    width: '10px',
-                    height: '10px',
-                    backgroundColor: '#880808', // Red for Shootings
-                    borderRadius: '50%',
-                    marginRight: '0.4em',
-                }} />
-                <Typography sx={{ fontSize: "12px" }}>
-                    Gun Violence Incidents
-                </Typography>
-            </Box>
-    
-            <Box sx={{ display: 'flex', alignItems: 'center', paddingLeft: '1em' }}>
-                <Box sx={{
-                    width: '10px',
-                    height: '10px',
-                    backgroundColor: '#228B22', // Red for Shootings
-                    borderRadius: '50%',
-                    marginRight: '0.4em',
-                }} />
-                <Typography sx={{ fontSize: "12px" }}>
-                    Assets
-                </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', paddingLeft: '1em' }}>
-                <Box sx={{
-                    width: '10px',
-                    height: '10px',
-                    backgroundColor: '#FBEC5D', // Red for Shootings
-                    borderRadius: '50%',
-                    marginRight: '0.5em',
-                }} />
-                <Typography sx={{ fontSize: "12px" }}>
-                    311 Requests
-                </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', paddingLeft: '1em' }}>
-                <Box sx={{
-                    width: '10px',
-                    height: '5px',
-                    backgroundColor: '#82aae7', // Red for Shootings
-                    borderRadius: '0',
-                    marginRight: '0.5em',
-                }} />
-                <Typography sx={{ fontSize: "12px" }}>
-                    TNT Border
-                </Typography>
-            </Box>
-        </Box>
+const LegendItem = ({
+  color,
+  label,
+  shape = "circle",
+}: {
+  color: string;
+  label: string;
+  shape?: "circle" | "line";
+}) => (
+  <Box sx={{ display: "flex", alignItems: "center" }}>
+    <Box
+      sx={{
+        width: shape === "line" ? 14 : 10,
+        height: shape === "circle" ? 10 : 4,
+        backgroundColor: color,
+        borderRadius: shape === "circle" ? "50%" : 0,
+        mr: 1,
+        flexShrink: 0,
+      }}
+    />
+    <Typography sx={{ fontSize: 13 }}>{label}</Typography>
+  </Box>
+);
 
-    )
-        
+export default function Key() {
+  return (
+    <Box
+      sx={{
+        maxWidth: 240,          
+        bgcolor: "#E9F4FF",    
+        boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+        borderRadius: 3,
+        p: 1.25,
+        overflowY: "auto",
+        maxHeight: "26vh",        // never taller than a quarter screen
+      }}
+    >
+      <Typography
+        sx={{ fontWeight: 700, mb: 0.75, fontSize: 15 }}
+      >
+        Legend
+      </Typography>
+
+      <Stack spacing={0.75}>
+        <LegendItem color="#880808" label="Gun Violence Incidents" />
+        <LegendItem color="#228B22" label="Assets" />
+        <LegendItem color="#FFC300" label="311 Requests" />
+        <LegendItem color="#82aae7" label="TNT Border" shape="line" />
+      </Stack>
+    </Box>
+  );
 }
-
-export default Key;
