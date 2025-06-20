@@ -1,19 +1,24 @@
 import pandas as pd
 import re
 from pathlib import Path
-from typing import Dict, Optional
-import nltk
-from collections import Counter
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.tag import pos_tag
+from typing import Dict, Optional, List
 import requests
 import math
-from pathlib import Path
-from typing import Dict, List
 import datetime
 from collections import defaultdict
+import json
 
+_geocoding_data = None
+
+def get_mapbox_coordinates(location_name: str) -> Optional[Dict]:
+    """
+    MAPBOX INTEGRATION PLACEHOLDER
+    
+    Returns:
+        {"lat": 42.12345, "lon": -71.12345} or None 
+
+    """
+    return None
 
 _geocoding_data = None
 
@@ -32,8 +37,46 @@ def _load_geocoding_data(datastore_path: Path) -> pd.DataFrame:
     
     return _geocoding_data
 
+
+def get_location_from_llm(message: str, api_base_url: str, api_key: str) -> Optional[Dict]:
+
+    try:
+        headers = {'RethinkAI-API-Key': api_key, 'Content-Type': 'application/json'}
+        
+        response = requests.post(
+            f"{api_base_url}/chat/identify_places",
+            json={"message": message},
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            llm_result = response.json()
+            
+            if isinstance(llm_result, str):
+                if llm_result.strip() == "No locations found.":
+                    return None
+                try:
+                    llm_result = json.loads(llm_result)
+                except:
+                    return None
+            
+            if isinstance(llm_result, dict):
+                if 'locations' in llm_result:
+                    return llm_result
+                else:
+
+                    return {"locations": llm_result if isinstance(llm_result, list) else []}
+            
+            return None
+        else:
+            print(f"LLM endpoint error: {response.status_code}")
+            return None
+            
+    except Exception as e:
+        print(f"Error calling LLM endpoint: {e}")
+        return None
+
 def _normalize_text(text: str) -> str:
-    # handle common street variations
     text = text.lower().strip()
     text = re.sub(r'\bavenue\b', 'ave', text)
     text = re.sub(r'\bstreet\b', 'st', text)
@@ -67,95 +110,107 @@ def _get_all_location_names(geocoding_data: pd.DataFrame) -> list:
     all_locations.sort(key=lambda x: len(x['name']), reverse=True)
     return all_locations
 
-def _find_location_in_message(message: str, all_locations: list) -> Optional[Dict]:
+def match_llm_location_to_assets(llm_location_name: str, datastore_path: Path) -> Optional[Dict]:
+    try:
+        geocoding_data = _load_geocoding_data(datastore_path)
+        if geocoding_data.empty:
+            return None
+            
+        all_locations = _get_all_location_names(geocoding_data)
+        location_normalized = _normalize_text(llm_location_name)
+        
+        best_match = None
+        best_score = 0
+        
+        for loc in all_locations:
+            raw_name = loc['name']
+            loc_norm = _normalize_text(raw_name)
+            tokens = loc_norm.split()
+
+            # Exact match first
+            if location_normalized == loc_norm:
+                return {
+                    'name': raw_name,
+                    'lat': loc['lat'],
+                    'lon': loc['lon']
+                }
+            
+            # Partial match
+            for n in range(len(tokens), 0, -1):
+                prefix = ' '.join(tokens[:n])
+                if prefix in location_normalized or location_normalized in prefix:
+                    score = len(prefix) / len(loc_norm)
+                    if score > best_score:
+                        best_score = score
+                        best_match = {
+                            'name': raw_name,
+                            'lat': loc['lat'],
+                            'lon': loc['lon']
+                        }
+                    break
+        
+        return best_match
+        
+    except Exception as e:
+        print(f"Error in location matching: {e}")
+        return None
+
+def extract_location_and_intent_enhanced(message: str, api_base_url: str, api_key: str, datastore_path: Path) -> Optional[Dict]:
+
+    # Try LLM for location detection and intent
+    llm_result = get_location_from_llm(message, api_base_url, api_key)
+    
+    if not llm_result:
+        return None
+    
+    # Extract LLM results
+    if isinstance(llm_result, dict):
+        locations_list = llm_result.get('locations', [])
+        llm_intent = llm_result.get('intent', 'general') 
+    else:
+        locations_list = llm_result if isinstance(llm_result, list) else []
+        llm_intent = 'general'
+    
+    if not locations_list:
+        return None
+    
+    first_location = locations_list[0]
+    location_name = first_location.get('name', '')
+    
+    matched_location = match_llm_location_to_assets(location_name, datastore_path)
+    
+    if not matched_location:
+        print(f"No coordinates found in community assets for: {location_name}")
+        
+        # MAPBOX INTEGRATION (placeholder)
+        mapbox_coords = get_mapbox_coordinates(location_name)
+        if mapbox_coords:
+            matched_location = {
+                'name': location_name,
+                'lat': mapbox_coords['lat'],
+                'lon': mapbox_coords['lon']
+            }
+        else:
+            return None
+
     message_normalized = _normalize_text(message)
     proximity_triggers = ['near', 'around', 'nearby', 'by', 'close to', 'within']
     is_near_query = any(tok in message_normalized for tok in proximity_triggers)
     
-    best_match = None
-    best_score = 0
+    intent = llm_intent
     
-    for loc in all_locations:
-        raw_name = loc['name']
-        loc_norm = _normalize_text(raw_name)
-        tokens = loc_norm.split()
-
-        for n in range(len(tokens), 0, -1):
-            prefix = ' '.join(tokens[:n])
-            if prefix in message_normalized:
-                # Score based on how much of the location name matched
-                score = len(prefix) / len(loc_norm)
-                if score > best_score:
-                    best_score = score
-                    best_match = {
-                        'name': raw_name,
-                        'lat': loc['lat'],
-                        'lon': loc['lon'],
-                        'is_near_query': is_near_query
-                    }
-                break  # Don't check shorter prefixes for this location
-    
-    return best_match
-
-def _extract_intent(message: str) -> str:
-    try:
-        tokens = word_tokenize(message.lower())
-        pos_tags = pos_tag(tokens)
-        stop_words = set(stopwords.words('english'))
-        
-        important_words = []
-        for word, pos in pos_tags:
-            if (pos.startswith('NN') or pos.startswith('JJ') or pos.startswith('VB')) and \
-               word not in stop_words and \
-               len(word) > 2 and \
-               word.isalpha():
-                important_words.append(word)
-                
-        if important_words:
-            return important_words[0]
-        
-        return 'general'
-        
-    except Exception as e:
-        print(f"Error in NLP intent extraction, falling back to simple method: {e}")
-        # Simple fallback if NLTK fails
-        words = [w.lower() for w in message.split() if len(w) > 3 and w.isalpha()]
-        common_words = {'what', 'where', 'when', 'there', 'this', 'that', 'about'}
-        for word in words:
-            if word not in common_words:
-                return word
-        return 'general'
-
-def extract_location_and_intent(message: str, datastore_path: Path) -> Optional[Dict]:
-
-    try:
-        geocoding_data = _load_geocoding_data(datastore_path)
-        
-        if geocoding_data.empty:
-            return None
-
-        all_locations = _get_all_location_names(geocoding_data)
-        location_info = _find_location_in_message(message, all_locations)
-        
-        if not location_info:
-            return None
-
-        intent = _extract_intent(message)
-        
-        return {
-            "location": location_info['name'],
-            "location_coords": {
-                "lat": location_info['lat'],
-                "lon": location_info['lon']
-            },
-            "intent": intent,
-            "showMap": True,
-            "is_near_query": location_info['is_near_query']
+    location_info = {
+        "location": matched_location['name'],
+        "intent": intent,
+        "is_near_query": is_near_query, 
+        "showMap": True,
+        "location_coords": {
+            "lat": matched_location['lat'],
+            "lon": matched_location['lon']
         }
-        
-    except Exception as e:
-        print(f"Error in extract_location_and_intent: {e}")
-        return None
+    }
+    
+    return location_info
 
 def build_local_context(location: str, intent: str, location_coords: Dict, is_near_query: bool, api_base_url: str, api_key: str, datastore_path: Path, message: str = "") -> List[str]:
 
@@ -163,7 +218,6 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
     
     radius = None
     if message:
-        # look for “within <number> <unit>”
         pattern = re.compile(
             r'\bwithin\s*([\d\.]+)\s*'                 
             r'(kilometers?|km|meters?|m|yards?|yd|feet|foot|ft)\b',
@@ -197,12 +251,11 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
     lat = location_coords['lat']
     lon = location_coords['lon']
     
-    context.append(f"EXACT DATA for {location} within {radius} meters - this is the complete dataset for your query:")
+    context.append(f"EXACT DATA for {location} within {radius} meters - this is the complete dataset for your query. IMPORTANT: Mention the community transcripts in your response if there are any in local context:")
     
     try:
         headers = {'RethinkAI-API-Key': api_key}
         
-        # Get 911 shots fired data
         response_911 = requests.get(
             f"{api_base_url}/data/query",
             params={'request': '911_shots_fired', 'output_type': 'json', 'is_spatial': 'true'},
@@ -218,7 +271,7 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
                     lat1, lon1, lat2, lon2 = map(math.radians, [lat, lon, shot_lat, shot_lon])
                     dlat, dlon = lat2 - lat1, lon2 - lon1
                     a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-                    distance = 6371000 * 2 * math.asin(math.sqrt(a))  # meters
+                    distance = 6371000 * 2 * math.asin(math.sqrt(a))  
                     
                     if distance <= radius:
                         local_shots.append(shot)
@@ -253,12 +306,11 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
         )
         if response_hom.status_code == 200:
             hom_data = response_hom.json()
-            # only keep those within our radius
             local_homs = []
             for ev in hom_data:
                 if 'latitude' in ev and 'longitude' in ev and 'date' in ev:
                     lat2, lon2 = float(ev['latitude']), float(ev['longitude'])
-                    # haversine
+                    # haversine calculation
                     φ1, λ1, φ2, λ2 = map(math.radians, [lat, lon, lat2, lon2])
                     dφ, dλ = φ2-φ1, λ2-λ1
                     a = math.sin(dφ/2)**2 + math.cos(φ1)*math.cos(φ2)*math.sin(dλ/2)**2
@@ -267,7 +319,6 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
                         local_homs.append(ev)
 
             if local_homs:
-                # group by year
                 homs_by_year = defaultdict(int)
                 for h in local_homs:
                     dt = None
@@ -283,11 +334,9 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
                 context.append("Homicides breakdown by year:")
                 for yr in sorted(homs_by_year):
                     context.append(f"- {yr}: {homs_by_year[yr]} homicides")
-
             else:
                 context.append(f"No homicide incidents found within {radius}m of {location}.")
 
-        # Get 311 data
         response_311 = requests.get(
             f"{api_base_url}/data/query", 
             params={'request': '311_by_geo', 'category': 'all', 'output_type': 'json', 'is_spatial': 'true'},
@@ -296,12 +345,10 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
         
         if response_311.status_code == 200:
             data_311 = response_311.json()
-            # Filter by distance
             local_311 = []
             for incident in data_311:
                 if 'latitude' in incident and 'longitude' in incident:
                     inc_lat, inc_lon = float(incident['latitude']), float(incident['longitude'])
-                    # Calculate distance 
                     lat1, lon1, lat2, lon2 = map(math.radians, [lat, lon, inc_lat, inc_lon])
                     dlat, dlon = lat2 - lat1, lon2 - lon1
                     a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
@@ -311,7 +358,6 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
                         local_311.append(incident)
             
             if local_311:
-                # filter by intent in the incident types
                 intent_lower = intent.lower()
                 intent_related = []
                 
@@ -320,7 +366,6 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
                     if intent_lower in incident_type:
                         intent_related.append(incident)
                 
-                # show intent related incidents first
                 if intent_related:
                     type_counts = {}
                     for incident in intent_related:
@@ -330,8 +375,6 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
                     context.append(f"311 complaints about {intent} within {radius}m:")
                     for incident_type, count in sorted(type_counts.items(), key=lambda x: x[1], reverse=True)[:3]:
                         context.append(f"- {count} reports of {incident_type}")
-                
-                # show other local issues
                 else:
                     type_counts = {}
                     for incident in local_311:
@@ -344,7 +387,6 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
             else:
                 context.append(f"No 311 complaints found within {radius}m of {location}.")
 
-        # get community quotes 
         if datastore_path.exists():
             txt_files = [f for f in datastore_path.iterdir() if f.suffix.lower() == '.txt' and not f.name.startswith('.')]
             
@@ -368,7 +410,7 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
                     print(f"Error reading {txt_file}: {e}")
             
             if relevant_quotes:
-                context.append("Community feedback:")
+                context.append("Community Transcripts:")
                 priority_quotes = [q for q in relevant_quotes if location_lower in q.lower() and intent_lower in q.lower()]
                 if priority_quotes:
                     context.extend([f"- {q}" for q in priority_quotes[:2]])
@@ -385,19 +427,14 @@ def build_local_context(location: str, intent: str, location_coords: Dict, is_ne
     
     return context
 
-
 def get_map_preview_data(location_coords: Dict, is_near_query: bool, location_name: str = "") -> Dict:
-
     lat = location_coords['lat']
     lon = location_coords['lon']
     
-    # Simple zoom, close for specific locations, wider for near queries
     zoom = 17 if is_near_query else 18
     
-    # calculate bounds for the map view (roughly 200m x 200m area)
-    # 1 degree lat = ~111km, 1 degree lon = ~111km * cos(lat)
-    lat_offset = 0.002  # ~220m
-    lon_offset = 0.002 / abs(lat / 90)  # adjust for latitude
+    lat_offset = 0.002
+    lon_offset = 0.002 / abs(lat / 90)
     
     return {
         "center": {
@@ -419,6 +456,7 @@ def get_map_preview_data(location_coords: Dict, is_near_query: bool, location_na
     }
 
 def construct_prompt(question: str, context: List[str]) -> str:
+    """Keep this function as is"""
     if not context or len(context) <= 1:
         return question
 
@@ -434,9 +472,12 @@ def construct_prompt(question: str, context: List[str]) -> str:
     return "\n".join(prompt_parts)
 
 def process_geospatial_message(message: str, datastore_path: Path, api_base_url: str, api_key: str) -> Dict:
+    """
+    Enhanced main function using LLM endpoint
+    """
     try:
-        location_info = extract_location_and_intent(message, datastore_path)
-        print(location_info)
+        location_info = extract_location_and_intent_enhanced(message, api_base_url, api_key, datastore_path)
+        
         if not location_info:
             return {
                 "enhanced_prompt": message,
@@ -461,7 +502,7 @@ def process_geospatial_message(message: str, datastore_path: Path, api_base_url:
             datastore_path=datastore_path,
             message=message
         )
-
+        print("Local Context: ", local_context)
         enhanced_prompt = construct_prompt(message, local_context)
         
         return {

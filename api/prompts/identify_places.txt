@@ -1,10 +1,15 @@
 Extract all location-related phrases from the user message you will be given. 
-These may include specific places (e.g., “Talbot Avenue”, “Ashmont Station”) or vague/general areas (e.g., “the park near Ashmont”, “a block from Codman Square”).
+These may include specific places (e.g., "Talbot Avenue", "Ashmont Station") or vague/general areas (e.g., "the park near Ashmont", "a block from Codman Square").
+
+Also determine the user's main intent from their question.
 
 For each location, return a JSON object containing:
 - name: the full location phrase from the message
 - type: either "specific" (a known place that can be directly geocoded) or "vague" (a general or relative reference that requires contextual resolution)
-- reference (optional): for vague locations, include a nearby reference point mentioned in the phrase (e.g., “Ashmont” in “the park near Ashmont”)
+- reference (optional): for vague locations, include a nearby reference point mentioned in the phrase (e.g., "Ashmont" in "the park near Ashmont")
+
+Additionally, include:
+- intent: what the user is asking about (e.g., "crime", "safety", "parking", "trash", "housing", "transportation", "general")
 
 Format your response like this:
 
@@ -19,9 +24,18 @@ Format your response like this:
       "type": "vague",
       "reference": "Ashmont"
     }
-  ]
+  ],
+  "intent": "crime"
 }
 
+Intent examples:
+- "crime" - questions about violence, shootings, safety, incidents
+- "trash" - questions about dumping, waste, cleanliness
+- "parking" - questions about parking availability, enforcement
+- "housing" - questions about living conditions, property issues
+- "transportation" - questions about buses, trains, accessibility
+- "general" - general questions about the area
+
 Don't wrap with backticks or use markdown to create a code block, just use this formatting in plaintext.
-Do not generate coordinates or any other metadata. Only extract and classify location names from the user message.
+Do not generate coordinates or any other metadata. Only extract and classify information from the user message.
 If there are no locations, say "No locations found." Nothing else, just this phrase.
