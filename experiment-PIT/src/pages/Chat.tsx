@@ -214,7 +214,7 @@ function Chat() {
             >
               <CircularProgress size={16} />
               <Typography variant="body2" color="text.secondary">
-                Bot is thinking...
+                Thinking...
               </Typography>
             </Box>
           )}
