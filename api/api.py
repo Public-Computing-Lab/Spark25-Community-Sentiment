@@ -803,7 +803,13 @@ def get_gemini_response(
             contents=prompt,
             config=config,
         )
-        return response.text
+        
+        raw_output = response.text.strip()
+
+        # Process to remove unwanted trailing sender tag if present
+        cleaned_output = re.sub(r'["\']?,\s*"?sender":"Gemini"?["}]?$', '', raw_output)
+        
+        return cleaned_output
 
     except Exception as e:
         print(
