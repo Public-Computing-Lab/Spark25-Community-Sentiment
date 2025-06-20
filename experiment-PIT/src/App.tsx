@@ -5,7 +5,7 @@ import Navbar from "./components/Navbar";
 import Chat from "./pages/Chat";
 // import Home from "./pages/Home";
 import Map from "./pages/Map";
-import { MapProvider } from './components/MapProvider'
+import MapProvider from './components/MapProvider'
 
 function App() {
 
