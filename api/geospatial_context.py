@@ -7,6 +7,7 @@ import math
 import datetime
 from collections import defaultdict
 import json
+import os
 
 _geocoding_data = None
 
@@ -19,7 +20,24 @@ def get_mapbox_coordinates(location_name: str) -> Optional[Dict]:
         {"lat": 42.12345, "lon": -71.12345} or None
 
     """
-    return None
+    MAPBOX_ACCESS_TOKEN = os.getenv("MAPBOX_TOKEN")
+    tnt_bbox = "-71.081784,42.284182,-71.071601,42.293255"
+
+    url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{location_name}.json"
+    params = {"bbox": tnt_bbox, "access_token": MAPBOX_ACCESS_TOKEN, "limit": 1}
+
+    try:
+        response = requests.get(url, params=params)
+        data = response.json()
+
+        if "features" in data and len(data["features"]) > 0:
+            coordinates = data["features"][0]["geometry"]["coordinates"]
+            return coordinates  # Returns as [longitude, latitude]
+        return None
+
+    except Exception as e:
+        print(f"Error geocoding location with mapbox: {e}")
+        return None
 
 
 _geocoding_data = None
@@ -196,6 +214,7 @@ def extract_location_and_intent_enhanced(
         # MAPBOX INTEGRATION (placeholder)
         mapbox_coords = get_mapbox_coordinates(location_name)
         if mapbox_coords:
+            print(f"Got coordinates: {mapbox_coords}")
             matched_location = {
                 "name": location_name,
                 "lat": mapbox_coords["lat"],
