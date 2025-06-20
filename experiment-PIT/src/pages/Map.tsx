@@ -16,7 +16,6 @@ import {
 import { processShotsData } from '../../public/data/process_911';
 import { process311Data } from '../../public/data/process_311';
 import FilterDialog from '../components/FilterDialog';
-import LayersClearIcon from '@mui/icons-material/LayersClear';
 //besure to install mapbox-gl 
 
 function Map() {
@@ -25,11 +24,6 @@ function Map() {
   const [isLoading, setIsLoading] = useState(true);
   
   mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
-
-  const handleMapClear = () => {
-    //need to implement, what do we want to see?
-    
-  }
 
   //loading all data
   useEffect(() => {
@@ -108,6 +102,8 @@ function Map() {
         const shots_geojson = await processShotsData(); //loading shots data from api and converting to geojson
         const request_geojson = await process311Data(); //loading 311 data from api and converting to geojson
       
+        console.log("geojson format" , shots_geojson);
+
         mapRef.current?.addSource('shots_data', { //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
           type: 'geojson',
           data: shots_geojson
@@ -227,8 +223,10 @@ function Map() {
       Filename: "TNT-PublicSafety-Data",
       accessToken: mapboxgl.accessToken,
     });
+   
     mapRef.current?.addControl(exportControl, 'top-right');
-    
+  
+
     return () => {
 
     }
@@ -242,7 +240,7 @@ function Map() {
         mapRef.current?.setLayoutProperty(layerId, 'visibility', visibility);
       });
     }
-  }, [selectedLayers, layers]);
+  }, [mapRef, selectedLayers, layers]);
 
 
   //filtering by years
@@ -251,14 +249,14 @@ function Map() {
       layers.forEach((layerId) => {
         if (layerId !== "Community Assets"){ //excluding filtering on community assets
           mapRef.current?.setFilter(layerId, [
-            "all",
+            "all", //(AND)
             [">=", "year", selectedYearsSlider[0]],
             ["<=", "year", selectedYearsSlider[selectedYearsSlider.length - 1]],
           ]);
         }
-      })
+      });
     }
-  }, [selectedYearsSlider, layers])
+  }, [mapRef, selectedYearsSlider, layers])
 
 
   return (
@@ -286,14 +284,6 @@ function Map() {
           <Typography variant="h4" component="h1">
             Map
           </Typography>
-          <Box>
-              <IconButton
-              aria-label="Clear Map"
-              onClick={handleMapClear}
-            >
-              <LayersClearIcon/>
-            </IconButton>
-          </Box>
           
       </Box>
       {isLoading && (
