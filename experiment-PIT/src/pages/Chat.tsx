@@ -135,21 +135,26 @@ function Chat() {
   }
   if (data.location) {
     const [centerLat, centerLon] = data.location;
-    const r = 0.005;
-    const minLat = centerLat - r;
-    const maxLat = centerLat + r;
-    const minLon = centerLon - r;
-    const maxLon = centerLon + r;
+    const metersToDegreesLat = (meters: number) => meters / 111320;
+    const metersToDegreesLon = (meters: number, lat: number) => meters / (111320 * Math.cos(lat * Math.PI / 180));
 
-    selectedLayers.forEach((layerId) => {
-      mapRef.current?.setFilter(layerId, [
-        "all",
-        [">=", "latitude", minLat],
-        ["<=", "latitude", maxLat],
-        [">=", "longitude", minLon],
-        ["<=", "longitude", maxLon]
-      ]);
-    });
+    const rMeters = 500; // example: 500 meters
+    const minLat = centerLat - metersToDegreesLat(rMeters);
+    const maxLat = centerLat + metersToDegreesLat(rMeters);
+    const minLon = centerLon - metersToDegreesLon(rMeters, centerLat);
+    const maxLon = centerLon + metersToDegreesLon(rMeters, centerLat);
+
+    // Zoom to bounding box
+    mapRef.current.fitBounds(
+      [
+        [minLon, minLat], // Southwest corner [lng, lat]
+        [maxLon, maxLat], // Northeast corner [lng, lat]
+      ],
+      {
+        padding: 40, // Optional: add padding around the box
+        duration: 1000, // Optional: animation duration in ms
+      }
+    );
   }
 
   // Optionally reset pendingMapFilter if you want to allow re-triggering with the same values
