@@ -176,24 +176,29 @@ class SQLConstants:
     """
 
     # 311 specific constants
-    BOS311_BASE_WHERE = f"""
+
+    BOS311_BASE_WHERE = (
+        "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
+    )
+
+    BOS311_SPATIAL_WHERE = f"""
     ST_Contains(
         ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
         coordinates
-    )
-    """
+    ) = 1
+    """    
 
     # 911 specific constants
-    BOS911_BASE_WHERE_HOMOCIDES = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
+    BOS911_BASE_WHERE = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
 
-    # Only works when coordinates exist (shots fired data)
-    BOS911_BASE_WHERE = f"""
+    BOS911_SPATIAL_WHERE = f"""
     year >= 2018 AND year < 2025
     AND ST_Contains(
         ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
         coordinates
-    )
+    ) = 1
     """
+
 
 
 #
@@ -205,7 +210,15 @@ def build_311_query(
     request_date: str = "",
     request_zipcode: str = "",
     event_ids: str = "",
+    is_spatial=False,
 ) -> str:
+    if is_spatial:
+        Bos311_where_clause = SQLConstants.BOS311_SPATIAL_WHERE
+        Bos911_where_clause = SQLConstants.BOS911_SPATIAL_WHERE
+    else:
+        Bos311_where_clause = SQLConstants.BOS311_BASE_WHERE
+        Bos911_where_clause = SQLConstants.BOS911_BASE_WHERE
+
     if data_request == "311_by_geo" and request_options:
         query = f"""
         SELECT
@@ -222,9 +235,9 @@ def build_311_query(
             END AS normalized_type
         FROM
             bos311_data
-        WHERE
-            type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+        WHERE 
+            type IN ({SQLConstants.CATEGORY_TYPES[request_options]}) 
+            AND {Bos311_where_clause}
         """
         if request_date:
             query += f"""AND DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'"""
@@ -240,7 +253,7 @@ def build_311_query(
                 'Category' AS level_type,
                 NULL AS category
             FROM shots_fired_data
-            WHERE {SQLConstants.BOS911_BASE_WHERE}
+            WHERE {Bos911_where_clause}
             AND ballistics_evidence = 1
             GROUP BY year, incident_type
             UNION ALL
@@ -251,7 +264,7 @@ def build_311_query(
                 'Category' AS level_type,
                 NULL AS category
             FROM shots_fired_data
-            WHERE {SQLConstants.BOS911_BASE_WHERE}
+            WHERE {Bos911_where_clause}
             AND ballistics_evidence = 0
             GROUP BY year, incident_type
             UNION ALL
@@ -262,7 +275,7 @@ def build_311_query(
                 'Category' AS level_type,
                 NULL AS category
             FROM homicide_data
-            WHERE {SQLConstants.BOS911_BASE_WHERE_HOMOCIDES}
+            WHERE {SQLConstants.BOS911_BASE_WHERE} # Always uses base where clause because it's pulling from homicide_data, which doesn't have coordinates
             GROUP BY year, incident_type
             UNION ALL
             SELECT
@@ -273,7 +286,7 @@ def build_311_query(
                 NULL AS category
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['trash']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, incident_type
             UNION ALL
             SELECT
@@ -284,7 +297,7 @@ def build_311_query(
                 NULL AS category
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, incident_type
             UNION ALL
             SELECT
@@ -295,7 +308,7 @@ def build_311_query(
                 NULL AS category
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['streets']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, incident_type
             UNION ALL
             SELECT
@@ -306,7 +319,7 @@ def build_311_query(
                 NULL AS category
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['parking']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, incident_type
         ),
         type_details AS (
@@ -318,7 +331,7 @@ def build_311_query(
                 'Type' AS level_type
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['trash']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, type
             UNION ALL
             SELECT
@@ -329,7 +342,7 @@ def build_311_query(
                 'Type' AS level_type
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['living_conditions']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, type
             UNION ALL
             SELECT
@@ -340,7 +353,7 @@ def build_311_query(
                 'Type' AS level_type
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['streets']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, type
             UNION ALL
             SELECT
@@ -351,7 +364,7 @@ def build_311_query(
                 'Type' AS level_type
             FROM bos311_data
             WHERE type IN ({SQLConstants.CATEGORY_TYPES['parking']})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
             GROUP BY year, type
         )
         SELECT
@@ -395,6 +408,11 @@ def build_311_query(
             """
         return query
     elif data_request == "311_summary" and event_ids:
+
+        # Quote each event_id if not already quoted
+        id_list = [f"'{x.strip()}'" for x in event_ids.split(",") if x.strip()]
+        id_str = ",".join(id_list)
+
         query = f"""
         SELECT
         CASE
@@ -406,7 +424,7 @@ def build_311_query(
         type AS subcategory,
         COUNT(*) AS total
         FROM bos311_data
-        WHERE id IN ({event_ids})
+        WHERE id IN ({id_str})
         GROUP BY category, subcategory
         UNION ALL
         SELECT
@@ -419,7 +437,7 @@ def build_311_query(
         'TOTAL' AS subcategory,
         COUNT(*) AS total
         FROM bos311_data
-        WHERE id IN ({event_ids})
+        WHERE id IN ({id_str})
         GROUP BY
         category
         ORDER BY
@@ -446,7 +464,7 @@ def build_311_query(
         WHERE
             DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
             AND type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
         GROUP BY category, subcategory
         UNION ALL
         SELECT
@@ -462,7 +480,7 @@ def build_311_query(
         WHERE
             DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'
             AND type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
         GROUP BY
         category
         ORDER BY
@@ -493,7 +511,7 @@ def build_311_query(
         FROM bos311_data
         WHERE
             type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
         GROUP BY category, subcategory
         UNION ALL
         SELECT
@@ -508,7 +526,7 @@ def build_311_query(
         FROM bos311_data
         WHERE
             type IN ({SQLConstants.CATEGORY_TYPES[request_options]})
-            AND {SQLConstants.BOS311_BASE_WHERE}
+            AND {Bos311_where_clause}
         GROUP BY
         category
         ORDER BY
@@ -527,9 +545,15 @@ def build_311_query(
         return ""
 
 
-def build_911_query(data_request: str) -> str:
+def build_911_query(data_request: str, is_spatial=False) -> str:
+    Bos911_where_clause = (
+        SQLConstants.BOS911_SPATIAL_WHERE
+        if is_spatial
+        else SQLConstants.BOS911_BASE_WHERE
+    )
+
     if data_request == "911_shots_fired":
-        return f"""
+        query = f"""
         SELECT
             id,
             incident_date_time AS date,
@@ -537,13 +561,15 @@ def build_911_query(data_request: str) -> str:
             latitude,
             longitude
         FROM shots_fired_data
-        WHERE {SQLConstants.BOS911_BASE_WHERE}
-        AND latitude IS NOT NULL
-        AND longitude IS NOT NULL
+        WHERE {Bos911_where_clause}
+            AND latitude IS NOT NULL
+            AND longitude IS NOT NULL
         GROUP BY id, date, ballistics_evidence, latitude, longitude;
         """
+
+        return query
     elif data_request == "911_homicides_and_shots_fired":
-        return """
+        return f"""
         SELECT
             s.id as id,
             h.homicide_date as date,
@@ -596,8 +622,10 @@ def get_files(
         if not Config.DATASTORE_PATH.exists():
             return []
 
+        files = []
+
         if specific_files:
-            return [
+            files = [
                 f.name
                 for f in Config.DATASTORE_PATH.iterdir()
                 if f.is_file()
@@ -605,8 +633,8 @@ def get_files(
                 and not f.name.startswith(".")
             ]
 
-        if file_type:
-            return [
+        elif file_type:
+            files = [
                 f.name
                 for f in Config.DATASTORE_PATH.iterdir()
                 if f.is_file()
@@ -614,11 +642,18 @@ def get_files(
                 and not f.name.startswith(".")
             ]
 
-        return [
-            f.name
-            for f in Config.DATASTORE_PATH.iterdir()
-            if f.is_file() and not f.name.startswith(".")
-        ]
+        else:
+            files = [
+                f.name
+                for f in Config.DATASTORE_PATH.iterdir()
+                if f.is_file() and not f.name.startswith(".")
+            ]
+
+        # Ensure geocoding-community-assets.csv is always included
+        if "geocoding-community-assets.csv" not in files:
+            files.append("geocoding-community-assets.csv")
+
+        return files
 
     except Exception as e:
         print(
@@ -758,12 +793,14 @@ def get_gemini_response(
         model = Config.GEMINI_MODEL
         if structured_response is True:
             config = types.GenerateContentConfig(
-                cached_content=cache_name,
+                cached_content=cache_name if cache_name else None,
                 response_schema=list[Structured_Data],
                 response_mime_type="application/json",
             )
         else:
-            config = types.GenerateContentConfig(cached_content=cache_name)
+            config = types.GenerateContentConfig(
+                cached_content=cache_name if cache_name else None
+            )
 
         # Direct synchronous call instead of asyncio.to_thread
         response = genai_client.models.generate_content(
@@ -786,146 +823,104 @@ def create_gemini_context(
     preamble: str = "",
     generate_cache: bool = True,
     app_version: str = "",
-    spatial_context: str = ""
-) -> Union[str, int]:
-    """
-    - On generate_cache=True:
-        • If spatial_context is non-empty, delete any existing static cache
-          so we rebuild with *only* the true static parts.
-        • Build (if missing) a static cache per context_request with your CSV/TXTs + prompt.
-        • If spatial_context is empty: return static_cache.name.
-        • If spatial_context non-empty: create a tiny dynamic cache that
-          prepends just that snippet to the same static contents → return its name.
-    - On generate_cache=False:
-        • Assemble spatial + static + prompt in memory and return total token count.
-    """
-    display_base = f"APP_VERSION_{app_version}_REQUEST_{context_request}"
-    static_cache = None
-
-    print(f"[create_gemini_context] start  request={context_request!r}, "
-          f"app_version={app_version!r}, generate_cache={generate_cache}, "
-          f"spatial_context length={len(spatial_context)}")
-
-    # 1) Look for an existing static cache
+    is_spatial: bool = False,
+) -> Union[str, int, bool]:
+    # test if cache exists
     if generate_cache:
-        for c in genai_client.caches.list():
-            if c.display_name == display_base and c.model == Config.GEMINI_MODEL:
-                static_cache = c
-                print("[create_gemini_context] FOUND static_cache:", c.name)
-                break
+        for cache in genai_client.caches.list():
+            if (
+                cache.display_name
+                == "APP_VERSION_" + app_version + "_REQUEST_" + context_request
+                and cache.model == Config.GEMINI_MODEL
+            ):
+                return cache.name
 
-    # 2) **If** we already have a static cache but you're about to inject
-    #    a spatial snippet, **delete** it so we rebuild cleanly.
-    if generate_cache and spatial_context and static_cache:
-        print("[create_gemini_context] deleting stale static_cache to rebuild fresh")
-        genai_client.caches.delete(name=static_cache.name)
-        static_cache = None
+    try:
+        files_list = []
+        content = {"parts": []}
 
-    # 3) Load file list & preamble name exactly as before
-    if context_request == "structured":
-        files_list  = get_files("csv", ["geocoding-community-assets.csv"])
-        prompt_file = "structured.txt"
-        extra_csv   = None
-    elif context_request == "unstructured":
-        files_list  = get_files("txt")
-        prompt_file = "unstructured.txt"
-        extra_csv   = None
-    elif context_request == "all":
-        files_list  = get_files()
-        prompt_file = "all.txt"
-        extra_csv   = None
-    elif context_request in {
-        "experiment_5","experiment_6","experiment_7","experiment_pit","get_summary"
-    }:
-        files_list  = get_files("txt")
-        prompt_file = f"{context_request}.txt"
-        print(f"[create_gemini_context] running 311-summary query for {context_request}")
-        resp        = get_query_results(
-                        query=build_311_query(data_request="311_summary_context"),
-                        output_type="csv"
-                     )
-        extra_csv   = resp.getvalue()
-        print("[create_gemini_context] 311-summary CSV size:", len(extra_csv))
-    else:
-        files_list, prompt_file, extra_csv = [], f"{context_request}.txt", None
+        # adding community assets to context (ignoring potential other csv in datastore)
+        if context_request == "structured":
+            files_list = get_files("csv", ["geocoding-community-assets.csv"])
+            preamble_file = context_request + ".txt"
 
-    # 4) Read in all static parts
-    static_parts: List[dict] = []
-    if extra_csv:
-        static_parts.append({"text": extra_csv})
-    for fname in files_list:
-        txt = get_file_content(fname)
-        if txt:
-            static_parts.append({"text": txt})
-            print(f"[create_gemini_context] loaded file '{fname}', {len(txt)} chars")
+        elif context_request == "unstructured":
+            files_list = get_files("txt")
+            preamble_file = context_request + ".txt"
 
-    # 5) Load your system prompt
-    prompt_path = Config.PROMPTS_PATH / prompt_file
-    if not prompt_path.is_file():
-        raise FileNotFoundError(f"Prompt not found: {prompt_path}")
-    system_prompt = prompt_path.read_text(encoding="utf-8")
-    print(f"[create_gemini_context] loaded system_prompt ({prompt_file}), "
-          f"{len(system_prompt)} chars")
+        elif context_request == "all":
+            files_list = get_files()
+            preamble_file = context_request + ".txt"
+        elif (
+            context_request == "experiment_5"
+            or context_request == "experiment_6"
+            or context_request == "experiment_7"
+            or context_request == "experiment_pit"
+            or context_request == "get_summary"
+        ):
+            files_list = get_files("txt")
+            query = build_311_query(
+                data_request="311_summary_context", is_spatial=is_spatial
+            )
+            response = get_query_results(query=query, output_type="csv")
 
-    # 6) If we need to create the static cache (and it doesn’t exist), do it now
-    if generate_cache and static_cache is None:
-        expire_time = (
-            datetime.datetime.now(datetime.timezone.utc)
-            + datetime.timedelta(days=Config.GEMINI_CACHE_TTL)
-        ).isoformat().replace("+00:00", "Z")
-        print("[create_gemini_context] creating static cache", display_base)
-        static_cache = genai_client.caches.create(
-            model=Config.GEMINI_MODEL,
-            config=types.CreateCachedContentConfig(
-                display_name=display_base,
-                system_instruction=system_prompt,
-                expire_time=expire_time,
-                contents=static_parts,
-            ),
+            content["parts"].append({"text": response.getvalue()})
+
+            preamble_file = context_request + ".txt"
+
+        # Read contents of found files
+        for file in files_list:
+            print("specific file", file)
+            file_content = get_file_content(file)
+            if file_content is not None:
+                content["parts"].append({"text": file_content})
+
+        path = Config.PROMPTS_PATH / preamble_file
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error: File not found:{Font_Colors.ENDC} {path}"
+            )
+        system_prompt = path.read_text(encoding="utf-8")
+
+        display_name = "APP_VERSION_" + app_version + "_REQUEST_" + context_request
+
+        # Generate cache or return token count
+        if generate_cache:
+            # Set cache expiration time
+            cache_ttl = (
+                (
+                    datetime.datetime.now(datetime.timezone.utc)
+                    + datetime.timedelta(days=Config.GEMINI_CACHE_TTL)
+                )
+                .isoformat()
+                .replace("+00:00", "Z")
+            )
+
+            # Create the cache
+            cache = genai_client.caches.create(
+                model=Config.GEMINI_MODEL,
+                config=types.CreateCachedContentConfig(
+                    display_name=display_name,
+                    system_instruction=system_prompt,
+                    expire_time=cache_ttl,
+                    contents=content["parts"],
+                ),
+            )
+
+            return cache.name
+        else:
+            # Return token count for testing
+            content["parts"].append({"text": system_prompt})
+            total_tokens = genai_client.models.count_tokens(
+                model=Config.GEMINI_MODEL, contents=content["parts"]
+            )
+            return total_tokens.total_tokens
+
+    except Exception as e:
+        print(
+            f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating context:{Font_Colors.ENDC} {e}"
         )
-        print("[create_gemini_context] created static_cache:", static_cache.name)
-
-    # 7) Token‐count‐only shortcut
-    if not generate_cache:
-        parts = []
-        if spatial_context:
-            parts.append({"text": spatial_context})
-            print("[create_gemini_context] counting tokens includes spatial_context")
-        parts.extend(static_parts)
-        parts.append({"text": system_prompt})
-        tc = genai_client.models.count_tokens(
-            model=Config.GEMINI_MODEL, contents=parts
-        )
-        print("[create_gemini_context] total_tokens:", tc.total_tokens)
-        return tc.total_tokens
-
-    # 8) generate_cache=True and static_cache ready
-    #    a) no spatial_context? just reuse static
-    if not spatial_context:
-        print("[create_gemini_context] no spatial_context → reusing static_cache")
-        return static_cache.name
-
-    #    b) spatial_context present → build a tiny one‐off dynamic cache
-    dynamic_name = f"{display_base}_{uuid.uuid4().hex}"
-    print("[create_gemini_context] building dynamic cache:", dynamic_name)
-    dynamic_parts = [{"text": spatial_context}] + static_parts
-
-    expire_time = (
-        datetime.datetime.now(datetime.timezone.utc)
-        + datetime.timedelta(days=Config.GEMINI_CACHE_TTL)
-    ).isoformat().replace("+00:00", "Z")
-
-    dynamic_cache = genai_client.caches.create(
-        model=Config.GEMINI_MODEL,
-        config=types.CreateCachedContentConfig(
-            display_name=dynamic_name,
-            system_instruction=system_prompt,
-            expire_time=expire_time,
-            contents=dynamic_parts,
-        ),
-    )
-    print("[create_gemini_context] created dynamic_cache:", dynamic_cache.name)
-    return dynamic_cache.name
+        return f"✖ Error generating context: {e}"
 
 # Log events
 def log_event(
@@ -1024,11 +1019,14 @@ def check_session():
     if request.method == "OPTIONS":
         return ("", 204)
 
-    # API-key authentication
-    api_key = request.headers.get("RethinkAI-API-Key")
+    rethinkai_api_client_key = request.headers.get("RethinkAI-API-Key")
     app_version = request.args.get("app_version", "")
 
-    if not api_key or api_key not in Config.RETHINKAI_API_KEYS:
+    if (
+        not rethinkai_api_client_key
+        or rethinkai_api_client_key not in Config.RETHINKAI_API_KEYS
+    ):
+
         return jsonify({"Error": "Invalid or missing API key"}), 401
 
     # Ensure session exists
@@ -1066,6 +1064,7 @@ def route_data_query():
     request_date = request.args.get("date", "")
     data_request = request.args.get("request", "")
     output_type = request.args.get("output_type", "")
+    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
 
     if not data_request:
         return jsonify({"✖ Error": "Missing data_request parameter"}), 400
@@ -1107,10 +1106,11 @@ def route_data_query():
                 request_date=request_date,
                 request_zipcode=request_zipcode,
                 event_ids=event_ids,
+                is_spatial=is_spatial,
             )
 
         elif data_request.startswith("911"):
-            query = build_911_query(data_request=data_request)
+            query = build_911_query(data_request=data_request, is_spatial=is_spatial)
         elif data_request == "zip_geo":
             query = f"""
             SELECT JSON_OBJECT(
@@ -1169,12 +1169,11 @@ def route_data_query():
         return jsonify({"✖ Error": str(e)}), 500
 
 
-from flask import session
-
 @app.route("/chat", methods=["POST"])
 def route_chat():
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
+    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
 
     context_request = request.args.get(
         "context_request", request.args.get("request", "")
@@ -1187,6 +1186,7 @@ def route_chat():
     user_message = data.get("user_message", "")
     prompt_preamble = data.get("prompt_preamble", "")
 
+    # GEOSPATIAL INTEGRATION - Keep your pipeline
     print("[GEOSPATIAL] incoming query:", client_query)
     geospatial_result = process_geospatial_message(
         user_message,
@@ -1198,29 +1198,24 @@ def route_chat():
     has_location = geospatial_result["map_data"] is not None
     map_data = geospatial_result["map_data"]
 
-    spatial_context_data = ""
+    # If we detected a location, use the enhanced prompt, otherwise use original
     if has_location:
-        enhanced = geospatial_result["enhanced_prompt"]
-        spatial_context_data = enhanced.split("Question:")[0].strip()
-        session["last_spatial_context"] = spatial_context_data
-        print("[GEOSPATIAL] new spatial_context_data:", repr(spatial_context_data))
+        enhanced_query = geospatial_result["enhanced_prompt"]
     else:
-        spatial_context_data = session.get("last_spatial_context", "")
-        print("[GEOSPATIAL] reusing spatial_context_data:", repr(spatial_context_data))
+        enhanced_query = client_query
 
-    print("[CACHE] Calling create_gemini_context(...)")
+    # data_selected, optional, list of files used when context_request==s
     cache_name = create_gemini_context(
         context_request=context_request,
         preamble=prompt_preamble,
         generate_cache=True,
         app_version=app_version,
-        spatial_context=spatial_context_data,
+        is_spatial=is_spatial,
     )
-    print("[CACHE] create_gemini_context returned cache_name:", cache_name)
 
-    full_prompt = f"User question: {client_query}"
-    print("[PROMPT] full_prompt sent to Gemini:\n", full_prompt)
+    full_prompt = f"User question: {enhanced_query}"
 
+    # Process chat
     try:
         app_response = get_gemini_response(
             prompt=full_prompt,
@@ -1228,8 +1223,12 @@ def route_chat():
             structured_response=structured_response,
         )
         if "Error" in app_response:
+            print(
+                f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ ERROR from Gemini API:{Font_Colors.ENDC} {app_response}"
+            )
             return jsonify({"Error": app_response}), 500
-
+        
+        # Log the interaction
         log_id = log_event(
             session_id=session_id,
             app_version=app_version,
@@ -1245,6 +1244,8 @@ def route_chat():
             "response": app_response,
             "log_id": log_id,
         }
+        
+        # GEOSPATIAL INTEGRATION - Include map data in response
         if map_data:
             response["mapData"] = map_data
 
@@ -1261,8 +1262,12 @@ def route_chat():
             session_id=session_id,
             app_version=app_version,
             log_id=g.log_entry,
-            app_response=f"ERROR: {e}",
+            app_response=f"ERROR: {str(e)}",
         )
+        print(f"✖ Exception in /chat: {e}")
+        print(f"✖ context_request: {context_request}")
+        print(f"✖ preamble: {prompt_preamble}")
+        print(f"✖ app_version: {app_version}")
         return jsonify({"Error": f"Internal server error: {e}"}), 500
 
 
@@ -1271,24 +1276,26 @@ def route_chat():
 def route_chat_context():
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
+    is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
 
     context_request = request.args.get(
         "context_request", request.args.get("request", "")
     )
 
     if request.method == "GET":
-        
+        # return list of context caches if <request> is ""
         if not context_request:
             response = {cache.name: str(cache) for cache in genai_client.caches.list()}
             return jsonify(response)
 
         else:
+            # test token count for context cache of <request>
             token_count = create_gemini_context(
                 context_request=context_request,
                 preamble="",
                 generate_cache=False,
                 app_version=app_version,
-                spatial_context=""  
+                is_spatial=is_spatial,
             )
 
             if isinstance(token_count, int):
@@ -1298,20 +1305,24 @@ def route_chat_context():
             ):
                 return jsonify({"token_count": token_count.total_tokens})
             else:
+                # Handle the error appropriately, e.g., log the error and return an error response
                 print(
-                    f"{Font_Colors.FAIL}{Font_Colors.BOLD}Error getting token count:{Font_Colors.ENDC} {token_count}"
+                    f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error getting token count:{Font_Colors.ENDC} {token_count}"
                 )  # Log the error
                 return (
                     jsonify({"error": "Failed to get token count"}),
                     500,
                 )  # Return an error response
     if request.method == "POST":
-
+        # TODO: implement 'specific' context_request with list of files from datastore
+        # FOR NOW: assumes 'structured', 'unstructured', 'all', 'experiment_5', 'experiment_6', 'experiment_7' context_request
+        # Context cache creation appends app_version so caches are versioned.
         if not context_request:
             return jsonify({"Error": "Missing context_request parameter"}), 400
 
         context_option = request.args.get("option", "")
         if context_option == "clear":
+            # clear the cache, either by name or all existing caches
             for cache in genai_client.caches.list():
                 if context_request == cache.display_name or context_request == "all":
                     genai_client.caches.delete(name=cache.name)
@@ -1325,6 +1336,7 @@ def route_chat_context():
             return jsonify({"Success": "Context cache cleared."})
         else:
             data = request.get_json()
+            # Extract chat data parameters
             prompt_preamble = data.get("prompt_preamble", "")
 
             response = create_gemini_context(
@@ -1332,7 +1344,7 @@ def route_chat_context():
                 preamble=prompt_preamble,
                 generate_cache=True,
                 app_version=app_version,
-                spatial_context=""  # Pass empty spatial context for manual cache creation
+                is_spatial=is_spatial,
             )
 
             log_event(
@@ -1348,30 +1360,75 @@ def route_chat_context():
 def chat_summary():
     data = request.get_json()
     messages = data.get("messages", [])
-    app_version = request.args.get("app_version", "0")
 
     if not messages:
         return jsonify({"error": "No messages provided."}), 400
 
+    # Create chat_transcript from messages
     chat_transcript = "\n".join(
         f"{'User' if msg['sender'] == 'user' else 'Chat'}: {msg['text']}"
         for msg in messages
     )
 
-    cache_name = create_gemini_context(
-        context_request="get_summary",
-        preamble="",
-        generate_cache=True,
-        app_version=app_version,
-    )
+    summary_file_path = "./prompts/get_summary.txt"
 
+    # Read the content from the get_summary.txt file
     try:
-        summary = get_gemini_response(prompt=chat_transcript, cache_name=cache_name)
+        with open(summary_file_path, "r") as file:
+            file_content = file.read()
+
+        # Combine the file content with the chat transcript to form the full prompt
+        full_prompt = f"{file_content}\n{chat_transcript}"
+
+    except FileNotFoundError:
+        return jsonify({"error": "Summary prompt not found."}), 404
+    except Exception as e:
+        print(f"✖ Error reading summary prompt file: {e}")
+        return jsonify({"error": str(e)}), 500
+
+    # Call the Gemini response function with the combined full_prompt
+    try:
+        summary = get_gemini_response(prompt=full_prompt, cache_name=None)
         return jsonify({"summary": summary})
 
     except Exception as e:
-        print(f" Error summarizing chat: {e}")
+        print(f"✖ Error summarizing chat: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/chat/identify_places", methods=["POST"])
+def identify_places():
+    data = request.get_json()
+    message = data.get("message", [])
+
+    if not message:
+        return jsonify({"error": "No message provided."}), 400
+
+    prompt_file_path = "./prompts/identify_places.txt"
+
+    # Read the content from identify_places.txt
+    try:
+        with open(prompt_file_path, "r") as file:
+            file_content = file.read()
+
+        # Combine the file content with the message to form the full prompt
+        full_prompt = f"{file_content}\n{message}"
+
+    except FileNotFoundError:
+        return jsonify({"error": "Prompt file not found."}), 404
+    except Exception as e:
+        print(f"✖ Error reading prompt file: {e}")
+        return jsonify({"error": str(e)}), 500
+
+    # Call the Gemini response function with the combined full_prompt
+    try:
+        places = get_gemini_response(prompt=full_prompt, cache_name=None)
+        return jsonify(places)
+
+    except Exception as e:
+        print(f"✖ Error identifying places: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 
 @app.route("/log", methods=["POST", "PUT"])
