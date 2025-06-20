@@ -1,7 +1,15 @@
 {
   "dependencies": {
+    "@mui/icons-material": "^7.1.1",
     "@placemarkio/check-geojson": "^0.1.14",
     "axios": "^1.9.0",
     "jspdf": "^3.0.1"
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && vite build"
+  },
+  "devDependencies": {
+    "@watergis/mapbox-gl-export": "^3.5.7"
   }
 }

@@ -175,7 +175,7 @@ class SQLConstants:
     SUM(CASE WHEN MONTH(open_dt) = 12 THEN 1 ELSE 0 END) AS dec_total
     """
 
-    # 311 specific constants
+    ##### 311 specific constants #####
 
     BOS311_BASE_WHERE = (
         "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
@@ -186,9 +186,10 @@ class SQLConstants:
         ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
         coordinates
     ) = 1
-    """    
+    """
 
-    # 911 specific constants
+    ##### 911 specific constants #####
+
     BOS911_BASE_WHERE = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
 
     BOS911_SPATIAL_WHERE = f"""
@@ -239,6 +240,7 @@ def build_311_query(
             type IN ({SQLConstants.CATEGORY_TYPES[request_options]}) 
             AND {Bos311_where_clause}
         """
+
         if request_date:
             query += f"""AND DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'"""
 
@@ -618,6 +620,7 @@ def get_files(
     file_type: Optional[str] = None, specific_files: Optional[List[str]] = None
 ) -> List[str]:
     """Get a list of files from the datastore directory."""
+    # changing get_files as it was only getting the .txt files, to ensured it would also get community assets csv
     try:
         if not Config.DATASTORE_PATH.exists():
             return []
@@ -833,6 +836,7 @@ def create_gemini_context(
                 == "APP_VERSION_" + app_version + "_REQUEST_" + context_request
                 and cache.model == Config.GEMINI_MODEL
             ):
+
                 return cache.name
 
     try:
@@ -856,8 +860,8 @@ def create_gemini_context(
             or context_request == "experiment_6"
             or context_request == "experiment_7"
             or context_request == "experiment_pit"
-            or context_request == "get_summary"
         ):
+
             files_list = get_files("txt")
             query = build_311_query(
                 data_request="311_summary_context", is_spatial=is_spatial
@@ -1187,7 +1191,7 @@ def route_chat():
     prompt_preamble = data.get("prompt_preamble", "")
 
     # GEOSPATIAL INTEGRATION - Keep your pipeline
-    print("[GEOSPATIAL] incoming query:", client_query)
+    print("[GEOSPATIAL] incoming query:", user_message)
     geospatial_result = process_geospatial_message(
         user_message,
         Config.DATASTORE_PATH,
@@ -1408,7 +1412,7 @@ def identify_places():
 
     # Read the content from identify_places.txt
     try:
-        with open(prompt_file_path, "r") as file:
+        with open(prompt_file_path, "r", encoding='utf-8') as file:
             file_content = file.read()
 
         # Combine the file content with the message to form the full prompt
@@ -1428,7 +1432,6 @@ def identify_places():
     except Exception as e:
         print(f"✖ Error identifying places: {e}")
         return jsonify({"error": str(e)}), 500
-
 
 
 @app.route("/log", methods=["POST", "PUT"])

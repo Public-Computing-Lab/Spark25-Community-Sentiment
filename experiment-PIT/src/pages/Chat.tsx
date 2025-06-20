@@ -54,7 +54,7 @@ function Chat() {
 
     try {
       // Call backend API helper to get AI response
-      const data = await sendChatMessage(userMsg, messages);
+      const data = await sendChatMessage(userMsg, messages, true);
 
       // Append backend response to messages
       if (data.response) {
@@ -87,7 +87,7 @@ function Chat() {
   };
 
   const handleExportSummary = async () => {
-    const summary = await getChatSummary(messages);
+    const summary = await getChatSummary(messages, true);
 
     if (summary === "Summary generation failed.") {
       setSummaryError(true);
@@ -137,7 +137,7 @@ function Chat() {
           }}
         >
           <Typography variant="h4" component="h1">
-            Chat with Us
+            On The Porch
           </Typography>
           <Box>
             <IconButton
