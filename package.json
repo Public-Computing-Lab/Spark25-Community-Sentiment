@@ -8,5 +8,8 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && vite build"
+  },
+  "devDependencies": {
+    "@watergis/mapbox-gl-export": "^3.5.7"
   }
 }

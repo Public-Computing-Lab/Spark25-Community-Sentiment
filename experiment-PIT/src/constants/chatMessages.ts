@@ -6,9 +6,10 @@ export type Message = {
 export const opening_message: Message[] = [
     {
       text:
-        "Hi there! Welcome to 26 Blocks. " +
-        "I'm here to help you explore safety insights in your neighborhood. " +
-        "What would you like to find today?",
+        "Hi there! Welcome to On The Porch. " +
+        "I'm here to help you explore safety insights in the Talbot-Norfolk Triangle. " +
+        "You can ask me about community concerns, city initiatives, and other neighborhood developments. " +
+        "What would you like to explore?",
       sender: "Gemini",
     },
 ];
