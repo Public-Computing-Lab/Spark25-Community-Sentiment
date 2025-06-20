@@ -12,6 +12,8 @@ interface MapContextType {
     setSelectedData: React.Dispatch<React.SetStateAction<string[]>>;
     selectedYearsSlider: number[];
     setSelectedYearsSlider: React.Dispatch<React.SetStateAction<number[]>>;
+    pendingFitBounds: [[number, number], [number, number]] | null;
+    setPendingFitBounds: React.Dispatch<React.SetStateAction<[[number, number], [number, number]] | null>>;
 }
 
 export const MapContext = createContext<MapContextType | null>(null);
