@@ -1,6 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import { CssBaseline, Box, ThemeProvider } from "@mui/material";
-import { customTheme } from "./assets/theme";
+
 import Navbar from "./components/Navbar";
 import Chat from "./pages/Chat";
 // import Home from "./pages/Home";
@@ -24,7 +24,7 @@ function App() {
         {/* Main content grows to fill available space */}
         <Box component="main" sx={{ flexGrow: 1 }}>
           <Routes>
-            {/* <Route path="/" element={<Navigate to="/experimenting/8" replace />} /> */}
+           
             <Route path="/" element={<Chat />} />
             <Route path="/map" element={<Map />} />
           </Routes>
