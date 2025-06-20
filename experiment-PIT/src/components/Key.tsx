@@ -5,7 +5,7 @@ function Key() {
         <Box sx={{
             maxWidth: "40vw",
             width: "30vw",
-            height: "15vh",
+            height: "17vh",
             bgcolor: 'white',
             boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
             '&:hover': {
@@ -30,7 +30,7 @@ function Key() {
                     marginRight: '0.4em',
                 }} />
                 <Typography sx={{ fontSize: "12px" }}>
-                    Shootings
+                    Gun Violence Incidents
                 </Typography>
             </Box>
     

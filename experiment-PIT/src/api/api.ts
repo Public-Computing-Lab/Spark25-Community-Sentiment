@@ -6,49 +6,79 @@ const header = {
     "Content-Type": "application/json",
   }
 
-export async function sendChatMessage(message: string, history: Message[]) {
-  const url = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False`
-  
-  const formattedHistory = history.map(message => JSON.stringify(message)).join('\n');
-  console.log("history: ", formattedHistory);
-  const json = {
-    "client_query": message + "\n Here's the message history to provide context to this request: " + JSON.stringify(formattedHistory),
-    "user_message": message,
-  };
-
+// Helper function to send the HTTP request and handle errors
+async function sendPostRequest(url: string, payload: any, headers: any) {
   try {
     console.log("➡️ Sending POST to:", url);
-    console.log("📦 Payload:", json);
-    console.log("header: ", header);
-    
-    const response = await axios.post(url, json, {
-      headers: header
-    });
+    console.log("📦 Payload:", payload);
+    console.log("header: ", headers);
+
+    const response = await axios.post(url, payload, { headers });
     
     console.log("✅ Response status:", response.status);
     console.log("🧾 Response data:", response.data);
 
     return response.data;
+
   } catch (error: any) {
     if (axios.isAxiosError(error)) {
-      console.error("❌ Axios error sending chat message:", {
+      console.error("❌ Axios error sending request:", {
         message: error.message,
         status: error.response?.status,
         data: error.response?.data,
       });
     } else {
-      console.error("❌ Unknown error sending chat message:", error);
+      console.error("❌ Unknown error sending request:", error);
     }
 
+    throw error; // Re-throw the error to be handled by the caller
+  }
+}
+
+export async function sendChatMessage(message: string, history: Message[], is_spatial: boolean = false) {
+
+  // Get all locations
+  const urlLocations = `${import.meta.env.VITE_BASE_URL}/chat/identify_places?request=identify_places&app_version=0.7.0&structured_response=False&is_spatial=${is_spatial ? 'true' : 'false'}`;
+  const payloadLocations = { "message": message };
+  
+  let locations = {};
+  try {
+    locations = await sendPostRequest(urlLocations, payloadLocations, header);
+    if (locations === "No locations found.") {
+      locations = {};
+    }
+    console.log("Edited locations: ", locations);
+  } catch (error) {
+    // Error is already logged in sendPostRequest, so no need to handle here again
+    console.error("Error while fetching locations.");
+    throw error;
+  }
+
+  // Send chat message with history
+  const urlChat = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False&is_spatial=${is_spatial ? 'true' : 'false'}`;
+  const formattedHistory = history.map(message => JSON.stringify(message)).join('\n');
+  const jsonChat = {
+    "client_query": JSON.stringify([...formattedHistory, { text: message, sender: "user" }]),
+    "user_message": message
+  };
+
+  try {
+    const response = await sendPostRequest(urlChat, jsonChat, header);
+    console.log("END OF SENDCHATMESSAGE");
+    return response;
+  } catch (error) {
+    console.error("Error while sending chat message.");
     throw error;
   }
 }
 
-export async function getChatSummary(messages: Message[]) {
-  const url = `${import.meta.env.VITE_BASE_URL}/chat/summary?app_version=0.7.0`
+
+export async function getChatSummary(messages: Message[], is_spatial: boolean = false) {
+  const url = `${import.meta.env.VITE_BASE_URL}/chat/summary?app_version=0.7.0&is_spatial=${is_spatial ? 'true' : 'false'}`
   
   try {
     const response = await axios.post(url, {messages}, {headers: header});
+    console.log(response.data.summary);
     return response.data.summary;
   } catch (error) {
     console.error("Failed to get chat summary:", error);
@@ -56,7 +86,7 @@ export async function getChatSummary(messages: Message[]) {
   }
 }
 
-export async function getShotsData(filtered_date?: string){//must make sure it is in correct format
+export async function getShotsData(filtered_date?: string, is_spatial: boolean = false){//must make sure it is in correct format
   const url = `${import.meta.env.VITE_BASE_URL}/data/query`
 
   const params = {
@@ -64,6 +94,7 @@ export async function getShotsData(filtered_date?: string){//must make sure it i
     request: '911_shots_fired',
     output_type:'json',
     date: filtered_date,
+    is_spatial: is_spatial ? 'true' : 'false',
   }
 
   const headers = {
@@ -94,7 +125,7 @@ export async function getShotsData(filtered_date?: string){//must make sure it i
   }
 } 
 
-export async function get311Data(filtered_date?: number, category?: string){
+export async function get311Data(filtered_date?: number, category?: string, is_spatial: boolean = false){
   const url = `${import.meta.env.VITE_BASE_URL}/data/query` //should output type be
   const params = {
     request: '311_by_geo',
@@ -102,6 +133,7 @@ export async function get311Data(filtered_date?: number, category?: string){
     date: filtered_date,
     app_version: '0.7.0',
     output_type: 'stream',
+    is_spatial: is_spatial ? 'true' : 'false', // check for spatial filtering
   }
 
   const headers = {
