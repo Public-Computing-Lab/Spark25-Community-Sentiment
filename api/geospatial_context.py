@@ -16,8 +16,6 @@ _geocoding_data = None
 
 def get_mapbox_coordinates(location_name: str) -> Optional[Dict]:
     """
-    MAPBOX INTEGRATION PLACEHOLDER
-
     Returns:
         {"lat": 42.12345, "lon": -71.12345} or None
     """
@@ -212,7 +210,6 @@ def extract_location_and_intent_enhanced(
     if not matched_location:
         print(f"No coordinates found in community assets for: {location_name}")
 
-        # MAPBOX INTEGRATION (placeholder)
         mapbox_coords = get_mapbox_coordinates(location_name)
         if mapbox_coords:
             print(f"Got coordinates: {mapbox_coords}")
