@@ -4,6 +4,7 @@ export type Message = {
   mapData?: {
     center: [number, number];
     layers: GeoJSON.Feature[];
+    marker: [number, number, string];
   };
 };
 

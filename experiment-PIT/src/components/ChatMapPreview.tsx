@@ -11,13 +11,57 @@ import type { Layer } from "mapbox-gl";
 
 interface ChatMapPreviewProps {
   center: [number, number];
-  layers: Feature<Geometry, GeoJsonProperties>[]; // raw features passed from chat response
+  layers?: Feature<Geometry, GeoJsonProperties>[]; // optional now
+  marker?: [number, number, string]; // [lon, lat, label]
 }
 
-const ChatMapPreview: React.FC<ChatMapPreviewProps> = ({ center, layers }) => {
+const ChatMapPreview: React.FC<ChatMapPreviewProps> = ({
+  center,
+  layers,
+  marker,
+}) => {
+  const safeLayers = Array.isArray(layers) ? layers : [];
+  const features = [...safeLayers];
+
+  let markerLabelLayer: Layer | undefined;
+
+  if (Array.isArray(marker) && marker.length === 3) {
+    const [lon, lat, label] = marker;
+
+    const markerFeature: Feature<Geometry, GeoJsonProperties> = {
+      type: "Feature",
+      geometry: {
+        type: "Point",
+        coordinates: [lon, lat],
+      },
+      properties: {
+        isMarker: true,
+        label,
+      },
+    };
+
+    features.push(markerFeature);
+
+    markerLabelLayer = {
+      id: "chat-marker-label",
+      type: "symbol",
+      source: "chat-preview",
+      layout: {
+        "text-field": ["get", "label"],
+        "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
+        "text-offset": [0, 1.5],
+        "text-anchor": "top",
+      },
+      paint: {
+        "text-color": "#333",
+      },
+      filter: ["==", ["get", "isMarker"], true],
+    };
+  }
+
   const featureCollection: FeatureCollection<Geometry, GeoJsonProperties> = {
     type: "FeatureCollection",
-    features: layers,
+    features,
   };
 
   const previewLayer: Layer = {
@@ -25,8 +69,13 @@ const ChatMapPreview: React.FC<ChatMapPreviewProps> = ({ center, layers }) => {
     type: "circle",
     source: "chat-preview",
     paint: {
-      "circle-radius": 6,
-      "circle-color": "#1976d2",
+      "circle-radius": ["case", ["==", ["get", "isMarker"], true], 8, 6],
+      "circle-color": [
+        "case",
+        ["==", ["get", "isMarker"], true],
+        "#ff5722",
+        "#1976d2",
+      ],
       "circle-stroke-color": "#fff",
       "circle-stroke-width": 2,
     },
@@ -39,6 +88,14 @@ const ChatMapPreview: React.FC<ChatMapPreviewProps> = ({ center, layers }) => {
       layer: previewLayer,
     },
   ];
+
+  if (markerLabelLayer) {
+    mapLayers.push({
+      id: "chat-marker-label",
+      data: featureCollection,
+      layer: markerLabelLayer,
+    });
+  }
 
   return (
     <Box

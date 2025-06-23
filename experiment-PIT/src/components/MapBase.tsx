@@ -43,6 +43,15 @@ const MapBase: React.FC<MapBaseProps> = ({
             type: "geojson",
             data,
           });
+        } else {
+          // If source already exists, update data (optional)
+          const source = mapRef.current!.getSource(
+            id
+          ) as mapboxgl.GeoJSONSource;
+          source.setData(data);
+        }
+
+        if (!mapRef.current!.getLayer(layer.id)) {
           mapRef.current!.addLayer(layer);
         }
       });

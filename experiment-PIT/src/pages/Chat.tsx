@@ -59,6 +59,19 @@ function Chat() {
 
       // Append backend response to messages
       if (data.text) {
+        // Map backend mapData to your expected format
+        const mapData = data.mapData
+          ? {
+              center: [data.mapData.center.lon, data.mapData.center.lat],
+              layers: data.mapData.layers ?? [],
+              marker: [
+                data.mapData.marker.lon,
+                data.mapData.marker.lat,
+                data.mapData.marker.title ?? "",
+              ],
+            }
+          : undefined;
+
         setMessages((prev) => [
           ...prev,
           { text: data.text, sender: "Gemini", mapData: data.mapData },
@@ -201,6 +214,7 @@ function Chat() {
                   <ChatMapPreview
                     center={msg.mapData.center}
                     layers={msg.mapData.layers}
+                    marker={msg.mapData.marker}
                   />
                 </Box>
               )}
