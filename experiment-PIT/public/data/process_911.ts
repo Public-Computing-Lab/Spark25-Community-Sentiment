@@ -24,7 +24,9 @@ export const processShotsData = async () => {
     try {
          //loading 
         const shots_data = await getShotsData(undefined, true);
+
         const shots_geojson: GeoJSON = { type: "FeatureCollection", features: [] as GeoJSONFeature[] }; //defining type of array
+
 
         //converting to GeoJSON
         for (const instance of shots_data){ //using for of instead of for in
