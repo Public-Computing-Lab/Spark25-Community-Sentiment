@@ -1,6 +1,10 @@
 export type Message = {
   text: string;
   sender: "user" | "Gemini";
+  mapData?: {
+    center: [number, number];
+    layers: GeoJSON.Feature[];
+  };
 };
 
 export const opening_message: Message[] = [
