@@ -18,7 +18,6 @@ def get_mapbox_coordinates(location_name: str) -> Optional[Dict]:
 
     Returns:
         {"lat": 42.12345, "lon": -71.12345} or None
-
     """
     MAPBOX_ACCESS_TOKEN = os.getenv("MAPBOX_TOKEN")
     tnt_bbox = "-71.081784,42.284182,-71.071601,42.293255"
@@ -32,7 +31,7 @@ def get_mapbox_coordinates(location_name: str) -> Optional[Dict]:
 
         if "features" in data and len(data["features"]) > 0:
             coordinates = data["features"][0]["geometry"]["coordinates"]
-            return coordinates  # Returns as [longitude, latitude]
+            return {"lat": coordinates[1], "lon": coordinates[0]}
         return None
 
     except Exception as e:
