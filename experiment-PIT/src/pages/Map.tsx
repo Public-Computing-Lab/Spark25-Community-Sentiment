@@ -26,8 +26,8 @@ function Map() {
   const {
     mapRef,
     mapContainerRef,
-    pendingFitBounds,
-    setPendingFitBounds,
+    // pendingFitBounds,
+    // setPendingFitBounds,
     selectedLayers,
     selectedYearsSlider,
     setSelectedLayer,
@@ -268,16 +268,16 @@ function Map() {
     return () => {};
   }, [mapRef, mapContainerRef]);
 
-  useEffect(() => {
-    if (mapRef.current && pendingFitBounds) {
-      mapRef.current.fitBounds(new mapboxgl.LngLatBounds(pendingFitBounds), {
-        padding: 40,
-        duration: 1000,
-      });
-      setPendingFitBounds(null); // Reset so it can be triggered again
-      console.log("set new bounds");
-    }
-  }, [pendingFitBounds, mapRef, setPendingFitBounds]);
+  // useEffect(() => {
+  //   if (mapRef.current && pendingFitBounds) {
+  //     mapRef.current.fitBounds(new mapboxgl.LngLatBounds(pendingFitBounds), {
+  //       padding: 40,
+  //       duration: 1000,
+  //     });
+  //     setPendingFitBounds(null); // Reset so it can be triggered again
+  //     console.log("set new bounds");
+  //   }
+  // }, [pendingFitBounds, mapRef, setPendingFitBounds]);
 
   //changing visibility of layers depending on what is checked in filters or not.
   useEffect(() => {
