@@ -8,6 +8,7 @@
   import { sendChatMessage, getChatSummary } from "../api/api";
   import { jsPDF } from "jspdf";
   import { colorPalette } from "../assets/palette";
+  import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 
   import {
     Box,
@@ -27,6 +28,7 @@
   import SendIcon from "@mui/icons-material/ArrowUpwardRounded";
   import RefreshIcon from "@mui/icons-material/Refresh";
   import DownloadIcon from "@mui/icons-material/DescriptionOutlined";
+  import onLogo from "/public/on_the_porch_logo.png"
 
   // Size of the blue arrow button (helps keep layout math tidy)
   const SEND_BTN_SIZE = 44;
@@ -148,16 +150,25 @@
           >
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                On The Porch
-              </Typography>
+             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+  <img
+    src={onLogo}
+    alt="On The Porch Logo"
+    style={{
+      height: 70,           // ← whatever size you settled on
+      width: "auto",
+      display: "block",
+      marginTop: 6,         // ← push it ~6 px downward
+    }}
+  />
+</Box>
             </Box>
             <Box>
               <IconButton
                 onClick={() => setConfirmExportOpen(true)}
                 sx={{ color: "#fff" }}
               >
-                <DownloadIcon />
+                <FileDownloadOutlinedIcon />
               </IconButton>
               <IconButton
                 onClick={() => setConfirmClearOpen(true)}
@@ -196,10 +207,11 @@
           borderBottomRightRadius: "15px",
           borderTopRightRadius: "15px",
           borderTopLeftRadius: "15px",
-            position: "relative",
-            whiteSpace: "pre-wrap",
-            fontSize: "0.95rem",
-            lineHeight: 1.6,
+          position: "relative",
+          whiteSpace: "pre-wrap",
+          fontSize: "1.25rem",
+          fontWeight: 440,        
+          lineHeight: 1.6,
             boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
             border: isBot ? `1px solid ${colorPalette.dark}` : "none",
 

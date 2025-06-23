@@ -18,6 +18,7 @@ import { process311Data } from '../../public/data/process_311';
 import FilterDialog from '../components/FilterDialog';
 import LayersClearIcon from '@mui/icons-material/LayersClear';
 import { colorPalette } from "../assets/palette";
+import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
 //besure to install mapbox-gl 
 
 function Map() {
@@ -120,7 +121,7 @@ function Map() {
           source: 'shots_data',
           paint: {
             'circle-radius': 3,
-            'circle-color': '#880808',
+            'circle-color': "#5d17d5" ,
           }
         })
 
@@ -288,9 +289,10 @@ function Map() {
           color: "#fff",
         }}
       >
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          Map
-        </Typography>
+        <MapOutlinedIcon
+   fontSize="large"       
+   sx={{ mr: 0.5 }}        
+ />
         <IconButton onClick={handleMapClear} sx={{ color: "#fff" }}>
           <LayersClearIcon />
         </IconButton>

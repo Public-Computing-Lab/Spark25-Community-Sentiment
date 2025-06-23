@@ -28,10 +28,15 @@ export default function Key() {
   return (
     <Box
       sx={{
+        position: "absolute",
+        top: -45, 
+        left: 15, 
+         width: 170,                     
         maxWidth: 240,          
         bgcolor: "#E9F4FF",    
         boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
         borderRadius: 3,
+        
         p: 1.25,
         overflowY: "auto",
         maxHeight: "26vh",        // never taller than a quarter screen
@@ -44,7 +49,7 @@ export default function Key() {
       </Typography>
 
       <Stack spacing={0.75}>
-        <LegendItem color="#880808" label="Gun Violence Incidents" />
+        <LegendItem color= "#5d17d5" label="Gun-related Incidents" />
         <LegendItem color="#228B22" label="Assets" />
         <LegendItem color="#FFC300" label="311 Requests" />
         <LegendItem color="#82aae7" label="TNT Border" shape="line" />
