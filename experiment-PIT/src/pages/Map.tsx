@@ -232,6 +232,18 @@ function Map() {
     }
   }, [mapRef, mapContainerRef]);
 
+  useEffect(() => {
+    if (mapRef.current && pendingFitBounds) {
+      mapRef.current.fitBounds(new mapboxgl.LngLatBounds(pendingFitBounds), {
+        padding: 40,
+        duration: 1000,
+      });
+      setPendingFitBounds(null); // Reset so it can be triggered again
+      console.log("set new bounds");
+    }
+  }, [pendingFitBounds, mapRef, setPendingFitBounds]);
+
+
   //changing visibility of layers depending on what is checked in filters or not.
   useEffect(() => {
     if (mapRef.current) {
@@ -258,17 +270,7 @@ function Map() {
     }
   }, [mapRef, selectedYearsSlider, layers])
 
-  useEffect(() => {
-    if (mapRef.current && pendingFitBounds) {
-      mapRef.current.fitBounds(new mapboxgl.LngLatBounds(pendingFitBounds), {
-        padding: 40,
-        duration: 1000,
-      });
-      setPendingFitBounds(null); // Reset so it can be triggered again
-      console.log("set new bounds");
-    }
-  }, [pendingFitBounds, mapRef, setPendingFitBounds]);
-
+  
   return (
     <Box
       sx={{

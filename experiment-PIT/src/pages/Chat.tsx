@@ -45,7 +45,7 @@ function Chat() {
   const { mapRef, setSelectedData, selectedLayers, setSelectedLayer, setSelectedYearsSlider, setSelectedYears, setPendingFitBounds} = useMap(); // Access mapRef and mapContainerRef from context
   const sampleData = { //IT WORKS!! changes just aren't reflected in the filter dialog
     "data_type": ["Community Assets", "Gun Violence Incidents"],
-    "location": [-71.07379065017204, 42.28608785581647]
+    "location": [-71.08012472023684, 42.29265737162938] // 
   }
   const [pendingMapFilter, setPendingMapFilter] = useState<mapFilter | null>(null);
 
@@ -134,19 +134,23 @@ function Chat() {
     console.log("Setting years", data.year);
   }
   if (data.location) {
-    const [centerLat, centerLon] = data.location;
-    const metersToDegreesLat = (meters: number) => meters / 111320;
-    const metersToDegreesLon = (meters: number, lat: number) => meters / (111320 * Math.cos(lat * Math.PI / 180));
 
-    const rMeters = 500; // example: 500 meters
-    const minLat = centerLat - metersToDegreesLat(rMeters);
-    const maxLat = centerLat + metersToDegreesLat(rMeters);
-    const minLon = centerLon - metersToDegreesLon(rMeters, centerLat);
-    const maxLon = centerLon + metersToDegreesLon(rMeters, centerLat);
+    const [centerLon, centerLat] = data.location;
+    const metersToDegreesLon = (meters: number) => meters / 111320;
+    const metersToDegreesLat = (meters: number, lat: number) => meters / (111320 * Math.cos(lat * Math.PI / 180));
+
+    const rMeters = 90; // example: 500 meters
+    const minLon = centerLon - metersToDegreesLon(rMeters);
+    const maxLon = centerLon + metersToDegreesLon(rMeters);
+    const minLat = centerLat - metersToDegreesLat(rMeters, centerLat);
+    const maxLat = centerLat + metersToDegreesLat(rMeters, centerLat);
+    console.log("fitBounds:", [[minLon, minLat], [maxLon, maxLat]]);
 
     setPendingFitBounds(
       [[minLon, minLat], [maxLon, maxLat]] // Northeast
-    );  
+    ); 
+
+    
   }
 
   // Optionally reset pendingMapFilter if you want to allow re-triggering with the same values
