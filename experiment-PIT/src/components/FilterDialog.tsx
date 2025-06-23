@@ -1,35 +1,25 @@
-import {
-  Box,
-  Typography,
-  Drawer,
-  Stack,
-  Slider,
-  FormGroup,
-  FormControlLabel,
-  Checkbox,
-  Fab,
-} from "@mui/material";
-import { useState } from "react";
-import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
+import { Box, Typography, Drawer, Stack, Slider, FormGroup, FormControlLabel, Checkbox, Fab } from '@mui/material';
+import { useState } from 'react';
+import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
+import { useMap } from "../components/useMap.tsx";
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants";
 
-interface FilterDialogProps {
-  layers: string[];
-  onSelectionChange: (layers: string[]) => void;
-  onSliderChange: (years: number[]) => void;
-}
 
-export default function FilterDialog({
-  layers,
-  onSelectionChange,
-  onSliderChange,
-}: FilterDialogProps) {
+function FilterDialog({ 
+    layers,
+    onSelectionChange, //callback function
+    onSliderChange
+} : {
+    layers: string[]
+    onSelectionChange : (selectedLayers: string[]) => void
+    onSliderChange : (selectedYears: number[]) => void
+}) {
   const [open, setOpen] = useState(false);
-  const [selectedData, setSelectedData] = useState<string[]>(["Community Assets"]);
-  const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
+  const { selectedData, selectedYears, setSelectedData, setSelectedYears } = useMap(); // Access these variables
 
-  /* ——— handlers ——— */
-  const toggleFilter = (newOpen: boolean) => () => setOpen(newOpen);
+  const toggleFilter = (newOpen: boolean) => () => {
+    setOpen(newOpen);
+  };
 
   const handleSelectData = (layer: string) => () => {
     setSelectedData((prev) => {

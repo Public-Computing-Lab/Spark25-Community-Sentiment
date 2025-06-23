@@ -1,4 +1,6 @@
   import React, { useState, useRef, useEffect } from "react";
+// import { useNavigate } from 'react-router-dom';
+// import { useMap } from "../components/useMap.tsx";
   import type { Message } from "../constants/chatMessages";
   import {
     opening_message,
@@ -50,6 +52,10 @@
     const [confirmClearOpen, setConfirmClearOpen] = useState(false);
     const [confirmExportOpen, setConfirmExportOpen] = useState(false);
     const [summaryError, setSummaryError] = useState(false);
+  // const { mapRef, setSelectedData, selectedLayers, setSelectedLayer, setSelectedYearsSlider, setSelectedYears, setPendingFitBounds} = useMap(); // Access mapRef and mapContainerRef from context
+
+  // const [pendingMapFilter, setPendingMapFilter] = useState<mapFilter | null>(null);
+
 
     // persist chat
     useEffect(() => {
@@ -155,6 +161,51 @@
     doc.save("chat-summary.pdf");
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") sendMessage();
+  };
+
+  // useEffect(() => {
+  //   if (!pendingMapFilter || !mapRef.current) return;
+
+  //   const data = pendingMapFilter;
+
+  //   if (data.data_type) {
+  //     setSelectedData(data.data_type);
+  //     setSelectedLayer(data.data_type);
+  //   }
+  //   if (data.year) {
+  //     setSelectedYears(data.year);
+  //     setSelectedYearsSlider(data.year);
+  //     console.log("Setting years", data.year);
+  //   }
+  //   if (data.location) {
+
+  //     const [centerLat, centerLon] = data.location;
+  //     const metersToDegreesLon = (meters: number) => meters / 111320;
+  //     const metersToDegreesLat = (meters: number, lat: number) => meters / (111320 * Math.cos(lat * Math.PI / 180));
+
+  //     const rMeters = 90; // example: 500 meters
+  //     const minLon = centerLon - metersToDegreesLon(rMeters);
+  //     const maxLon = centerLon + metersToDegreesLon(rMeters);
+  //     const minLat = centerLat - metersToDegreesLat(rMeters, centerLat);
+  //     const maxLat = centerLat + metersToDegreesLat(rMeters, centerLat);
+  //     console.log("fitBounds:", [[minLon, minLat], [maxLon, maxLat]]);
+
+  //     setPendingFitBounds(
+  //       [[minLon, minLat], [maxLon, maxLat]] // Northeast
+  //     ); 
+  //   }
+
+  // // Optionally reset pendingMapFilter if you want to allow re-triggering with the same values
+  // // setPendingMapFilter(null);
+
+  // }, [pendingMapFilter,setPendingFitBounds, mapRef, selectedLayers, setSelectedData, setSelectedLayer, setSelectedYears, setSelectedYearsSlider]);
+
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
     // scroll to bottom on new messages
     useEffect(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
