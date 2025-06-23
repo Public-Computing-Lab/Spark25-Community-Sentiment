@@ -12,7 +12,7 @@ export default function MapProvider({ children }: { children: React.ReactNode })
 
   const [selectedData, setSelectedData] = useState<string[]>(["Community Assets"]);
   const [selectedYears, setSelectedYears] = useState<number[]>([2018, 2024]);
-const [pendingFitBounds, setPendingFitBounds] = useState<[[number, number], [number, number]] | null>(null);
+
   //map provider works! it just takes time for the data to load...
 
   return (
@@ -26,9 +26,7 @@ const [pendingFitBounds, setPendingFitBounds] = useState<[[number, number], [num
         selectedData,
         setSelectedData,
         selectedYearsSlider,
-        setSelectedYearsSlider,
-        pendingFitBounds,
-        setPendingFitBounds,
+        setSelectedYearsSlider
         }}>
         {children}
     </MapContext.Provider> 

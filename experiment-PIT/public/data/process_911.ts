@@ -1,4 +1,4 @@
-import { getShotsData } from './api.ts';
+import { getShotsData } from '../../src/api/api.ts';
 
 interface GeoJSON {
     type: "FeatureCollection",
@@ -11,7 +11,6 @@ interface GeoJSONFeature {
         id: number;
         date: string;
         year: number;
-        coordinates: number[];
     };
     geometry: {
         type: "Point";
@@ -45,10 +44,6 @@ export const processShotsData = async () => {
                     id: shot_id,
                     date: shot_date.toLocaleString("en"),
                     year: shot_year,
-                    coordinates: [
-                        parseFloat(shot_longitude),
-                        parseFloat(shot_latitude)
-                    ]
                     //ballistics: shot_ballistics,
                 },
                 "geometry": {

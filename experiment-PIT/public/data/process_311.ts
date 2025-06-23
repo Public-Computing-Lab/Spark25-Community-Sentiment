@@ -12,7 +12,6 @@ interface GeoJSONFeature {
         request_type: string,
         date: string;
         year: number;
-        coordinates: number[];
     };
     geometry: {
         type: "Point";
@@ -44,10 +43,6 @@ export const process311Data = async () => {
                     request_type: request_type,
                     date: request_date.toLocaleString("en"),
                     year: request_year,
-                    coordinates: [
-                        parseFloat(request_longitude),
-                        parseFloat(request_latitude)
-                    ]
                 },
                 "geometry": {
                     "type": "Point",
