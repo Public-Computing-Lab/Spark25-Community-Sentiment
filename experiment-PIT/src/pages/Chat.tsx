@@ -123,38 +123,38 @@ function Chat() {
   };
 
   useEffect(() => {
-  if (!pendingMapFilter || !mapRef.current) return;
+    if (!pendingMapFilter || !mapRef.current) return;
 
-  const data = pendingMapFilter;
+    const data = pendingMapFilter;
 
-  if (data.data_type) {
-    setSelectedData(data.data_type);
-    setSelectedLayer(data.data_type);
-  }
-  if (data.year) {
-    setSelectedYears(data.year);
-    setSelectedYearsSlider(data.year);
-    console.log("Setting years", data.year);
-  }
-  if (data.location) {
+    if (data.data_type) {
+      setSelectedData(data.data_type);
+      setSelectedLayer(data.data_type);
+    }
+    if (data.year) {
+      setSelectedYears(data.year);
+      setSelectedYearsSlider(data.year);
+      console.log("Setting years", data.year);
+    }
+    if (data.location) {
 
-    const [centerLat, centerLon] = data.location;
-    const metersToDegreesLon = (meters: number) => meters / 111320;
-    const metersToDegreesLat = (meters: number, lat: number) => meters / (111320 * Math.cos(lat * Math.PI / 180));
+      const [centerLat, centerLon] = data.location;
+      const metersToDegreesLon = (meters: number) => meters / 111320;
+      const metersToDegreesLat = (meters: number, lat: number) => meters / (111320 * Math.cos(lat * Math.PI / 180));
 
-    const rMeters = 90; // example: 500 meters
-    const minLon = centerLon - metersToDegreesLon(rMeters);
-    const maxLon = centerLon + metersToDegreesLon(rMeters);
-    const minLat = centerLat - metersToDegreesLat(rMeters, centerLat);
-    const maxLat = centerLat + metersToDegreesLat(rMeters, centerLat);
-    console.log("fitBounds:", [[minLon, minLat], [maxLon, maxLat]]);
+      const rMeters = 90; // example: 500 meters
+      const minLon = centerLon - metersToDegreesLon(rMeters);
+      const maxLon = centerLon + metersToDegreesLon(rMeters);
+      const minLat = centerLat - metersToDegreesLat(rMeters, centerLat);
+      const maxLat = centerLat + metersToDegreesLat(rMeters, centerLat);
+      console.log("fitBounds:", [[minLon, minLat], [maxLon, maxLat]]);
 
-    setPendingFitBounds(
-      [[minLon, minLat], [maxLon, maxLat]] // Northeast
-    ); 
+      setPendingFitBounds(
+        [[minLon, minLat], [maxLon, maxLat]] // Northeast
+      ); 
 
-    
-  }
+      
+    }
 
   // Optionally reset pendingMapFilter if you want to allow re-triggering with the same values
   // setPendingMapFilter(null);

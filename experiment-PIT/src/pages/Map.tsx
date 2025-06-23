@@ -74,7 +74,7 @@ function Map() {
         });
         
           // Fetching and adding community assets
-        fetch(`${import.meta.env.BASE_URL}data/map_2.geojson`)
+        fetch(`${import.meta.env.VITE_BASE_URL}/data/map_2.geojson`)
           .then((response) => response.json())
           .then((geojsonData) => {
             mapRef.current?.addSource('assets', {
