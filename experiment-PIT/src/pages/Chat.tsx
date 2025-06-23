@@ -7,6 +7,7 @@ import {
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants";
 import { sendChatMessage, getChatSummary } from "../api/api";
 import { jsPDF } from "jspdf";
+import { MdTextRender } from 'jspdf-md-renderer';
 
 import {
   Box,
@@ -94,13 +95,44 @@ function Chat() {
       return;
     }
 
-    const doc = new jsPDF();
-    const margin = 10;
-    const lineHeight = 10;
-    const maxLineWidth = 180; // A4 page width minus margins
+    const doc = new jsPDF({format: 'a4', orientation: 'portrait'});
+    
+    // Add app name to document
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(16);
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.text("On The Porch", doc.internal.pageSize.getWidth() / 2, pageHeight - 10, { align: "center" });
 
-    const lines = doc.splitTextToSize(summary, maxLineWidth);
-    doc.text(lines, margin, margin + lineHeight);
+    // Set formatting options for summary
+    const options = {
+        cursor: { x: 10, y: 10 },
+        page: {
+            cursor: { x: 10, y: 10 },
+            format: 'a4',
+            maxContentWidth: 190,
+            maxContentHeight: 277,
+            lineSpace: 1.5,
+            defaultLineHeightFactor: 1.2,
+            defaultFontSize: 12,
+            defaultTitleFontSize: 18,
+            topmargin: 10,
+            xpading: 10,
+            xmargin: 10,
+            indent: 10,
+        },
+        font: {
+            bold: { name: 'helvetica', style: 'bold' },
+            regular: { name: 'helvetica', style: 'normal' },
+            light: { name: 'helvetica', style: 'light' },
+        },
+        color: '#000000',
+        endCursorYHandler: (y: number) => {
+            console.log('End cursor Y position:', y);
+        },
+    };
+
+    // Use MdTextRender function and Gemini's MD response to render summary 
+    await MdTextRender(doc, summary, options);
 
     doc.save("chat-summary.pdf");
   };
