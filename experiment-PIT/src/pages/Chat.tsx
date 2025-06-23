@@ -8,6 +8,7 @@ import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants";
 import { sendChatMessage, getChatSummary } from "../api/api";
 import ChatMapPreview from "../components/ChatMapPreview";
 import { jsPDF } from "jspdf";
+import type { Feature, Geometry, GeoJsonProperties } from "geojson";
 
 import {
   Box,
@@ -62,19 +63,25 @@ function Chat() {
         // Map backend mapData to your expected format
         const mapData = data.mapData
           ? {
-              center: [data.mapData.center.lon, data.mapData.center.lat],
-              layers: data.mapData.layers ?? [],
+              center: [data.mapData.center.lon, data.mapData.center.lat] as [
+                number,
+                number
+              ],
+              layers: data.mapData.layers as Feature<
+                Geometry,
+                GeoJsonProperties
+              >[],
               marker: [
                 data.mapData.marker.lon,
                 data.mapData.marker.lat,
                 data.mapData.marker.title ?? "",
-              ],
+              ] as [number, number, string],
             }
           : undefined;
 
         setMessages((prev) => [
           ...prev,
-          { text: data.text, sender: "Gemini", mapData: data.mapData },
+          { text: data.text, sender: "Gemini", mapData: mapData },
         ]);
       } else {
         setMessages((prev) => [
