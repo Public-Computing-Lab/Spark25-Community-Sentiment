@@ -608,6 +608,9 @@ def process_geospatial_message(
         print("Local Context: ", local_context)
         enhanced_prompt = construct_prompt(message, local_context)
 
+        print("=== FINAL OUTPUT OF GEOSPATIAL_CONTEXT.PY: ===")
+        print(f"enhanced_prompt: {enhanced_prompt}")
+        print(f"map_data: {map_data}")
         return {"enhanced_prompt": enhanced_prompt, "map_data": map_data}
 
     except Exception as e:

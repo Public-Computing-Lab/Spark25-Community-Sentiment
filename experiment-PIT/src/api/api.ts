@@ -36,7 +36,7 @@ async function sendPostRequest(url: string, payload: any, headers: any) {
 }
 
 // Send chat message with history
-export async function sendChatMessage(message: string, history: Message[], is_spatial: boolean = false) {
+export async function sendChatMessage(message: string, history: Message[], is_spatial: boolean = false): Promise<{ text: string; mapData?: any }> {
   const urlChat = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False&is_spatial=${is_spatial ? 'true' : 'false'}`;
   const formattedHistory = history.map(message => JSON.stringify(message)).join('\n');
   const jsonChat = {
@@ -46,8 +46,12 @@ export async function sendChatMessage(message: string, history: Message[], is_sp
 
   try {
     const response = await sendPostRequest(urlChat, jsonChat, header);
+    console.log("received in sendChatMessage: ", response)
     console.log("END OF SENDCHATMESSAGE");
-    return response;
+    return {
+      text: response.response ?? "No response.",
+      mapData: response.mapData ?? undefined,
+    };
   } catch (error) {
     console.error("Error while sending chat message.");
     throw error;

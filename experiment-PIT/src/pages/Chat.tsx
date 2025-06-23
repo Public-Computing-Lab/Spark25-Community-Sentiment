@@ -58,10 +58,10 @@ function Chat() {
       const data = await sendChatMessage(userMsg, messages, true);
 
       // Append backend response to messages
-      if (data.response) {
+      if (data.text) {
         setMessages((prev) => [
           ...prev,
-          { text: data.response, sender: "Gemini" },
+          { text: data.text, sender: "Gemini", mapData: data.mapData },
         ]);
       } else {
         setMessages((prev) => [
