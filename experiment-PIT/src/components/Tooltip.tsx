@@ -40,11 +40,11 @@ function Tooltip({
                 Also known as:
             </Typography>
         
-            {alts[0] != '' ? (
+            {alts && alts[0] !== '' ? (
                 alts.map((str, key) => (
                     <li key={key}>{str}</li>
                 ))
-            ):(
+            ) : (
                 <Typography sx={{ fontSize: "14px", fontStyle: "italic" }}>
                     No alternate names available.
                 </Typography>

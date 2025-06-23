@@ -260,7 +260,7 @@ function Map() {
       PrintableArea: true,
       Local: "en",
       Filename: "TNT-PublicSafety-Data",
-      accessToken: mapboxgl.accessToken,
+      accessToken: mapboxgl.accessToken ?? undefined,
     });
 
     mapRef.current?.addControl(exportControl, "top-right");
