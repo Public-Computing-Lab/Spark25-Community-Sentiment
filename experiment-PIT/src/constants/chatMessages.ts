@@ -16,15 +16,15 @@ export const opening_message: Message[] = [
 
 export const suggested_questions = [
   {
-    question: "What are my neighbors worried about?",
-    subLabel: "Searching community meeting transcripts",
+    question: "What challenges are my neighbors discussing?",
+    subLabel: "Search community meeting transcripts",
   },
   {
-    question: "How are the road conditions on Talbot Ave?",
-    subLabel: "Exploring geographic data",
+    question: "What is being done about speeding and traffic?",
+    subLabel: "Explore city initiatives",
   },
   {
-    question: "Where do residents avoid walking at night?",
-    subLabel: "Learn about hot spots",
+    question: "Tell me about youth spaces in the neighborhood",
+    subLabel: "Learn about community organizations",
   },
 ];
