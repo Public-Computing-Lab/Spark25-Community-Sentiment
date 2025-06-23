@@ -13,7 +13,7 @@ import {
 		DPI
 	} from '@watergis/mapbox-gl-export';
 	import '@watergis/mapbox-gl-export/dist/mapbox-gl-export.css';
-import { processShotsData } from '../../public/data/process_911';
+import { processShotsData } from '../api/process_911.ts';
 import { process311Data } from '../../public/data/process_311';
 import FilterDialog from '../components/FilterDialog';
 //besure to install mapbox-gl 
