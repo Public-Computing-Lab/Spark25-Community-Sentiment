@@ -312,37 +312,6 @@ function Chat() {
         >
           Chat responses may be inaccurate. Check important information.
         </Typography>
-        <Button
-          variant="outlined"
-          sx={{ ml: 2 }}
-          onClick={() => {
-            setMessages((prev) => [
-              ...prev,
-              {
-                text: "Testing a dynamic map bubble.",
-                sender: "Gemini",
-                mapData: {
-                  center: [-71.076543, 42.288386],
-                  layers: [
-                    {
-                      type: "Feature",
-                      geometry: {
-                        type: "Point",
-                        coordinates: [-71.078, 42.289],
-                      },
-                      properties: {
-                        title: "Demo Point",
-                        color: "#1976d2",
-                      },
-                    },
-                  ],
-                },
-              },
-            ]);
-          }}
-        >
-          Add Test Map
-        </Button>
       </Box>
 
       {/* Confirm Clear Dialog */}
