@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from 'react-router-dom';
 import { useMap } from "../components/useMap.tsx";
 import type { Message } from "../constants/chatMessages";
 import {
@@ -45,9 +46,11 @@ function Chat() {
   const { mapRef, setSelectedData, selectedLayers, setSelectedLayer, setSelectedYearsSlider, setSelectedYears, setPendingFitBounds} = useMap(); // Access mapRef and mapContainerRef from context
   const sampleData = { //IT WORKS!! changes just aren't reflected in the filter dialog
     "data_type": ["Community Assets", "Gun Violence Incidents"],
-    "location": [-71.08012472023684, 42.29265737162938] // 
+    "location": [42.29265737162938, -71.08012472023684] // 
   }
   const [pendingMapFilter, setPendingMapFilter] = useState<mapFilter | null>(null);
+  const navigate = useNavigate();
+
 
   // Save messages to localStorage when they change
   useEffect(() => {
@@ -135,7 +138,7 @@ function Chat() {
   }
   if (data.location) {
 
-    const [centerLon, centerLat] = data.location;
+    const [centerLat, centerLon] = data.location;
     const metersToDegreesLon = (meters: number) => meters / 111320;
     const metersToDegreesLat = (meters: number, lat: number) => meters / (111320 * Math.cos(lat * Math.PI / 180));
 
@@ -204,7 +207,10 @@ function Chat() {
             </IconButton>
             <IconButton
               aria-label="Testing Map-Chat-Link"
-              onClick={() => setPendingMapFilter(sampleData)}
+              onClick={() => {
+                setPendingMapFilter(sampleData)
+                navigate("/map");
+              }}
             >
               <ExploreIcon />
             </IconButton>
