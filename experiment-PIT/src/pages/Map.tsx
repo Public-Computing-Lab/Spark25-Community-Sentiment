@@ -20,6 +20,8 @@ import {
 	import '@watergis/mapbox-gl-export/dist/mapbox-gl-export.css';
 import { processShotsData } from '../api/process_911.ts';
 import { process311Data } from '../api/process_311.ts';
+import { colorPalette } from "../assets/palette";
+import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
 //besure to install mapbox-gl 
 
 function Map() {
@@ -129,10 +131,10 @@ function Map() {
           type: "circle",
           source: "shots_data",
           paint: {
-            "circle-radius": 3,
-            "circle-color": "#880808",
-          },
-        });
+            'circle-radius': 3,
+            'circle-color': "#5d17d5" ,
+          }
+        })
 
         //adding 311 data
         mapRef.current?.addSource("311_data", {
@@ -307,6 +309,8 @@ function Map() {
     }
   }, [mapRef, selectedYearsSlider, layers]);
 
+
+   /* ─── Render ───────────────────────────────────────────── */
   return (
     <Box
       sx={{
@@ -314,24 +318,29 @@ function Map() {
         flexDirection: "column",
         height: `calc(100vh - ${BOTTOM_NAV_HEIGHT}px)`,
         width: "100%",
-        bgcolor: "background.paper",
-        color: "text.primary",
+        bgcolor: "#E7F4FF",
         overflow: "hidden",
-        position: "relative",
-        p: 2,
       }}
     >
+      {/* ─── Header ─────────────────────────────────────── */}
       <Box
         sx={{
           display: "flex",
-          justifyContent: "space-between",
           alignItems: "center",
-          mb: 2,
+          justifyContent: "space-between",
+          px: 2,
+          height: 75,
+          borderBottomLeftRadius: 16,
+          borderBottomRightRadius: 16,
+          bgcolor: colorPalette.dark,
+          color: "#fff",
         }}
       >
-        <Typography variant="h4" component="h1">
-          Map
-        </Typography>
+        <MapOutlinedIcon
+   fontSize="large"       
+   sx={{ mr: 0.5 }}        
+ />
+        
       </Box>
       {isLoading && (
         <Box
@@ -360,20 +369,16 @@ function Map() {
           }}
         />
       )}
-      <Box
-        sx={{
-          //element rendering the map
-          left: "0",
-          top: "0",
-          flex: 1,
-          width: "100%",
-          height: `calc(100vh - ${BOTTOM_NAV_HEIGHT}px)`,
-          position: "relative",
-        }}
-        ref={mapContainerRef}
-      />
-      <Box sx={{ mb: 3, position: "absolute", left: "5", top: "4em" }}>
-        <Key />
+
+      {/* ─── Flexible content area (fills the rest) ─────── */}
+      <Box sx={{ flex: 1, p: 2, position: "relative" }}>
+        {/* Mapbox container fills its parent */}
+        <Box ref={mapContainerRef} sx={{ position: "absolute", inset: 0 }} />
+
+        {/* Legend overlay */}
+        <Box sx={{ position: "absolute", top: "4em", left: 5 }}>
+          <Key />
+        </Box>
       </Box>
       <FilterDialog
         layers={layers}
