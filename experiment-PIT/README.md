@@ -53,6 +53,19 @@ The project uses a mix of structured and geospatial public data:
   - `budget_data_dictionary_v1.txt`: Definitions for project fields (Department, Scope, Budget, etc.)
 - Used by the chat box to answer questions about city investments.
 
+### Policy Data
+- Sourced from public city policy documents
+  - [Anti-Displacement Action Plan](https://www.boston.gov/departments/planning-advisory-council/anti-displacement-action-plan) 
+  - [Imagine Boston 2030 City Master Plan](https://www.boston.gov/civic-engagement/imagine-boston-2030)
+  - [Neighborhood Slow Streets Program](https://www.boston.gov/departments/transportation/neighborhood-slow-streets)
+- The content of these plans has been distilled into 3 policy summaries using Gemini's deep research tool
+  - `Boston Anti-Displacement Plan Analysis.txt`
+  - `Imagine Boston 2030 Analysis.txt`
+  - `Boston Slow Streets Plan Analysis.txt`
+- Gemini primarily sourced data for these summaries from the city policy documents and some supplemental info from other online sources, all of which are cited in the summaries.
+- Each summary includes a particular focus on the connection of each policy to both Dorchester and the TNT neighborhood.
+- Used by the model to answer questions about city plans, specific initiatives, and various processes affecting the TNT neighborhood.
+
 ### Additional Public Datasets
 
 Data for the dashboard are from public [BPD Crime Hub](https://boston-pd-crime-hub-boston.hub.arcgis.com/pages/data) and [BOS:311](https://data.boston.gov/dataset/311-service-requests):
