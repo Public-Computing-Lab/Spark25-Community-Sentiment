@@ -1,5 +1,10 @@
 import { Box, Typography, CircularProgress } from '@mui/material'
+import ReactDOM from "react-dom/client"; // For React 18+
+
 import Key from '../components/Key';
+import Tooltip from "../components/Tooltip"; // Adjust path as needed
+import FilterDialog from '../components/FilterDialog';
+
 import { useMap } from "../components/useMap.tsx";
 import { useEffect, useState} from 'react';
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants"
@@ -14,8 +19,7 @@ import {
 	} from '@watergis/mapbox-gl-export';
 	import '@watergis/mapbox-gl-export/dist/mapbox-gl-export.css';
 import { processShotsData } from '../api/process_911.ts';
-import { process311Data } from '../../public/data/process_311';
-import FilterDialog from '../components/FilterDialog';
+import { process311Data } from '../api/process_311.ts';
 //besure to install mapbox-gl 
 
 function Map() {
@@ -23,7 +27,7 @@ function Map() {
   const [layers, setLayers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  mapboxgl.accessToken = "pk.eyJ1IjoiYWthbXJhMTE4IiwiYSI6ImNtYjluNW03MTBpd3cyanBycnU4ZjQ3YjcifQ.LSPKVriOtvKxyZasMcxqxw"; 
+  mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
   //loading all data
   useEffect(() => {
@@ -74,7 +78,7 @@ function Map() {
         });
         
           // Fetching and adding community assets
-        fetch(`${import.meta.env.VITE_BASE_URL}/data/map_2.geojson`)
+        fetch(`${import.meta.env.BASE_URL}/data/map_2.geojson`)
           .then((response) => response.json())
           .then((geojsonData) => {
             mapRef.current?.addSource('assets', {
@@ -154,6 +158,7 @@ function Map() {
 
 
     mapRef.current?.on('click', 'Community Assets', (e) => { //getting popup text
+      const type = "Community Assets";
       if (e.features && e.features[0]) {
         const name = e.features[0].properties && e.features[0].properties['Name'];
         const alternates = e.features[0].properties && e.features[0].properties['Alternate Names'];
@@ -164,18 +169,25 @@ function Map() {
           coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360; //adjusting X coordinate of popup
         } //may need to give more wiggle room for mobile 
 
-        const description = `<strong>${name}</strong><br>${alternates}` //need to figure out better styling for popup
+        // Create a container div for the React component
+        const container = document.createElement('div');
+
+        // Render Tooltip into the container
+        ReactDOM.createRoot(container).render(<Tooltip type={type} name={name} alternates={alternates} />);
 
         new mapboxgl.Popup()
           .setLngLat([coordinates[0], coordinates[1]])
-          .setHTML(description)
+          .setDOMContent(container)
           .addTo(mapRef.current!);
+
+
       }
     })
 
     mapRef.current?.on('click', 'Gun Violence Incidents', (e) => { //getting popup text
+      const type = "Gun Violence Incidents";
       if (e.features && e.features[0]) {
-        const name = e.features[0].properties && e.features[0].properties['year'];
+        const date = e.features[0].properties && e.features[0].properties['date'];
         const geometry = e.features[0].geometry as { type: 'Point'; coordinates: number[] }; //type assertion to prevent typescript error
         const coordinates = geometry.coordinates.slice();
 
@@ -183,19 +195,25 @@ function Map() {
           coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360; //adjusting X coordinate of popup
         } //may need to give more wiggle room for mobile 
 
-        const description = `<strong>${name}</strong>` //need to figure out better styling for popup
+        // Create a container div for the React component
+        const container = document.createElement('div');
+
+        // Render Tooltip into the container
+        ReactDOM.createRoot(container).render(<Tooltip type={type} date={date} />);
 
         new mapboxgl.Popup()
-          .setLngLat([coordinates[0], coordinates[1]])          
-          .setHTML(description)
+          .setLngLat([coordinates[0], coordinates[1]])
+          .setDOMContent(container)
           .addTo(mapRef.current!);
+
       }
     })
 
     mapRef.current?.on('click', '311 Requests', (e) => { //getting popup text
+      const type = "311 Requests";
       if (e.features && e.features[0]) {
-        const year = e.features[0].properties && e.features[0].properties['year'];
-        const type = e.features[0].properties && e.features[0].properties['request_type'];
+        const date = e.features[0].properties && e.features[0].properties['date'];
+        const request_type = e.features[0].properties && e.features[0].properties['request_type'];
         const geometry = e.features[0].geometry as { type: 'Point'; coordinates: number[] }; //type assertion to prevent typescript error
         const coordinates = geometry.coordinates.slice();
 
@@ -203,11 +221,15 @@ function Map() {
           coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360; //adjusting X coordinate of popup
         } //may need to give more wiggle room for mobile 
 
-        const description = `<strong>${year}</strong><br>${type}` //need to figure out better styling for popup
+        // Create a container div for the React component
+        const container = document.createElement('div');
+
+        // Render Tooltip into the container
+        ReactDOM.createRoot(container).render(<Tooltip type={type} name={request_type} date={date}/>);
 
         new mapboxgl.Popup()
           .setLngLat([coordinates[0], coordinates[1]])
-          .setHTML(description)
+          .setDOMContent(container)
           .addTo(mapRef.current!);
       }
     })
