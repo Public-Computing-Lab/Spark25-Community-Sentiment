@@ -1,4 +1,4 @@
-import { get311Data } from '../../src/api/api.ts';
+import { get311Data } from './api.ts';
 
 interface GeoJSON {
     type: "FeatureCollection",
