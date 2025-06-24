@@ -125,3 +125,5 @@ export default function FilterDialog({
     </>
   );
 }
+
+export default FilterDialog;
