@@ -312,7 +312,7 @@ function Chat() {
               }}
             >
               <CircularProgress size={16} />
-              <Typography variant="body2">Bot is thinking…</Typography>
+              <Typography variant="body2">Thinking…</Typography>
             </Box>
           )}
           <div ref={messagesEndRef} />
