@@ -37,36 +37,23 @@ async function sendPostRequest(url: string, payload: any, headers: any) {
   }
 }
 
-export async function sendChatMessage(message: string, history: Message[], is_spatial: boolean = false) {
-
-  // Get all locations
-  const urlLocations = `${import.meta.env.VITE_BASE_URL}/chat/identify_places?request=identify_places&app_version=0.7.0&structured_response=False&is_spatial=${is_spatial ? 'true' : 'false'}`;
-  const payloadLocations = { "message": message };
-  
-  let locations = {};
-  try {
-    locations = await sendPostRequest(urlLocations, payloadLocations, header);
-    if (locations === "No locations found.") {
-      locations = {};
-    }
-    console.log("Edited locations: ", locations);
-  } catch (error) {
-    // Error is already logged in sendPostRequest, so no need to handle here again
-    console.error("Error while fetching locations.");
-    throw error;
-  }
-
-  // Send chat message with history
+// Send chat message with history
+export async function sendChatMessage(message: string, history: Message[], is_spatial: boolean = false): Promise<{ text: string; mapData?: any }> {
   const urlChat = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False&is_spatial=${is_spatial ? 'true' : 'false'}`;
   const formattedHistory = history.map(message => JSON.stringify(message)).join('\n');
   const jsonChat = {
     "client_query": JSON.stringify([...formattedHistory, { text: message, sender: "user" }]),
+    "user_message": message
   };
 
   try {
     const response = await sendPostRequest(urlChat, jsonChat, header);
+    console.log("received in sendChatMessage: ", response)
     console.log("END OF SENDCHATMESSAGE");
-    return response;
+    return {
+      text: response.response ?? "No response.",
+      mapData: response.mapData ?? undefined,
+    };
   } catch (error) {
     console.error("Error while sending chat message.");
     throw error;

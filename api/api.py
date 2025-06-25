@@ -1,3 +1,6 @@
+import faulthandler; faulthandler.enable()
+print("=== api.py start ===")
+
 from flask import Flask, request, jsonify, g, session, Response, stream_with_context
 import csv
 from dotenv import load_dotenv
@@ -18,6 +21,8 @@ from pydantic import BaseModel
 
 from flask import Flask
 from flask_cors import CORS
+
+from geospatial_context import process_geospatial_message
 
 # Load environment variables
 load_dotenv()
@@ -76,6 +81,7 @@ CORS(
     supports_credentials=True,
     expose_headers=["RethinkAI-API-Key"],
     resources={r"/*": {"origins": "*"}},
+    allow_headers=["Content-Type", "RethinkAI-API-Key"]
 )
 
 
@@ -194,6 +200,7 @@ class SQLConstants:
         coordinates
     ) = 1
     """
+
 
 
 #
@@ -685,6 +692,7 @@ def get_file_content(filename: str) -> Optional[str]:
 def get_db_connection():
     # return mysql.connector.connect(**Config.DB_CONFIG)
     return db_pool.get_connection()
+    
 
 
 def json_query_results(query: str) -> Optional[Response]:
@@ -825,6 +833,7 @@ def get_gemini_response(
         return f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}"
 
 
+
 def create_gemini_context(
     context_request: str,
     preamble: str = "",
@@ -932,7 +941,6 @@ def create_gemini_context(
         )
         return f"✖ Error generating context: {e}"
 
-
 # Log events
 def log_event(
     session_id: str,
@@ -1026,9 +1034,9 @@ def log_event(
 #
 @app.before_request
 def check_session():
+    # Handle CORS preflight requests
     if request.method == "OPTIONS":
-        # Preflight CORS request – skip auth
-        return None
+        return ("", 204)
 
     rethinkai_api_client_key = request.headers.get("RethinkAI-API-Key")
     app_version = request.args.get("app_version", "")
@@ -1037,10 +1045,12 @@ def check_session():
         not rethinkai_api_client_key
         or rethinkai_api_client_key not in Config.RETHINKAI_API_KEYS
     ):
+
         return jsonify({"Error": "Invalid or missing API key"}), 401
 
+    # Ensure session exists
     if "session_id" not in session:
-        session.permanent = True  # Make the session persistent
+        session.permanent = True
         session["session_id"] = str(uuid.uuid4())
         log_event(
             session_id=session["session_id"],
@@ -1049,13 +1059,14 @@ def check_session():
             app_response="New session created",
         )
 
-    # Log the request
+    # Log the incoming request
     g.log_entry = log_event(
         session_id=session["session_id"],
         app_version=app_version,
         data_attributes=Config.API_VERSION,
         client_query=f"Request: [{request.method}] {request.url}",
     )
+
 
 
 #
@@ -1189,11 +1200,28 @@ def route_chat():
     structured_response = request.args.get("structured_response", False)
 
     data = request.get_json()
-
-    # Extract chat data parameters
     data_attributes = data.get("data_attributes", "")
     client_query = data.get("client_query", "")
+    user_message = data.get("user_message", "")
     prompt_preamble = data.get("prompt_preamble", "")
+
+    # GEOSPATIAL INTEGRATION - Keep your pipeline
+    print("[GEOSPATIAL] incoming query:", user_message)
+    geospatial_result = process_geospatial_message(
+        user_message,
+        Config.DATASTORE_PATH,
+        f"http://127.0.0.1:{Config.PORT}",
+        Config.RETHINKAI_API_KEYS[0],
+    )
+
+    has_location = geospatial_result["map_data"] is not None
+    map_data = geospatial_result["map_data"]
+
+    # If we detected a location, use the enhanced prompt, otherwise use original
+    if has_location:
+        enhanced_query = geospatial_result["enhanced_prompt"]
+    else:
+        enhanced_query = client_query
 
     # data_selected, optional, list of files used when context_request==s
     cache_name = create_gemini_context(
@@ -1204,7 +1232,7 @@ def route_chat():
         is_spatial=is_spatial,
     )
 
-    full_prompt = f"User question: {client_query}"
+    full_prompt = f"User question: {enhanced_query}"
 
     # Process chat
     try:
@@ -1218,7 +1246,7 @@ def route_chat():
                 f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ ERROR from Gemini API:{Font_Colors.ENDC} {app_response}"
             )
             return jsonify({"Error": app_response}), 500
-
+        
         # Log the interaction
         log_id = log_event(
             session_id=session_id,
@@ -1229,11 +1257,16 @@ def route_chat():
             client_query=full_prompt,
             app_response=app_response,
         )
+
         response = {
             "session_id": session_id,
             "response": app_response,
             "log_id": log_id,
         }
+        
+        # GEOSPATIAL INTEGRATION - Include map data in response
+        if map_data:
+            response["mapData"] = map_data
 
         log_event(
             session_id=session_id,
@@ -1255,6 +1288,7 @@ def route_chat():
         print(f"✖ preamble: {prompt_preamble}")
         print(f"✖ app_version: {app_version}")
         return jsonify({"Error": f"Internal server error: {e}"}), 500
+
 
 
 @app.route("/chat/context", methods=["GET", "POST"])
@@ -1396,7 +1430,7 @@ def identify_places():
 
     # Read the content from identify_places.txt
     try:
-        with open(prompt_file_path, "r") as file:
+        with open(prompt_file_path, "r", encoding='utf-8') as file:
             file_content = file.read()
 
         # Combine the file content with the message to form the full prompt

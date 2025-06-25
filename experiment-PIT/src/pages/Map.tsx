@@ -1,9 +1,9 @@
-import { Box, CircularProgress } from '@mui/material'
+import { Box, Typography, CircularProgress } from "@mui/material";
 import ReactDOM from "react-dom/client"; // For React 18+
 
-import Key from '../components/Key';
-import Tooltip from '../components/Tooltip.tsx'; // Adjust path as needed
-import FilterDialog from '../components/FilterDialog';
+import Key from "../components/Key";
+import Tooltip from "../components/Tooltip"; // Adjust path as needed
+import FilterDialog from "../components/FilterDialog";
 
 import { useMap } from "../components/useMap.tsx";
 import { useEffect, useState } from "react";
@@ -11,15 +11,15 @@ import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import {
-		MapboxExportControl,
-		Size,
-		PageOrientation,
-		Format,
-		DPI
-	} from '@watergis/mapbox-gl-export';
-	import '@watergis/mapbox-gl-export/dist/mapbox-gl-export.css';
-import { processShotsData } from '../api/process_911.ts';
-import { process311Data } from '../api/process_311.ts';
+  MapboxExportControl,
+  Size,
+  PageOrientation,
+  Format,
+  DPI,
+} from "@watergis/mapbox-gl-export";
+import "@watergis/mapbox-gl-export/dist/mapbox-gl-export.css";
+import { processShotsData } from "../api/process_911.ts";
+import { process311Data } from "../api/process_311.ts";
 import { colorPalette } from "../assets/palette";
 import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
 //besure to install mapbox-gl 
@@ -37,7 +37,7 @@ function Map() {
   } = useMap(); // Access mapRef and mapContainerRef from context
   const [layers, setLayers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
   //loading all data
@@ -49,8 +49,7 @@ function Map() {
         center: [-71.076543, 42.288386], //centered based on 4 rectangle coordinates of TNT
         zoom: 14.5,
         minZoom: 12,
-        maxZoom: 18,
-        style: "mapbox://styles/mapbox/light-v11?optimize=true", //should decide on style
+        style: "mapbox://styles/mapbox/light-v11", //should decide on style
       });
     }
 
@@ -79,26 +78,26 @@ function Map() {
         },
       });
 
-        mapRef.current?.addLayer({
-          id: 'tnt-outline',
-          type: 'line',
-          source: 'TNT',
-          layout: {},
-          paint: {
-            'line-color': '#82aae7',
-            'line-width': 3,
-          }
-        });
-        
-          // Fetching and adding community assets
-        fetch(`./data/map_2.geojson`)
-          .then((response) => response.json())
-          .then((geojsonData) => {
-            mapRef.current?.addSource('assets', {
-              type: 'geojson',
-              data: geojsonData,
-            });
+      mapRef.current?.addLayer({
+        id: "tnt-outline",
+        type: "line",
+        source: "TNT",
+        layout: {},
+        paint: {
+          "line-color": "#82aae7",
+          "line-width": 3,
+        },
+      });
 
+      // Fetching and adding community assets
+      fetch(`${import.meta.env.BASE_URL}/data/map_2.geojson`)
+        .then((response) => response.json())
+        .then((geojsonData) => {
+          mapRef.current?.addSource("assets", {
+            type: "geojson",
+            data: geojsonData,
+          });
+          
           mapRef.current?.addLayer({
             id: "Community Assets",
             type: "circle",
@@ -169,8 +168,8 @@ function Map() {
       }
     });
 
-
-    mapRef.current?.on('click', 'Community Assets', (e) => { //getting popup text
+    mapRef.current?.on("click", "Community Assets", (e) => {
+      //getting popup text
       const type = "Community Assets";
       if (e.features && e.features[0]) {
         const name =
@@ -189,25 +188,30 @@ function Map() {
         } //may need to give more wiggle room for mobile
 
         // Create a container div for the React component
-        const container = document.createElement('div');
+        const container = document.createElement("div");
 
         // Render Tooltip into the container
-        ReactDOM.createRoot(container).render(<Tooltip type={type} name={name} alternates={alternates} />);
+        ReactDOM.createRoot(container).render(
+          <Tooltip type={type} name={name} alternates={alternates} />
+        );
 
         new mapboxgl.Popup()
           .setLngLat([coordinates[0], coordinates[1]])
           .setDOMContent(container)
           .addTo(mapRef.current!);
-
-
       }
     });
 
-    mapRef.current?.on('click', 'Gun Violence Incidents', (e) => { //getting popup text
+    mapRef.current?.on("click", "Gun Violence Incidents", (e) => {
+      //getting popup text
       const type = "Gun Violence Incidents";
       if (e.features && e.features[0]) {
-        const date = e.features[0].properties && e.features[0].properties['date'];
-        const geometry = e.features[0].geometry as { type: 'Point'; coordinates: number[] }; //type assertion to prevent typescript error
+        const date =
+          e.features[0].properties && e.features[0].properties["date"];
+        const geometry = e.features[0].geometry as {
+          type: "Point";
+          coordinates: number[];
+        }; //type assertion to prevent typescript error
         const coordinates = geometry.coordinates.slice();
 
         while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
@@ -215,25 +219,32 @@ function Map() {
         } //may need to give more wiggle room for mobile
 
         // Create a container div for the React component
-        const container = document.createElement('div');
+        const container = document.createElement("div");
 
         // Render Tooltip into the container
-        ReactDOM.createRoot(container).render(<Tooltip type={type} date={date} />);
+        ReactDOM.createRoot(container).render(
+          <Tooltip type={type} date={date} />
+        );
 
         new mapboxgl.Popup()
           .setLngLat([coordinates[0], coordinates[1]])
           .setDOMContent(container)
           .addTo(mapRef.current!);
-
       }
     });
 
-    mapRef.current?.on('click', '311 Requests', (e) => { //getting popup text
+    mapRef.current?.on("click", "311 Requests", (e) => {
+      //getting popup text
       const type = "311 Requests";
       if (e.features && e.features[0]) {
-        const date = e.features[0].properties && e.features[0].properties['date'];
-        const request_type = e.features[0].properties && e.features[0].properties['request_type'];
-        const geometry = e.features[0].geometry as { type: 'Point'; coordinates: number[] }; //type assertion to prevent typescript error
+        const date =
+          e.features[0].properties && e.features[0].properties["date"];
+        const request_type =
+          e.features[0].properties && e.features[0].properties["request_type"];
+        const geometry = e.features[0].geometry as {
+          type: "Point";
+          coordinates: number[];
+        }; //type assertion to prevent typescript error
         const coordinates = geometry.coordinates.slice();
 
         while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
@@ -241,10 +252,12 @@ function Map() {
         } //may need to give more wiggle room for mobile
 
         // Create a container div for the React component
-        const container = document.createElement('div');
+        const container = document.createElement("div");
 
         // Render Tooltip into the container
-        ReactDOM.createRoot(container).render(<Tooltip type={type} name={request_type} date={date}/>);
+        ReactDOM.createRoot(container).render(
+          <Tooltip type={type} name={request_type} date={date} />
+        );
 
         new mapboxgl.Popup()
           .setLngLat([coordinates[0], coordinates[1]])
@@ -284,6 +297,7 @@ function Map() {
   }, [pendingFitBounds, mapRef, setPendingFitBounds]);
 
   //changing visibility of layers depending on what is checked in filters or not.
+  //NEED TO DETERMINE WHY VISIBILITY FOR COMMUNITY ASSETS ISN'T WORKING
   useEffect(() => {
     if (mapRef.current) {
       layers.forEach((layerId) => {
