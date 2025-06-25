@@ -225,6 +225,13 @@ function Chat() {
                     layers={msg.mapData.layers}
                     marker={msg.mapData.marker}
                   />
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 1, textAlign: "center" }}
+                  >
+                    Click on the map to explore more
+                  </Typography>
                 </Box>
               )}
             </Box>
