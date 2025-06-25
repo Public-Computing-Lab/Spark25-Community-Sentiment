@@ -58,8 +58,8 @@ function Chat() {
   const [pendingMapFilter, setPendingMapFilter] = useState<mapFilter | null>(null);
   const navigate = useNavigate();
   const sampleData = { //IT WORKS!! changes just aren't reflected in the filter dialog
-    "data_type": ["Community Assets", "Gun Violence Incidents"],
-    "location": [42.29265737162938, -71.08012472023684] // 
+    "data_type": ["311 Requests", "Gun Violence Incidents"],
+    "location": [42.28739647716228, -71.07841912589409] // 
   }
 
   // ─── send handler ─────────────────────────────────────────────────

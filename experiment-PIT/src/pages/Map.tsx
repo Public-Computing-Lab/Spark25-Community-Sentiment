@@ -113,8 +113,8 @@ function Map() {
           console.error("Error fetching community assets:", error);
         });
 
-      setIsLoading(true);
-      try {
+      setIsLoading(true); //using loading screen while data loads
+      try { //adding 311 and shots data
         const shots_geojson = await processShotsData(); //loading shots data from api and converting to geojson
         const request_geojson = await process311Data(); //loading 311 data from api and converting to geojson
 
@@ -131,7 +131,7 @@ function Map() {
           type: "circle",
           source: "shots_data",
           paint: {
-            'circle-radius': 3,
+            'circle-radius': 4,
             'circle-color': "#5d17d5" ,
           }
         })
@@ -148,7 +148,7 @@ function Map() {
           type: "circle",
           source: "311_data",
           paint: {
-            "circle-radius": 3,
+            "circle-radius": 4,
             "circle-color": "#FFC300",
             "circle-opacity": 0.3,
           },
