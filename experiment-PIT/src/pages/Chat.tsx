@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useMap } from "../components/useMap.tsx";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 import type { mapFilter } from "../constants/mapFilter";
 import type { Message } from "../constants/chatMessages";
-
 
 import {
   opening_message,
@@ -32,7 +31,7 @@ import {
 
 import SendIcon from "@mui/icons-material/ArrowUpwardRounded";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import ExploreIcon from '@mui/icons-material/Explore';
+import ExploreIcon from "@mui/icons-material/Explore";
 import onLogo from "/public/on_the_porch_logo.png";
 
 // Size of the blue arrow button (helps keep layout math tidy)
@@ -54,13 +53,6 @@ function Chat() {
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [confirmExportOpen, setConfirmExportOpen] = useState(false);
   const [summaryError, setSummaryError] = useState(false);
-  const { mapRef, setSelectedData, selectedLayers, setSelectedLayer, setSelectedYearsSlider, setSelectedYears, setPendingFitBounds} = useMap(); // Access mapRef and mapContainerRef from context
-  const [pendingMapFilter, setPendingMapFilter] = useState<mapFilter | null>(null);
-  const navigate = useNavigate();
-  const sampleData = { //IT WORKS!! changes just aren't reflected in the filter dialog
-    "data_type": ["311 Requests", "Gun Violence Incidents"],
-    "location": [42.28739647716228, -71.07841912589409] // 
-  }
 
   // ─── send handler ─────────────────────────────────────────────────
   const sendMessage = async (customInput?: string) => {
@@ -165,47 +157,6 @@ function Chat() {
     doc.save("chat-summary.pdf");
   };
 
-  //map-chat-link 
-  useEffect(() => {
-    if (!pendingMapFilter || !mapRef.current) return;
-
-    const data = pendingMapFilter;
-
-    if (data.data_type) {
-      setSelectedData(data.data_type);
-      setSelectedLayer(data.data_type);
-    }
-    if (data.year) {
-      setSelectedYears(data.year);
-      setSelectedYearsSlider(data.year);
-      console.log("Setting years", data.year);
-    }
-    if (data.location) {
-
-      const [centerLat, centerLon] = data.location;
-      const metersToDegreesLon = (meters: number) => meters / 111320;
-      const metersToDegreesLat = (meters: number, lat: number) => meters / (111320 * Math.cos(lat * Math.PI / 180));
-
-      const rMeters = 90; // example: 500 meters
-      const minLon = centerLon - metersToDegreesLon(rMeters);
-      const maxLon = centerLon + metersToDegreesLon(rMeters);
-      const minLat = centerLat - metersToDegreesLat(rMeters, centerLat);
-      const maxLat = centerLat + metersToDegreesLat(rMeters, centerLat);
-      console.log("fitBounds:", [[minLon, minLat], [maxLon, maxLat]]);
-
-      setPendingFitBounds(
-        [[minLon, minLat], [maxLon, maxLat]] // Northeast
-      ); 
-
-      
-    }
-
-  // Optionally reset pendingMapFilter if you want to allow re-triggering with the same values
-  // setPendingMapFilter(null);
-
-  }, [pendingMapFilter,setPendingFitBounds, mapRef, selectedLayers, setSelectedData, setSelectedLayer, setSelectedYears, setSelectedYearsSlider]);
-
-
   // scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -264,15 +215,6 @@ function Chat() {
               sx={{ color: "#fff" }}
             >
               <RefreshIcon />
-            </IconButton>
-            <IconButton
-              aria-label="Testing Map-Chat-Link"
-              onClick={() => {
-                setPendingMapFilter(sampleData)
-                navigate("/map");
-              }}
-            >
-              <ExploreIcon />
             </IconButton>
           </Box>
         </Box>
