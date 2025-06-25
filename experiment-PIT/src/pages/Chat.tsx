@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import type { Message } from "../constants/chatMessages";
 import {
   opening_message,
@@ -7,9 +6,7 @@ import {
 } from "../constants/chatMessages";
 import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants";
 import { sendChatMessage, getChatSummary } from "../api/api";
-import ChatMapPreview from "../components/ChatMapPreview";
 import { jsPDF } from "jspdf";
-import type { Feature, Geometry, GeoJsonProperties } from "geojson";
 
 import {
   Box,
@@ -41,7 +38,6 @@ function Chat() {
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [confirmExportOpen, setConfirmExportOpen] = useState(false);
   const [summaryError, setSummaryError] = useState(false);
-  const navigate = useNavigate();
 
   // Save messages to localStorage when they change
   useEffect(() => {
@@ -62,29 +58,7 @@ function Chat() {
 
       // Append backend response to messages
       if (data.text) {
-        // Map backend mapData to your expected format
-        const mapData = data.mapData
-          ? {
-              center: [data.mapData.center.lon, data.mapData.center.lat] as [
-                number,
-                number
-              ],
-              layers: data.mapData.layers as Feature<
-                Geometry,
-                GeoJsonProperties
-              >[],
-              marker: [
-                data.mapData.marker.lon,
-                data.mapData.marker.lat,
-                data.mapData.marker.title ?? "",
-              ] as [number, number, string],
-            }
-          : undefined;
-
-        setMessages((prev) => [
-          ...prev,
-          { text: data.text, sender: "Gemini", mapData: mapData },
-        ]);
+        setMessages((prev) => [...prev, { text: data.text, sender: "Gemini" }]);
       } else {
         setMessages((prev) => [
           ...prev,
@@ -218,22 +192,6 @@ function Chat() {
               }}
             >
               {msg.text}
-              {msg.mapData && (
-                <Box sx={{ mt: 2 }}>
-                  <ChatMapPreview
-                    center={msg.mapData.center}
-                    layers={msg.mapData.layers}
-                    marker={msg.mapData.marker}
-                  />
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ mt: 1, textAlign: "center" }}
-                  >
-                    Click on the map to explore more
-                  </Typography>
-                </Box>
-              )}
             </Box>
           ))}
           {isSending && (

@@ -20,7 +20,6 @@ import {
 import "@watergis/mapbox-gl-export/dist/mapbox-gl-export.css";
 import { processShotsData } from "../api/process_911.ts";
 import { process311Data } from "../api/process_311.ts";
-import { useLocation } from "react-router-dom";
 
 //besure to install mapbox-gl
 
@@ -34,13 +33,9 @@ function Map() {
     selectedYearsSlider,
     setSelectedLayer,
     setSelectedYearsSlider,
-    setSelectedData,
-    setSelectedYears,
   } = useMap(); // Access mapRef and mapContainerRef from context
   const [layers, setLayers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const location = useLocation();
-  const filters = location.state?.filters ?? null;
 
   mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -326,49 +321,6 @@ function Map() {
       });
     }
   }, [mapRef, selectedYearsSlider, layers]);
-
-  useEffect(() => {
-    console.log("Filters?", filters);
-    if (!mapRef.current) return;
-
-    console.log("Applying filters:", filters);
-
-    if (filters?.data_type) {
-      setSelectedData(filters.data_type);
-      setSelectedLayer(filters.data_type);
-    }
-
-    if (filters?.year) {
-      setSelectedYears(filters.year);
-      setSelectedYearsSlider(filters.year);
-    }
-
-    if (filters?.location) {
-      const [centerLat, centerLon] = filters.location;
-      const metersToDegreesLon = (meters: number) => meters / 111320;
-      const metersToDegreesLat = (meters: number, lat: number) =>
-        meters / (111320 * Math.cos((lat * Math.PI) / 180));
-
-      const rMeters = 90;
-      const minLon = centerLon - metersToDegreesLon(rMeters);
-      const maxLon = centerLon + metersToDegreesLon(rMeters);
-      const minLat = centerLat - metersToDegreesLat(rMeters, centerLat);
-      const maxLat = centerLat + metersToDegreesLat(rMeters, centerLat);
-
-      setPendingFitBounds([
-        [minLon, minLat],
-        [maxLon, maxLat],
-      ]);
-    }
-  }, [
-    filters,
-    mapRef,
-    setSelectedData,
-    setSelectedLayer,
-    setSelectedYears,
-    setSelectedYearsSlider,
-    setPendingFitBounds,
-  ]);
 
   return (
     <Box
