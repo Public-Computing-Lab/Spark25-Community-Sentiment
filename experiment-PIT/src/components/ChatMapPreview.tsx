@@ -12,7 +12,7 @@ import type { Layer } from "mapbox-gl";
 import mapboxgl from "mapbox-gl";
 
 interface ChatMapPreviewProps {
-  center: [number, number];
+  center: [number, number]; // lon, lat
   layers?: Feature<Geometry, GeoJsonProperties>[];
   marker?: [number, number, string]; // [lon, lat, label]
 }
@@ -25,7 +25,7 @@ const ChatMapPreview: React.FC<ChatMapPreviewProps> = ({
   const navigate = useNavigate();
   const handleClick = () => {
     const filters = {
-      location: center,
+      location: [center[1], center[0]],
     };
 
     navigate("/map", { state: { filters } });
