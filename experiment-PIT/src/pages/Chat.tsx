@@ -1,7 +1,4 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useMap } from "../components/useMap.tsx";
-import { useNavigate } from "react-router-dom";
-import type { mapFilter } from "../constants/mapFilter";
 import type { Message } from "../constants/chatMessages";
 
 import {
@@ -31,7 +28,6 @@ import {
 
 import SendIcon from "@mui/icons-material/ArrowUpwardRounded";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import ExploreIcon from "@mui/icons-material/Explore";
 import onLogo from "/public/on_the_porch_logo.png";
 
 // Size of the blue arrow button (helps keep layout math tidy)
