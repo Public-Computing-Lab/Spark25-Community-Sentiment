@@ -1,4 +1,6 @@
-import faulthandler; faulthandler.enable()
+import faulthandler
+
+faulthandler.enable()
 print("=== api.py start ===")
 
 from flask import Flask, request, jsonify, g, session, Response, stream_with_context
@@ -39,6 +41,7 @@ class Config:
     GEMINI_CACHE_TTL = float(os.getenv("GEMINI_CACHE_TTL", "0.125"))
     HOST = os.getenv("API_HOST", "127.0.0.1")
     PORT = os.getenv("API_PORT", "8888")
+    BASE_URL = os.getenv("VITE_BASE_URL")
     DATASTORE_PATH = BASE_DIR / Path(
         os.getenv("DATASTORE_PATH", "./datastore").lstrip("./")
     )
@@ -81,7 +84,7 @@ CORS(
     supports_credentials=True,
     expose_headers=["RethinkAI-API-Key"],
     resources={r"/*": {"origins": "*"}},
-    allow_headers=["Content-Type", "RethinkAI-API-Key"]
+    allow_headers=["Content-Type", "RethinkAI-API-Key"],
 )
 
 
@@ -181,7 +184,6 @@ class SQLConstants:
         "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
     )
 
-
     BOS311_SPATIAL_WHERE = f"""
     ST_Contains(
         ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
@@ -202,7 +204,6 @@ class SQLConstants:
     """
 
 
-
 #
 # Query Builders
 #
@@ -212,9 +213,7 @@ def build_311_query(
     request_date: str = "",
     request_zipcode: str = "",
     event_ids: str = "",
-
     is_spatial=False,
-
 ) -> str:
     if is_spatial:
         Bos311_where_clause = SQLConstants.BOS311_SPATIAL_WHERE
@@ -243,7 +242,6 @@ def build_311_query(
             type IN ({SQLConstants.CATEGORY_TYPES[request_options]}) 
             AND {Bos311_where_clause}
         """
-
 
         if request_date:
             query += f"""AND DATE_FORMAT(open_dt, '%Y-%m') = '{request_date}'"""
@@ -415,8 +413,6 @@ def build_311_query(
         return query
     elif data_request == "311_summary" and event_ids:
 
-
-
         # Quote each event_id if not already quoted
         id_list = [f"'{x.strip()}'" for x in event_ids.split(",") if x.strip()]
         id_str = ",".join(id_list)
@@ -551,7 +547,6 @@ def build_311_query(
             f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating query:{Font_Colors.ENDC}: check query args"
         )
         return ""
-
 
 
 def build_911_query(data_request: str, is_spatial=False) -> str:
@@ -692,7 +687,6 @@ def get_file_content(filename: str) -> Optional[str]:
 def get_db_connection():
     # return mysql.connector.connect(**Config.DB_CONFIG)
     return db_pool.get_connection()
-    
 
 
 def json_query_results(query: str) -> Optional[Response]:
@@ -818,12 +812,12 @@ def get_gemini_response(
             contents=prompt,
             config=config,
         )
-        
+
         raw_output = response.text.strip()
 
         # Process to remove unwanted trailing sender tag if present
-        cleaned_output = re.sub(r'["\']?,\s*"?sender":"Gemini"?["}]?$', '', raw_output)
-        
+        cleaned_output = re.sub(r'["\']?,\s*"?sender":"Gemini"?["}]?$', "", raw_output)
+
         return cleaned_output
 
     except Exception as e:
@@ -831,7 +825,6 @@ def get_gemini_response(
             f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}"
         )
         return f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}"
-
 
 
 def create_gemini_context(
@@ -874,7 +867,6 @@ def create_gemini_context(
             or context_request == "experiment_7"
             or context_request == "experiment_pit"
         ):
-
 
             files_list = get_files("txt")
             query = build_311_query(
@@ -940,6 +932,7 @@ def create_gemini_context(
             f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating context:{Font_Colors.ENDC} {e}"
         )
         return f"✖ Error generating context: {e}"
+
 
 # Log events
 def log_event(
@@ -1066,7 +1059,6 @@ def check_session():
         data_attributes=Config.API_VERSION,
         client_query=f"Request: [{request.method}] {request.url}",
     )
-
 
 
 #
@@ -1210,7 +1202,7 @@ def route_chat():
     geospatial_result = process_geospatial_message(
         user_message,
         Config.DATASTORE_PATH,
-        f"http://127.0.0.1:{Config.PORT}",
+        Config.BASE_URL,
         Config.RETHINKAI_API_KEYS[0],
     )
 
@@ -1246,7 +1238,7 @@ def route_chat():
                 f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ ERROR from Gemini API:{Font_Colors.ENDC} {app_response}"
             )
             return jsonify({"Error": app_response}), 500
-        
+
         # Log the interaction
         log_id = log_event(
             session_id=session_id,
@@ -1263,7 +1255,7 @@ def route_chat():
             "response": app_response,
             "log_id": log_id,
         }
-        
+
         # GEOSPATIAL INTEGRATION - Include map data in response
         if map_data:
             response["mapData"] = map_data
@@ -1288,7 +1280,6 @@ def route_chat():
         print(f"✖ preamble: {prompt_preamble}")
         print(f"✖ app_version: {app_version}")
         return jsonify({"Error": f"Internal server error: {e}"}), 500
-
 
 
 @app.route("/chat/context", methods=["GET", "POST"])
@@ -1380,8 +1371,6 @@ def chat_summary():
     data = request.get_json()
     messages = data.get("messages", [])
 
-
-
     if not messages:
         return jsonify({"error": "No messages provided."}), 400
 
@@ -1397,7 +1386,6 @@ def chat_summary():
     try:
         with open(summary_file_path, "r") as file:
             file_content = file.read()
-
 
         # Combine the file content with the chat transcript to form the full prompt
         full_prompt = f"{file_content}\n{chat_transcript}"
@@ -1430,7 +1418,7 @@ def identify_places():
 
     # Read the content from identify_places.txt
     try:
-        with open(prompt_file_path, "r", encoding='utf-8') as file:
+        with open(prompt_file_path, "r", encoding="utf-8") as file:
             file_content = file.read()
 
         # Combine the file content with the message to form the full prompt
