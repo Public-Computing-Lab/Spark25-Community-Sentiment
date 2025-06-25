@@ -65,10 +65,11 @@ const MapBase: React.FC<MapBaseProps> = ({
     <div
       ref={mapContainerRef}
       style={{
-        width,
-        height,
+        width: "100%",
+        height: height,
         borderRadius: 8,
         overflow: "hidden",
+        position: "relative",
       }}
     />
   );

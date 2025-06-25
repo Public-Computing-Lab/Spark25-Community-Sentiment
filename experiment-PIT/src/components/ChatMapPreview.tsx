@@ -1,5 +1,6 @@
 import React from "react";
-import Box from "@mui/material/Box";
+import { useNavigate } from "react-router-dom";
+import { Box, Typography, ButtonBase } from "@mui/material";
 import MapBase from "./MapBase";
 import type {
   Feature,
@@ -8,10 +9,11 @@ import type {
   FeatureCollection,
 } from "geojson";
 import type { Layer } from "mapbox-gl";
+import mapboxgl from "mapbox-gl";
 
 interface ChatMapPreviewProps {
   center: [number, number];
-  layers?: Feature<Geometry, GeoJsonProperties>[]; // optional now
+  layers?: Feature<Geometry, GeoJsonProperties>[];
   marker?: [number, number, string]; // [lon, lat, label]
 }
 
@@ -20,6 +22,15 @@ const ChatMapPreview: React.FC<ChatMapPreviewProps> = ({
   layers,
   marker,
 }) => {
+  const navigate = useNavigate();
+  const handleClick = () => {
+    const filters = {
+      location: center,
+    };
+
+    navigate("/map", { state: { filters } });
+  };
+
   const safeLayers = Array.isArray(layers) ? layers : [];
   const features = [...safeLayers];
 
@@ -98,7 +109,8 @@ const ChatMapPreview: React.FC<ChatMapPreviewProps> = ({
   }
 
   return (
-    <Box
+    <ButtonBase
+      onClick={handleClick}
       sx={{
         width: "100%",
         height: 300,
@@ -108,10 +120,13 @@ const ChatMapPreview: React.FC<ChatMapPreviewProps> = ({
         boxShadow: 2,
         border: "1px solid",
         borderColor: "divider",
+        display: "block", // so the child (MapBase) fills the button
+        textAlign: "left", // prevent text centering
+        p: 0, // no extra padding
       }}
     >
       <MapBase center={center} layers={mapLayers} />
-    </Box>
+    </ButtonBase>
   );
 };
 
