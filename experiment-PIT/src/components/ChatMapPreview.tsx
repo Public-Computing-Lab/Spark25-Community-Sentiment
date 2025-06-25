@@ -125,7 +125,7 @@ const ChatMapPreview: React.FC<ChatMapPreviewProps> = ({
         p: 0, // no extra padding
       }}
     >
-      <MapBase center={center} layers={mapLayers} />
+      <MapBase center={center} layers={mapLayers} zoom={15.8} />
     </ButtonBase>
   );
 };
