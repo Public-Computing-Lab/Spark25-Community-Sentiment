@@ -20,8 +20,9 @@ import {
 import "@watergis/mapbox-gl-export/dist/mapbox-gl-export.css";
 import { processShotsData } from "../api/process_911.ts";
 import { process311Data } from "../api/process_311.ts";
-
-//besure to install mapbox-gl
+import { colorPalette } from "../assets/palette";
+import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
+//besure to install mapbox-gl 
 
 function Map() {
   const {
@@ -96,7 +97,7 @@ function Map() {
             type: "geojson",
             data: geojsonData,
           });
-
+          
           mapRef.current?.addLayer({
             id: "Community Assets",
             type: "circle",
@@ -111,8 +112,8 @@ function Map() {
           console.error("Error fetching community assets:", error);
         });
 
-      setIsLoading(true);
-      try {
+      setIsLoading(true); //using loading screen while data loads
+      try { //adding 311 and shots data
         const shots_geojson = await processShotsData(); //loading shots data from api and converting to geojson
         const request_geojson = await process311Data(); //loading 311 data from api and converting to geojson
 
@@ -129,10 +130,10 @@ function Map() {
           type: "circle",
           source: "shots_data",
           paint: {
-            "circle-radius": 3,
-            "circle-color": "#880808",
-          },
-        });
+            'circle-radius': 4,
+            'circle-color': "#5d17d5" ,
+          }
+        })
 
         //adding 311 data
         mapRef.current?.addSource("311_data", {
@@ -146,7 +147,7 @@ function Map() {
           type: "circle",
           source: "311_data",
           paint: {
-            "circle-radius": 3,
+            "circle-radius": 4,
             "circle-color": "#FFC300",
             "circle-opacity": 0.3,
           },
@@ -282,6 +283,8 @@ function Map() {
     return () => {};
   }, [mapRef, mapContainerRef]);
 
+
+  //map-chat link (zoom functionality)
   useEffect(() => {
     if (mapRef.current && pendingFitBounds) {
       mapRef.current.fitBounds(new mapboxgl.LngLatBounds(pendingFitBounds), {
@@ -322,6 +325,8 @@ function Map() {
     }
   }, [mapRef, selectedYearsSlider, layers]);
 
+
+   /* ─── Render ───────────────────────────────────────────── */
   return (
     <Box
       sx={{
@@ -329,24 +334,29 @@ function Map() {
         flexDirection: "column",
         height: `calc(100vh - ${BOTTOM_NAV_HEIGHT}px)`,
         width: "100%",
-        bgcolor: "background.paper",
-        color: "text.primary",
+        bgcolor: "#E7F4FF",
         overflow: "hidden",
-        position: "relative",
-        p: 2,
       }}
     >
+      {/* ─── Header ─────────────────────────────────────── */}
       <Box
         sx={{
           display: "flex",
-          justifyContent: "space-between",
           alignItems: "center",
-          mb: 2,
+          justifyContent: "space-between",
+          px: 2,
+          height: 75,
+          borderBottomLeftRadius: 16,
+          borderBottomRightRadius: 16,
+          bgcolor: colorPalette.dark,
+          color: "#fff",
         }}
       >
-        <Typography variant="h4" component="h1">
-          Map
-        </Typography>
+        <MapOutlinedIcon
+   fontSize="large"       
+   sx={{ mr: 0.5 }}        
+ />
+        
       </Box>
       {isLoading && (
         <Box
@@ -375,20 +385,16 @@ function Map() {
           }}
         />
       )}
-      <Box
-        sx={{
-          //element rendering the map
-          left: "0",
-          top: "0",
-          flex: 1,
-          width: "100%",
-          height: `calc(100vh - ${BOTTOM_NAV_HEIGHT}px)`,
-          position: "relative",
-        }}
-        ref={mapContainerRef}
-      />
-      <Box sx={{ mb: 3, position: "absolute", left: "5", top: "4em" }}>
-        <Key />
+
+      {/* ─── Flexible content area (fills the rest) ─────── */}
+      <Box sx={{ flex: 1, p: 2, position: "relative" }}>
+        {/* Mapbox container fills its parent */}
+        <Box ref={mapContainerRef} sx={{ position: "absolute", inset: 0 }} />
+
+        {/* Legend overlay */}
+        <Box sx={{ position: "absolute", top: "4em", left: 5 }}>
+          <Key />
+        </Box>
       </Box>
       <FilterDialog
         layers={layers}
