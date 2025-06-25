@@ -28,8 +28,8 @@ function Map() {
   const {
     mapRef,
     mapContainerRef,
-    // pendingFitBounds,
-    // setPendingFitBounds,
+    pendingFitBounds,
+    setPendingFitBounds,
     selectedLayers,
     selectedYearsSlider,
     setSelectedLayer,
@@ -38,7 +38,7 @@ function Map() {
   const [layers, setLayers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  mapboxgl.accessToken = "pk.eyJ1IjoiY2xlZGFudGVjIiwiYSI6ImNtYW56NjJmdzAxa2cybm9sbnlsc25wbHoifQ.tZvmfzppnqPUG9FfmqMJZA";
+  mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
   //loading all data
   useEffect(() => {
@@ -270,16 +270,18 @@ function Map() {
     return () => {};
   }, [mapRef, mapContainerRef]);
 
-  // useEffect(() => {
-  //   if (mapRef.current && pendingFitBounds) {
-  //     mapRef.current.fitBounds(new mapboxgl.LngLatBounds(pendingFitBounds), {
-  //       padding: 40,
-  //       duration: 1000,
-  //     });
-  //     setPendingFitBounds(null); // Reset so it can be triggered again
-  //     console.log("set new bounds");
-  //   }
-  // }, [pendingFitBounds, mapRef, setPendingFitBounds]);
+
+  //map-chat link (zoom functionality)
+  useEffect(() => {
+    if (mapRef.current && pendingFitBounds) {
+      mapRef.current.fitBounds(new mapboxgl.LngLatBounds(pendingFitBounds), {
+        padding: 40,
+        duration: 1000,
+      });
+      setPendingFitBounds(null); // Reset so it can be triggered again
+      console.log("set new bounds");
+    }
+  }, [pendingFitBounds, mapRef, setPendingFitBounds]);
 
   //changing visibility of layers depending on what is checked in filters or not.
   useEffect(() => {
