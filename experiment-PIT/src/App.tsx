@@ -7,10 +7,11 @@ import Navbar from "./components/Navbar";
 import Chat from "./pages/Chat";
 // import Home from "./pages/Home";
 import Map from "./pages/Map";
+import MapProvider from "./components/MapProvider";
 
 function App() {
   return (
-    <>
+    <MapProvider>
       <CssBaseline />
       <Box
         sx={{
@@ -33,7 +34,7 @@ function App() {
         {/* Navbar sticks at bottom */}
         <Navbar />
       </Box>
-    </>
+    </MapProvider>
   );
 }
 
