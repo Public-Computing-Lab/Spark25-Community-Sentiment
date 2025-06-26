@@ -1,5 +1,5 @@
 /**
- * navbar.tsx
+ * Navbar.tsx
  *
  * This file provides a responsive bottom navigation component for navigating between the pages in the app.
  *

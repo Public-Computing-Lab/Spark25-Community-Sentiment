@@ -1,17 +1,32 @@
+/**
+ * Chat.tsx
+ *
+ * This file provides a chat interface component that allows users to send and receive messages from an AI assistant.
+ * The component supports:
+ * - Sending and receiving text messages with the AI (Gemini).
+ * - Displaying chat history, with messages coming from either the user or the AI.
+ * - Exporting the chat history to a PDF summary.
+ * - Clearing the chat history stored in local storage.
+ *
+ * It uses Material UI for layout and UI elements, and integrates with an API to send messages and fetch summaries.
+ */
+
 import React, { useState, useRef, useEffect } from "react";
 import type { Message } from "../constants/chatMessages";
 
+// Import constants and API helpers
 import {
   opening_message,
   suggested_questions,
 } from "../constants/chatMessages";
-import { BOTTOM_NAV_HEIGHT } from "../constants/layoutConstants";
+import { BOTTOM_NAV_HEIGHT, SEND_BTN_SIZE } from "../constants/layoutConstants";
 import { sendChatMessage, getChatSummary } from "../api/api";
 import { jsPDF } from "jspdf";
 import { MdTextRender } from "jspdf-md-renderer";
 import { colorPalette } from "../assets/palette";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 
+// MUI components
 import {
   Box,
   Typography,
@@ -25,45 +40,93 @@ import {
   Button,
   CircularProgress,
 } from "@mui/material";
-
 import SendIcon from "@mui/icons-material/ArrowUpwardRounded";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import onLogo from "/public/on_the_porch_logo.png";
 
-// Size of the blue arrow button (helps keep layout math tidy)
-const SEND_BTN_SIZE = 44;
-
+/**
+ * Chat
+ *
+ * A functional React component that renders a full chat interface where users can interact with an AI assistant.
+ * This component handles the sending and receiving of messages, displays the conversation history,
+ * and provides options to export the chat summary or clear the chat.
+ *
+ * ### Dependencies:
+ * - `useState`, `useRef`, `useEffect` from React for managing state and effects.
+ * - `sendChatMessage` and `getChatSummary` from the `api/api` module to interact with the backend.
+ * - `jsPDF` and `MdTextRender` for generating a PDF summary of the chat.
+ * - `Box`, `Typography`, `TextField`, `IconButton`, and other MUI components for the UI.
+ * - `colorPalette` from local theme assets for custom styling.
+ * - `BOTTOM_NAV_HEIGHT` for consistent layout height across the app.
+ *
+ * ### State:
+ * - `messages` (array): The list of messages in the chat history.
+ * - `input` (string): The current text input from the user.
+ * - `isSending` (boolean): A flag to track if a message is currently being sent.
+ * - `confirmClearOpen` (boolean): Whether the clear chat confirmation dialog is open.
+ * - `confirmExportOpen` (boolean): Whether the export chat summary confirmation dialog is open.
+ * - `summaryError` (boolean): Whether there was an error generating the chat summary.
+ *
+ * ### Returns:
+ * - A JSX element representing the full chat interface with:
+ *   - Chat history.
+ *   - User input field.
+ *   - Send button.
+ *   - Option to clear the chat or export the summary.
+ *   - Dialogs for clearing chat or exporting the summary.
+ *
+ * ### Side Effects:
+ * - Calls the backend API to get the AI's response when a message is sent.
+ * - Automatically scrolls to the bottom of the chat history when a new message is added.
+ * - Displays loading indicators while waiting for the AI's response.
+ * - Opens confirmation dialogs for clearing the chat or exporting the summary.
+ *
+ * ### Raises:
+ * - If there is an error in generating the summary, displays a summary error dialog.
+ */
 function Chat() {
   // ─── Local-storage helpers ─────────────────────────────────────────
+  /**
+   * Retrieves initial messages from local storage or sets the opening message if none is found.
+   *
+   * @returns {Message[]} Initial set of messages.
+   */
   const getInitialMessages = (): Message[] => {
     const stored = localStorage.getItem("chatMessages");
     return stored ? JSON.parse(stored) : opening_message;
   };
 
+  // States for chat, input, sending status, etc.
   const [messages, setMessages] = useState<Message[]>(getInitialMessages);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // confirm dialogs
+  // States for confirmation dialogs
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [confirmExportOpen, setConfirmExportOpen] = useState(false);
   const [summaryError, setSummaryError] = useState(false);
 
   // ─── send handler ─────────────────────────────────────────────────
+  /**
+   * Sends a chat message to the server and appends the response to the chat.
+   *
+   * @param {string} [customInput] Optional custom input for the message.
+   */
   const sendMessage = async (customInput?: string) => {
     const userMsg = (customInput ?? input).trim();
     if (!userMsg || isSending) return;
 
+    // Update the message list with the user's message
     setMessages((prev) => [...prev, { text: userMsg, sender: "user" }]);
-    setInput("");
-    setIsSending(true);
+    setInput(""); // Reset input field
+    setIsSending(true); // Indicate that a message is being sent
 
     try {
-      // Call backend API helper to get AI response
+      // Send the message to the server and get a response
       const data = await sendChatMessage(userMsg, messages, true);
 
-      // Append backend response to messages
+      // Append the server's response to the chat
       if (data.text) {
         setMessages((prev) => [...prev, { text: data.text, sender: "Gemini" }]);
       } else {
@@ -81,20 +144,31 @@ function Chat() {
         },
       ]);
     } finally {
-      setIsSending(false);
+      setIsSending(false); // Reset sending status
     }
   };
 
   // ─── utils ────────────────────────────────────────────────────────
+  /**
+   * Handles the "Enter" key press to send a message.
+   *
+   * @param {React.KeyboardEvent<HTMLInputElement>} e The keyboard event.
+   */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") sendMessage();
   };
 
+  /**
+   * Clears the chat history from local storage and resets the message list.
+   */
   const handleClearChat = () => {
     localStorage.removeItem("chatMessages");
     setMessages(getInitialMessages());
   };
 
+  /**
+   * Exports the chat summary as a PDF.
+   */
   const handleExportSummary = async () => {
     const summary = await getChatSummary(messages, true);
 
@@ -147,10 +221,11 @@ function Chat() {
     // Use MdTextRender function and Gemini's MD response to render summary
     await MdTextRender(doc, summary, options);
 
+    // Save the PDF as 'chat-summary.pdf'
     doc.save("chat-summary.pdf");
   };
 
-  // scroll to bottom on new messages
+  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -188,15 +263,16 @@ function Chat() {
                 src={onLogo}
                 alt="On The Porch Logo"
                 style={{
-                  height: 70, // ← whatever size you settled on
+                  height: 70,
                   width: "auto",
                   display: "block",
-                  marginTop: 6, // ← push it ~6 px downward
+                  marginTop: 6,
                 }}
               />
             </Box>
           </Box>
           <Box>
+            {/* Export and Clear chat buttons */}
             <IconButton
               onClick={() => setConfirmExportOpen(true)}
               sx={{ color: "#fff" }}
