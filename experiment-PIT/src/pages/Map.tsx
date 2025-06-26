@@ -12,10 +12,6 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import {
   MapboxExportControl,
-  Size,
-  PageOrientation,
-  Format,
-  DPI,
 } from "@watergis/mapbox-gl-export";
 import "@watergis/mapbox-gl-export/dist/mapbox-gl-export.css";
 import { processShotsData } from "../api/process_911.ts";
@@ -267,18 +263,10 @@ function Map() {
     });
 
     const exportControl = new MapboxExportControl({
-      PageSize: Size.A4,
-      PageOrientation: PageOrientation.Portrait,
-      Format: Format.PNG,
-      DPI: DPI[96],
-      Crosshair: false,
-      PrintableArea: true,
-      Local: "en",
-      Filename: "TNT-PublicSafety-Data",
       accessToken: mapboxgl.accessToken ?? undefined,
     });
 
-    mapRef.current?.addControl(exportControl, "top-right");
+    mapRef.current?.addControl(exportControl as unknown as mapboxgl.IControl, "top-right");
 
     return () => {};
   }, [mapRef, mapContainerRef]);

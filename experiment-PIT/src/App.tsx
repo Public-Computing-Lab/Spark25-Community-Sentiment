@@ -2,7 +2,7 @@ import mapboxgl from "mapbox-gl";
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
 import { Routes, Route } from "react-router-dom";
-import { CssBaseline, Box, ThemeProvider } from "@mui/material";
+import { CssBaseline, Box } from "@mui/material";
 
 import Navbar from "./components/Navbar";
 import Chat from "./pages/Chat";
