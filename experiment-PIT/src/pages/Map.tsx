@@ -1,4 +1,4 @@
-import { Box, Typography, CircularProgress } from "@mui/material";
+import { Box, CircularProgress } from "@mui/material";
 import ReactDOM from "react-dom/client"; // For React 18+
 
 import Key from "../components/Key";
