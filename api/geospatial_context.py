@@ -1,3 +1,21 @@
+"""
+geospatial_context.py
+
+This script contains functions to extract, process, and present geospatial data
+for locations, including 911 incidents, homicides, shots fired, and 311 complaints.
+It leverages various APIs to fetch location-based data and creates a comprehensive
+context for answering geospatial-related queries.
+
+Key Components:
+- The script handles complex location queries involving proximity-based searches (e.g., nearby incidents).
+- The context includes a breakdown of incidents, both historical (by year) and real-time, as well as user-provided transcripts.
+- Utilizes spatial calculations such as the Haversine formula for distance measurement between two geographical points.
+
+Usage:
+1. Use the `process_geospatial_message` function to process geospatial queries based on a message input.
+2. The function returns a prompt enriched with location-specific context and an optional map preview.
+"""
+
 import datetime
 import json
 import math
