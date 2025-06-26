@@ -1,3 +1,9 @@
+/**
+ * FilterDialog.tsx
+ * This file host the UI of the filter in the map interface. 
+ * Sends data up to the Map.tsx component about which data layers and years are being filtered.
+ */
+
 import { Box, Typography, Drawer, Stack, Slider, FormGroup, FormControlLabel, Checkbox, Fab } from '@mui/material';
 import { useState } from 'react';
 import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
@@ -18,10 +24,21 @@ function FilterDialog({
   const { selectedData, selectedYears, setSelectedData, setSelectedYears } = useMap(); // Access these variables
 
   const toggleFilter = (newOpen: boolean) => () => {
+     /** 
+     * Functionality to open and close filter, triggered by onClose()
+     * Args/Dependencies: newOpen (boolean)
+     * Returns: N/A
+    */
     setOpen(newOpen);
   };
 
   const handleSelectData = (layer: string) => () => {
+    /** 
+     * Functionality to updated which data layers are being filtered
+     * Updates the checked boxes accordingly
+     * Args/Dependencies: layer: string
+     * Returns: next: string[] (the updated set of layers being filtered)
+    */
     setSelectedData((prev) => {
       const next = prev.includes(layer) ? prev.filter((l) => l !== layer) : [...prev, layer];
       onSelectionChange(next);
@@ -30,6 +47,12 @@ function FilterDialog({
   };
 
   const handleSelectYears = (_: Event, newVals: number[]) => {
+    /** 
+     * Functionality to updated which years are being filtered
+     * Updates the slider accordingly
+     * Args/Dependencies: newVals: number[]
+     * Returns: N/A
+    */
     setSelectedYears(newVals);
     onSliderChange(newVals);
   };

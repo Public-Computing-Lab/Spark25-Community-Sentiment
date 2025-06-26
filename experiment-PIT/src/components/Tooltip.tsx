@@ -1,6 +1,16 @@
+/**
+ * Key.tsx
+ * This file hosts the UI of the tooltips of each data point for the map. 
+ */
+
 import { Box, Typography } from '@mui/material';
 
 function Tooltip({
+    /**
+     * This file hosts the UI of the tooltips of each data point for the map. Varies content by data type
+     * Args/Dependencies: type: string, name (optional): string, date (optional): string, alternates (optional): string
+     * Returns: N/A
+     */
     type,
     name,
     date,
@@ -12,7 +22,7 @@ function Tooltip({
     alternates?: string
 }) {
  
-    const alts = alternates?.split(",");
+    const alts = alternates?.split(","); //turning alternate name strings into a list
     console.log(alts)
 
     if (type == "Community Assets"){

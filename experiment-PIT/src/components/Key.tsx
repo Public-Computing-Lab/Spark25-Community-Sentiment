@@ -1,6 +1,15 @@
+/**
+ * Key.tsx
+ * This file hosts the UI of the data legend of the map. 
+ */
+
+
 import { Box, Typography, Stack } from "@mui/material";
 
 const LegendItem = ({
+  /**
+   * Reusable component to detail color/encoding information for each data type on map
+   */
   color,
   label,
   shape = "circle",
@@ -25,6 +34,9 @@ const LegendItem = ({
 );
 
 export default function Key() {
+   /**
+   * Putting LegendItem information together
+   */
   return (
     <Box
       sx={{

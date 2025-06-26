@@ -1,3 +1,9 @@
+/**
+ * MapContent.tsx
+ * This file hosts the typescript interface for the MapProvider. I.e what data types and variables it should always hold
+ */
+
+
 import { createContext } from 'react';
 
 interface MapContextType {

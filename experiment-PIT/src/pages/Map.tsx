@@ -1,3 +1,10 @@
+/**
+ * Map.tsx
+ * This file hosts the map interface and is where the assets, 311, 911 data is displayed along with their tooltips. 
+ * Also creates loading screen while larger data sets loads
+ * it also includes the filter functionality and map-chat-link functionality.
+ */
+
 import { Box, CircularProgress } from "@mui/material";
 import ReactDOM from "react-dom/client"; // For React 18+
 
@@ -36,8 +43,12 @@ function Map() {
 
   mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
-  //loading all data
   useEffect(() => {
+    /** 
+     * Loads mapbox map and loads all data onto map
+     * Args/Dependencies: mapRef, mapContainerRef
+     * Returns: N/A
+    */
     if (mapContainerRef.current) {
       mapRef.current = new mapboxgl.Map({
         //creating map
@@ -51,9 +62,8 @@ function Map() {
 
     //adding initial map annotations
     mapRef.current?.on("load", async () => {
-      //made async in order to be able to load shots data
 
-      //adding rect borders of TNT
+      //storing data of rect borders of TNT
       mapRef.current?.addSource("TNT", {
         type: "geojson",
         data: {
@@ -73,7 +83,7 @@ function Map() {
           properties: {},
         },
       });
-
+      //loading 
       mapRef.current?.addLayer({
         id: "tnt-outline",
         type: "line",
@@ -85,7 +95,7 @@ function Map() {
         },
       });
 
-      // Fetching and adding community assets
+      // Fetching and adding community assets from map_2.geojson
       fetch(`${import.meta.env.BASE_URL}/data/map_2.geojson`)
         .then((response) => response.json())
         .then((geojsonData) => {
@@ -109,14 +119,13 @@ function Map() {
         });
 
       setIsLoading(true); //using loading screen while data loads
-      try { //adding 311 and shots data
-        const shots_geojson = await processShotsData(); //loading shots data from api and converting to geojson
-        const request_geojson = await process311Data(); //loading 311 data from api and converting to geojson
 
-        console.log("geojson format", shots_geojson);
+      try { //adding 311 and shots data 
+        const shots_geojson = await processShotsData(); //loading from api and converting to geojson
+        const request_geojson = await process311Data(); //loading from api and converting to geojson
 
+        //shots data
         mapRef.current?.addSource("shots_data", {
-          //takes a while to load entire dataset... hopefully will be better when we get it hyperlocal
           type: "geojson",
           data: shots_geojson,
         });
@@ -131,7 +140,7 @@ function Map() {
           }
         })
 
-        //adding 311 data
+        //311 data
         mapRef.current?.addSource("311_data", {
           //takes even longer than 911 data...
           type: "geojson",
@@ -149,7 +158,7 @@ function Map() {
           },
         });
 
-        // Retrieve all layers after community-assets is added
+        // Retrieve all layers after community-assets is added for filter dialog text
         const mapLayers = mapRef.current?.getStyle().layers;
         const layerIds = mapLayers
           ? mapLayers
@@ -158,14 +167,14 @@ function Map() {
           : [];
         setLayers(layerIds);
 
-        setIsLoading(false);
+        setIsLoading(false); //turning loading screen off
       } catch (error) {
         console.log("Error loading data", error);
       }
     });
 
+    //Tooltips
     mapRef.current?.on("click", "Community Assets", (e) => {
-      //getting popup text
       const type = "Community Assets";
       if (e.features && e.features[0]) {
         const name =
@@ -262,10 +271,10 @@ function Map() {
       }
     });
 
+    //Export Map PDF functionality
     const exportControl = new MapboxExportControl({
       accessToken: mapboxgl.accessToken ?? undefined,
     });
-
     mapRef.current?.addControl(exportControl as unknown as mapboxgl.IControl, "top-right");
 
     return () => {};
@@ -280,12 +289,10 @@ function Map() {
         duration: 1000,
       });
       setPendingFitBounds(null); // Reset so it can be triggered again
-      console.log("set new bounds");
     }
   }, [pendingFitBounds, mapRef, setPendingFitBounds]);
 
   //changing visibility of layers depending on what is checked in filters or not.
-  //NEED TO DETERMINE WHY VISIBILITY FOR COMMUNITY ASSETS ISN'T WORKING
   useEffect(() => {
     if (mapRef.current) {
       layers.forEach((layerId) => {
@@ -302,7 +309,7 @@ function Map() {
     if (mapRef.current) {
       layers.forEach((layerId) => {
         if (layerId !== "Community Assets") {
-          //excluding filtering on community assets
+          //excluding filtering on community assets as it has no year property
           mapRef.current?.setFilter(layerId, [
             "all", //(AND)
             [">=", "year", selectedYearsSlider[0]],
