@@ -1,6 +1,17 @@
 # Experiment-PIT
 
-This project is a collaboration between Rethink AI and the **Community Sentiment and Public Safety** initiative within the PIT-NE Impact Fellowship 2025. It includes a modern web app for exploring public safety data and interacting with a large language model (LLM) via chat.
+[This project](https://boston.ourcommunity.is/experimenting/8/) is a collaboration between Rethink AI and the **Community Sentiment and Public Safety** initiative within the PIT-NE Impact Fellowship 2025. It includes a modern mobile-first web app for exploring public safety data. This is accomplished through chat interaction with a large language model (LLM) and a dynamic neighborhood map that displays relevant data. 
+
+The aim is to help the Talbot-Norfolk Triangle (TNT) community within Dorchester better understand and share their experiences with public safety by combining real community voices with official city data. By putting these sources of information in conversation, we hope to create a centralized hub of community and official knowledge that allows community members and local organizations to understand their neighborhood's challenges and strengths, ultimately using this information as a jumping-off point for action and advocacy.
+
+For the SE/UX portion of this project, We have packaged data into an accessible and intuitive interface that will be used by community groups to represent their needs to the City of Boston. This interface builds on the existing `experiment-7` prototype that: 
+- maps out crime and disorder patterns in the neighborhood based on 5 years of 311 data and police crime data 
+- leverages an LLM to provide sentiment context to this structured data by using 3 years of community meeting transcripts
+
+This version, `experiment-PIT`, builds on this prototype with new data sources, an accessible and appealing interface, and features that empower community members to go deeper into the available data.
+
+Work on this project has been guided by [Talbot Norfolk Triangle Neighbors United](https://www.tbpm.org/community/tnt-neighbors-united/), a civic association of residents, local businesses, churches, schools, and non-profit partners working together to create a thriving community that is more eco-friendly, healthier, safer, connected, and economically-empowered. This org represents 26 blocks in Dorchester and hosts community meetings, which has been an integral part of this project’s data collection and dialogue with community stakeholders.
+
 
 ## Overview
 

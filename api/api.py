@@ -1,3 +1,12 @@
+"""
+api.py
+
+This module contains the main API logic for the application, handling requests, processing data, and interacting with the database and external services.
+It includes endpoints for querying 311 and 911 data, generating responses from the Gemini AI model, and serving static files.
+It also includes utility functions for file handling, database connections, and response formatting.
+It is designed to be used with Flask and supports CORS for cross-origin requests.
+"""
+
 import faulthandler
 
 faulthandler.enable()
@@ -180,10 +189,14 @@ class SQLConstants:
 
     ##### 311 specific constants #####
 
+    # Base WHERE clause for 311 queries, not using neighborhood coordinates
+    # This is a simplified version that provides backward compatibility
     BOS311_BASE_WHERE = (
         "police_district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester'"
     )
 
+    # Spatial WHERE clause for 311 queries, using neighborhood coordinates
+    # Uses a polygon that covers the TNT area
     BOS311_SPATIAL_WHERE = f"""
     ST_Contains(
         ST_GeomFromText('POLYGON(({DEFAULT_POLYGON_COORDINATES}))'),
@@ -193,8 +206,12 @@ class SQLConstants:
 
     ##### 911 specific constants #####
 
+    # Base WHERE clause for 911 queries, not using neighborhood coordinates
+    # This is a simplified version that provides backward compatibility
     BOS911_BASE_WHERE = "district IN ('B2', 'B3', 'C11') AND neighborhood = 'Dorchester' AND year >= 2018 AND year < 2025"
 
+    # Spatial WHERE clause for 911 queries, using neighborhood coordinates
+    # Uses a polygon that covers the TNT area
     BOS911_SPATIAL_WHERE = f"""
     year >= 2018 AND year < 2025
     AND ST_Contains(
@@ -215,6 +232,26 @@ def build_311_query(
     event_ids: str = "",
     is_spatial=False,
 ) -> str:
+    
+    """
+    Build SQL query for 311 data based on the request type and parameters.
+
+    Args:
+        data_request (str): The type of data request (e.g., "311_by_geo", "311_summary_context", "311_summary").
+        request_options (str, optional): Specific options for the request, such as categories or types.
+        request_date (str, optional): Date in 'YYYY-MM' format for filtering results.
+        request_zipcode (str, optional): Zipcode for filtering results.
+        event_ids (str, optional): Comma-separated list of event IDs for specific queries.
+        is_spatial (bool, optional): Whether to use spatial queries based on coordinates.
+
+    Returns:
+        str: The constructed SQL query string.
+
+    Raises:
+        None, but prints an error message and returns an empty string if the data_request is not recognized
+    """
+
+    # Set the WHERE clause based on whether the query is looking for TNT-specific data or not
     if is_spatial:
         Bos311_where_clause = SQLConstants.BOS311_SPATIAL_WHERE
         Bos911_where_clause = SQLConstants.BOS911_SPATIAL_WHERE
@@ -222,7 +259,8 @@ def build_311_query(
         Bos311_where_clause = SQLConstants.BOS311_BASE_WHERE
         Bos911_where_clause = SQLConstants.BOS911_BASE_WHERE
 
-    if data_request == "311_by_geo" and request_options:
+    if data_request == "311_by_geo" and request_options: 
+        # This query is used to get 311 data by geographic area
         query = f"""
         SELECT
             id,
@@ -248,6 +286,7 @@ def build_311_query(
 
         return query
     elif data_request == "311_summary_context":
+        # This query is used to generate a summary of 311 data for context in the Gemini model
         query = f"""
         WITH category_aggregates AS (
             SELECT
@@ -416,7 +455,8 @@ def build_311_query(
         # Quote each event_id if not already quoted
         id_list = [f"'{x.strip()}'" for x in event_ids.split(",") if x.strip()]
         id_str = ",".join(id_list)
-
+        
+        # This query is used to summarize 311 data for specific event IDs
         query = f"""
         SELECT
         CASE
@@ -454,6 +494,7 @@ def build_311_query(
         """
         return query
     elif data_request == "311_summary" and request_date and request_options:
+        # This query is used to summarize 311 data for a specific date and request options
         query = f"""
         SELECT
         CASE
@@ -502,6 +543,7 @@ def build_311_query(
         and not event_ids
         and request_options
     ):
+        # This query is used to summarize 311 data for specific request options without date or event IDs
         query = f"""
         SELECT
         CASE
@@ -543,6 +585,7 @@ def build_311_query(
         """
         return query
     else:
+        # If the data_request is not recognized, print an error message and return an empty string
         print(
             f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating query:{Font_Colors.ENDC}: check query args"
         )
@@ -550,6 +593,20 @@ def build_311_query(
 
 
 def build_911_query(data_request: str, is_spatial=False) -> str:
+    """
+    Build SQL query for 911 data based on the request type.
+
+    Args:
+        data_request (str): The type of data request (e.g., "911_shots_fired", "911_homicides_and_shots_fired").
+        is_spatial (bool, optional): Whether to use spatial queries based on coordinates.
+
+    Returns:
+        str: The constructed SQL query string.
+    
+    Raises:
+        None, but returns an empty string if the data_request is not recognized.
+    """
+
     Bos911_where_clause = (
         SQLConstants.BOS911_SPATIAL_WHERE
         if is_spatial
@@ -601,8 +658,20 @@ def build_911_query(data_request: str, is_spatial=False) -> str:
 #
 
 
-# Checks if a string is in 'YYYY-MM' format.
 def check_date_format(date_string: str) -> bool:
+    """
+    Check if the given date string is in 'YYYY-MM' format and if the month is valid.
+
+    Args:
+        date_string (str): The date string to check.
+    
+    Returns:
+        bool: True if the date string is in 'YYYY-MM' format and the month is valid, False otherwise.
+
+    Raises:
+        None
+    """
+    
     pattern = r"^\d{4}-\d{2}$"
     if not re.match(pattern, date_string):
         return False
@@ -612,6 +681,18 @@ def check_date_format(date_string: str) -> bool:
 
 
 def check_filetype(filename: str) -> bool:
+    """
+    Check if the given filename has an allowed file extension.
+
+    Args:
+        filename (str): The name of the file to check.
+
+    Returns:
+        bool: True if the file has an allowed extension, False otherwise.
+    
+    Raises:
+        None 
+    """
     return (
         "." in filename
         and filename.rsplit(".", 1)[1].lower() in Config.ALLOWED_EXTENSIONS
@@ -621,7 +702,19 @@ def check_filetype(filename: str) -> bool:
 def get_files(
     file_type: Optional[str] = None, specific_files: Optional[List[str]] = None
 ) -> List[str]:
-    """Get a list of files from the datastore directory."""
+    """
+    Get a list of files from the datastore directory.
+    
+    Args:
+        file_type (str, optional): The type of file to filter by (e.g., "csv", "txt").
+        specific_files (List[str], optional): A list of specific filenames to retrieve.
+    
+    Returns:
+        List[str]: A list of filenames in the datastore directory that match the criteria.
+    
+    Raises:
+        Exception: If there is an error accessing the datastore directory or reading files.
+    """
     # changing get_files as it was only getting the .txt files, to ensured it would also get community assets csv
     try:
         if not Config.DATASTORE_PATH.exists():
@@ -660,6 +753,7 @@ def get_files(
 
         return files
 
+    # Handle any exceptions that occur while accessing the datastore directory
     except Exception as e:
         print(
             f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error getting files:{Font_Colors.ENDC} {e}"
@@ -668,7 +762,18 @@ def get_files(
 
 
 def get_file_content(filename: str) -> Optional[str]:
-    """Read content from a file in the datastore."""
+    """
+    Read content from a file in datastore.
+    
+    Args:
+        filename (str): The name of the file to read.
+
+    Returns:
+        Optional[str]: The content of the file as a string, or None if the file does not exist or an error occurs.
+    
+    Raises:
+        Exception: If there is an error reading the file.
+    """
     try:
         file_path = Config.DATASTORE_PATH / filename
         if not file_path.exists():
@@ -683,14 +788,34 @@ def get_file_content(filename: str) -> Optional[str]:
         return None
 
 
-# DB Connection
 def get_db_connection():
+    """
+    Get a database connection from the connection pool.
+    
+    Returns:
+        mysql.connector.connection.MySQLConnection: A connection object from the MySQL connection pool.
+    """
+
+    # Uncomment the line below to use a direct connection instead of a pool
     # return mysql.connector.connect(**Config.DB_CONFIG)
+
+    # Use the connection pool to get a connection
     return db_pool.get_connection()
 
 
 def json_query_results(query: str) -> Optional[Response]:
-    """Execute a database query and return results as JSON."""
+    """
+    Execute a database query and return results as JSON.
+    
+    Args:
+        query (str): The SQL query to execute.
+    
+    Returns:
+        Optional[Response]: A Flask Response object containing the JSON results, or None if an error occurs.
+    
+    Raises:
+        mysql.connector.Error: If there is an error executing the query or connecting to the database.
+    """
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
@@ -710,7 +835,20 @@ def json_query_results(query: str) -> Optional[Response]:
 
 
 def stream_query_results(query: str) -> Generator[str, None, None]:
-    """Execute a database query and stream results as JSON."""
+    """
+    Execute a database query and stream results as JSON.
+    This function yields JSON strings for each row in the result set, allowing for efficient streaming of large datasets.
+    
+    Args:
+        query (str): The SQL query to execute.
+    
+    Returns:
+        Generator[str, None, None]: A generator that yields JSON strings for each row in the result set.
+    
+    Raises:
+        mysql.connector.Error: If there is an error executing the query or connecting to the database.
+    """
+
     conn = None
     cursor = None
     try:
@@ -752,7 +890,19 @@ def stream_query_results(query: str) -> Generator[str, None, None]:
 
 
 def csv_query_results(query: str) -> Optional[io.StringIO]:
-    """Execute a database query and return results as CSV in a StringIO object."""
+    """
+    Execute a database query and return results as CSV in a StringIO object.
+    
+    Args:
+        query (str): The SQL query to execute.
+    
+    Returns:
+        Optional[io.StringIO]: A StringIO object containing the CSV results, or None if an error occurs.
+    
+    Raises:
+        mysql.connector.Error: If there is an error executing the query or connecting to the database.
+    """
+    
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
@@ -778,6 +928,20 @@ def csv_query_results(query: str) -> Optional[io.StringIO]:
 
 
 def get_query_results(query: str, output_type: str = ""):
+    """
+    Execute a database query and return results in the specified format.
+
+    Args:
+        query (str): The SQL query to execute.
+        output_type (str): The format of the output. Can be "stream", "csv", "json", or "" (default is "json").
+    
+    Returns:
+        Union[Generator[str, None, None], io.StringIO, Response]: The query results in the specified format.
+    
+    Raises:
+        ValueError: If the output_type is not recognized.
+    """
+
     if output_type == "stream":
         return stream_query_results(query)
     elif output_type == "csv":
@@ -793,6 +957,21 @@ def get_query_results(query: str, output_type: str = ""):
 def get_gemini_response(
     prompt: str, cache_name: str, structured_response: bool = False
 ) -> str:
+    """
+    Generate a response from the Gemini model using the provided prompt and cache name.
+
+    Args:
+        prompt (str): The prompt to send to the Gemini model.
+        cache_name (str): The name of the cache to use for the response.
+        structured_response (bool): Whether to expect a structured response (default is False).
+    
+    Returns:
+        str: The cleaned response text from the Gemini model, or an error message if an exception occurs.
+    
+    Raises:
+        Exception: If there is an error generating the response from the Gemini model.
+    """
+
     try:
         model = Config.GEMINI_MODEL
         if structured_response is True:
@@ -834,6 +1013,23 @@ def create_gemini_context(
     app_version: str = "",
     is_spatial: bool = False,
 ) -> Union[str, int, bool]:
+    """
+    Create a context for the Gemini model based on the specified request type and parameters.
+
+    Args:
+        context_request (str): The type of context request (e.g., "structured", "unstructured", "all", "experiment_5", "experiment_6", "experiment_7", "experiment_pit").
+        preamble (str, optional): Additional preamble text to include in the context (default is an empty string).
+        generate_cache (bool, optional): Whether to generate a cache for the context (default is True).
+        app_version (str, optional): The application version to include in the cache name (default is an empty string).
+        is_spatial (bool, optional): Whether to use spatial queries based on coordinates (default is False).
+    
+    Returns:
+        Union[str, int, bool]: The name of the generated cache if generate_cache is True, or the total token count if generate_cache is False. Returns an error message if an exception occurs
+    
+    Raises:
+        Exception: If there is an error generating the context or accessing files.
+    """
+
     # test if cache exists
     if generate_cache:
         for cache in genai_client.caches.list():
@@ -934,7 +1130,6 @@ def create_gemini_context(
         return f"✖ Error generating context: {e}"
 
 
-# Log events
 def log_event(
     session_id: str,
     app_version: str,
@@ -946,7 +1141,28 @@ def log_event(
     client_response_rating: str = "",
     log_id: str = "",
 ) -> Union[int, bool]:
-    """Log an event to the database."""
+    """
+    Log an event to the database. 
+    This function inserts a new log entry or updates an existing one based on the provided parameters.
+
+    Args:
+        session_id (str): The session ID for the event.
+        app_version (str): The version of the application.
+        data_selected (str, optional): Data selected for the event (default is an empty string).
+        data_attributes (str, optional): Attributes of the data selected (default is an empty string).
+        prompt_preamble (str, optional): Preamble for the prompt (default is an empty string).
+        client_query (str, optional): The client's query (default is an empty string).
+        app_response (str, optional): The application's response (default is an empty string).
+        client_response_rating (str, optional): The client's response rating (default is an empty string).
+        log_id (str, optional): The ID of the log entry to update (default is an empty string).
+    
+    Returns:
+        Union[int, bool]: The ID of the log entry if successful, or False if there was an error.
+
+    Raises:
+        mysql.connector.Error: If there is an error connecting to the database or executing the query.
+    """
+
     if not session_id or not app_version:
         print("Missing session_id or app_version")
         return False
@@ -1027,6 +1243,20 @@ def log_event(
 #
 @app.before_request
 def check_session():
+    """
+    Middleware to check if a session exists and create one if it doesn't.
+    This function also logs the incoming request and handles CORS preflight requests.
+
+    Args:
+        None
+    
+    Returns:
+        None: This function does not return a value, but modifies the session and logs the request
+    
+    Raises:
+        None
+    """
+
     # Handle CORS preflight requests
     if request.method == "OPTIONS":
         return ("", 204)
@@ -1066,6 +1296,22 @@ def check_session():
 #
 @app.route("/data/query", methods=["GET", "POST"])
 def route_data_query():
+    """
+    Endpoint to handle data queries for 311 and 911 data.
+    This endpoint supports both GET and POST requests. It builds SQL queries based on the request parameters
+    and returns the results in the requested format (streaming, JSON, or CSV).
+
+    Args:
+        None: This function does not take any parameters directly, but uses Flask's request and session objects to access query parameters and session data.
+    
+    Returns:
+        Response: A Flask Response object containing the query results in the requested format (streaming, JSON, or CSV).
+    
+    Raises:
+        ValueError: If the output_type is not recognized or if required parameters are missing.
+        Exception: If there is an error building the query or executing it against the database.
+    """
+
     session_id = session.get("session_id")
     # Get query parameters
     app_version = request.args.get("app_version", "0")
@@ -1182,6 +1428,21 @@ def route_data_query():
 
 @app.route("/chat", methods=["POST"])
 def route_chat():
+    """
+    Endpoint to handle chat interactions with the Gemini model.
+    This endpoint processes user messages, integrates geospatial data if available, and generates a response using the Gemini model.
+    It also logs the interaction and returns the response along with any geospatial data if applicable.
+
+    Args:
+        None: This function does not take any parameters directly, but uses Flask's request and session objects to access the request data and session information.
+    
+    Returns:
+        Response: A Flask Response object containing the chat response in JSON format, including the session ID, the generated response, and any geospatial map data if available.
+    
+    Raises:
+        Exception: If there is an error processing the user message, generating the response from the Gemini model, or logging the interaction.
+    """
+
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
     is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
@@ -1268,6 +1529,7 @@ def route_chat():
         )
         return jsonify(response)
 
+    # Handle exceptions and log errors
     except Exception as e:
         log_event(
             session_id=session_id,
@@ -1284,6 +1546,23 @@ def route_chat():
 
 @app.route("/chat/context", methods=["GET", "POST"])
 def route_chat_context():
+    """
+    Endpoint to handle context cache management for the chat application.
+    This endpoint allows users to create, clear, or retrieve context caches based on the specified request parameters.
+    It supports both GET and POST requests, where GET requests can return the list of existing context caches or the token count for a specific context request,
+    and POST requests can create a new context cache or clear existing caches.
+
+    Args:
+        None: This function does not take any parameters directly, but uses Flask's request and session objects to access the request data and session information.
+    
+    Returns:
+        Response: A Flask Response object containing the context cache information in JSON format.
+    
+    Raises:
+        400 Bad Request: If the required parameters are missing or invalid.
+        500 Internal Server Error: If there is an error generating the context cache or retrieving the token count.
+    """
+
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
     is_spatial = request.args.get("is_spatial", "0") in ("true", "1", "yes")
@@ -1368,6 +1647,23 @@ def route_chat_context():
 
 @app.route("/chat/summary", methods=["POST"])
 def chat_summary():
+    """
+    Endpoint to summarize a chat conversation.
+    This endpoint takes a list of messages from the chat, constructs a chat transcript, and generates a summary using the Gemini model.
+    It reads a predefined prompt from a file and combines it with the chat transcript to form the full prompt for the model.
+
+    Args:
+        None: This function does not take any parameters directly, but uses Flask's request object to access the request data.
+
+    Returns:
+        Response: A Flask Response object containing the summary of the chat conversation in JSON format.
+    
+    Raises:
+        400 Bad Request: If no messages are provided in the request.
+        404 Not Found: If the summary prompt file is not found.
+        500 Internal Server Error: If there is an error reading the summary prompt file or generating the summary.
+    """
+
     data = request.get_json()
     messages = data.get("messages", [])
 
@@ -1408,6 +1704,23 @@ def chat_summary():
 
 @app.route("/chat/identify_places", methods=["POST"])
 def identify_places():
+    """
+    Endpoint to identify places from a user message.
+    This endpoint takes a user message, reads a predefined prompt from a file, and generates a response using the Gemini model.
+    It combines the content of the prompt file with the user message to form the full prompt for the model.
+
+    Args:
+        None: This function does not take any parameters directly, but uses Flask's request object to access the request data.
+    
+    Returns:
+        Response: A Flask Response object containing the identified places in JSON format.
+    
+    Raises:
+        400 Bad Request: If no message is provided in the request.
+        404 Not Found: If the identify_places prompt file is not found.
+        500 Internal Server Error: If there is an error reading the prompt file or generating the response.
+    """
+    
     data = request.get_json()
     message = data.get("message", [])
 
@@ -1442,6 +1755,24 @@ def identify_places():
 
 @app.route("/log", methods=["POST", "PUT"])
 def route_log():
+    """
+    Endpoint to log events related to user interactions with the application.
+    This endpoint supports both POST and PUT requests.
+    - POST requests create a new log entry.
+    - PUT requests update an existing log entry based on the provided log_id.
+    The log entry includes details such as session ID, app version, data selected, data attributes, prompt preamble, client query, app response, and client response rating.
+
+    Args:
+        None: This function does not take any parameters directly, but uses Flask's request and session objects to access the request data and session information.
+    
+    Returns:
+        Response: A Flask Response object containing a success message and the log ID if the log entry is created or updated successfully.
+    
+    Raises:
+        400 Bad Request: If required parameters are missing or invalid.
+        500 Internal Server Error: If there is an error creating or updating the log entry.
+    """
+    
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
 
@@ -1521,6 +1852,24 @@ def route_log():
 
 @app.route("/llm_summaries", methods=["GET"])
 def route_llm_summary():
+    """
+    Endpoint to retrieve a summary for a specific month.
+    This endpoint accepts a month parameter and returns the summary for that month.
+    If the month is not provided or if no summary is available for the specified month, it returns an error response.
+    The summary is fetched from the llm_summaries table in the database.
+
+    Args:
+        None: This function does not take any parameters directly, but uses Flask's request and session objects to access the request data and session information.
+    
+    Returns:
+        Response: A Flask Response object containing the summary for the specified month in JSON format.
+    
+    Raises:
+        400 Bad Request: If the month parameter is missing or invalid.
+        404 Not Found: If no summary is available for the specified month.
+        500 Internal Server Error: If there is an error accessing the database or fetching the summary.
+    """
+
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
     month = request.args.get("month", request.args.get("date", ""))
@@ -1570,6 +1919,21 @@ def route_llm_summary():
 
 @app.route("/llm_summaries/all", methods=["GET"])
 def route_all_llm_summaries():
+    """
+    Endpoint to retrieve all LLM summaries.
+    This endpoint fetches all summaries from the llm_summaries table in the database and returns them in JSON format.
+    It logs the request and handles any errors that may occur during the database query.
+
+    Args:
+        None: This function does not take any parameters directly, but uses Flask's request and session objects to access the request data and session information.
+    
+    Returns:
+        Response: A Flask Response object containing all summaries in JSON format.
+    
+    Raises:
+        500 Internal Server Error: If there is an error accessing the database or fetching the summaries
+    """
+
     session_id = session.get("session_id")
     app_version = request.args.get("app_version", "0")
 
@@ -1604,6 +1968,6 @@ def route_all_llm_summaries():
             cursor.close()
             conn.close()
 
-
+# Main entry point to run the Flask application
 if __name__ == "__main__":
     app.run(host=Config.HOST, port=Config.PORT, debug=True)
