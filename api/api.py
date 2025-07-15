@@ -1275,20 +1275,25 @@ def check_session():
     if "session_id" not in session:
         session.permanent = True
         session["session_id"] = str(uuid.uuid4())
-        log_event(
+        if request.endpoint not in ['route_chat', 'chat_summary', 'identify_places']:
+            log_event(
+                session_id=session["session_id"],
+                app_version=app_version,
+                data_attributes=Config.API_VERSION,
+                app_response="New session created",
+            )
+
+
+    # Create g.log_entry for all endpoints BUT don't log for chat endpoints
+    if request.endpoint not in ['route_chat', 'chat_summary', 'identify_places']:
+        g.log_entry = log_event(
             session_id=session["session_id"],
             app_version=app_version,
             data_attributes=Config.API_VERSION,
-            app_response="New session created",
+            client_query=f"Request: [{request.method}] {request.url}",
         )
-
-    # Log the incoming request
-    g.log_entry = log_event(
-        session_id=session["session_id"],
-        app_version=app_version,
-        data_attributes=Config.API_VERSION,
-        client_query=f"Request: [{request.method}] {request.url}",
-    )
+    else:
+        g.log_entry = None  # Set to None for chat endpoints
 
 
 #
@@ -1501,13 +1506,25 @@ def route_chat():
             return jsonify({"Error": app_response}), 500
 
         # Log the interaction
+        try:
+            raw_client_query = data.get("client_query", "")
+            if raw_client_query:
+                import json
+                conversation = json.loads(raw_client_query)
+                user_queries = [msg.get("text", "") for msg in conversation if msg.get("sender") == "user"]
+                clean_client_query = json.dumps(user_queries)
+            else:
+                clean_client_query = user_message
+        except:
+            clean_client_query = user_message
+
         log_id = log_event(
             session_id=session_id,
             app_version=app_version,
             data_selected=context_request,
             data_attributes=data_attributes,
             prompt_preamble=prompt_preamble,
-            client_query=full_prompt,
+            client_query=clean_client_query,  
             app_response=app_response,
         )
 
@@ -1521,22 +1538,24 @@ def route_chat():
         if map_data:
             response["mapData"] = map_data
 
-        log_event(
-            session_id=session_id,
-            app_version=app_version,
-            log_id=g.log_entry,
-            app_response="SUCCESS",
-        )
+        if hasattr(g, 'log_entry') and g.log_entry:
+            log_event(
+                session_id=session_id,
+                app_version=app_version,
+                log_id=g.log_entry,
+                app_response="SUCCESS",
+            )
         return jsonify(response)
 
     # Handle exceptions and log errors
     except Exception as e:
-        log_event(
-            session_id=session_id,
-            app_version=app_version,
-            log_id=g.log_entry,
-            app_response=f"ERROR: {str(e)}",
-        )
+        if hasattr(g, 'log_entry') and g.log_entry:
+            log_event(
+                session_id=session_id,
+                app_version=app_version,
+                log_id=g.log_entry,
+                app_response=f"ERROR: {str(e)}",
+            )
         print(f"✖ Exception in /chat: {e}")
         print(f"✖ context_request: {context_request}")
         print(f"✖ preamble: {prompt_preamble}")
