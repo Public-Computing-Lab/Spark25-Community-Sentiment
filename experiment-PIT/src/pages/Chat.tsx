@@ -387,43 +387,42 @@ function Chat() {
               <Typography variant="body2">Thinking…</Typography>
             </Box>
           )}
+          {/* ─── Suggested questions (first-time helper) ─────────────── */}
+          {messages.length === 1 && (
+            <Box sx={{ mt: "auto", pt: 1 }}>
+              <Typography
+                variant="subtitle1"
+                sx={{ mb: 1, color: colorPalette.dark, fontWeight: 500 }}
+              >
+                Suggested Questions
+              </Typography>
+              {suggested_questions.map((q, idx) => (
+                <Box
+                  key={idx}
+                  sx={{
+                    my: 0.5,
+                    p: 1.5,
+                    borderRadius: 7,
+                    bgcolor: colorPalette.botBubble,
+                    cursor: "pointer",
+                    "&:hover": { backgroundColor: "#d3ecf4" },
+                  }}
+                  onClick={() => {
+                    setInput(q.question);
+                    sendMessage(q.question);
+                  }}
+                >
+                  <Typography>{q.question}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {q.subLabel}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+
           <div ref={messagesEndRef} />
         </Box>
-
-        {/* ─── Suggested questions (first-time helper) ─────────────── */}
-        {messages.length === 1 && (
-          <Box sx={{ mt: 0.5 }}>
-            <Typography
-              variant="subtitle1"
-              sx={{ mb: 1, px: 2, color: colorPalette.dark, fontWeight: 500 }}
-            >
-              Suggested Questions
-            </Typography>
-            {suggested_questions.map((q, idx) => (
-              <Box
-                key={idx}
-                sx={{
-                  mx: 2,
-                  my: 0.5,
-                  p: 1.5,
-                  borderRadius: 7,
-                  bgcolor: colorPalette.botBubble,
-                  cursor: "pointer",
-                  "&:hover": { backgroundColor: "#d3ecf4" },
-                }}
-                onClick={() => {
-                  setInput(q.question);
-                  sendMessage(q.question);
-                }}
-              >
-                <Typography>{q.question}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {q.subLabel}
-                </Typography>
-              </Box>
-            ))}
-          </Box>
-        )}
 
         {/* ─── Input bar ──────────────────────────────────────────── */}
         <Box
