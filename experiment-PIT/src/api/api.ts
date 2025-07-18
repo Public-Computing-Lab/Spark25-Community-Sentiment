@@ -208,7 +208,7 @@ export async function get311Data(filtered_date?: number, category?: string, is_s
     request: '311_by_geo',
     category: category || 'all', //default to all if not provided 
     date: filtered_date,
-    app_version: '0.7.0',
+    app_version: '0.8.0',
     output_type: 'stream',
     is_spatial: is_spatial ? 'true' : 'false', // check for spatial filtering
   }
