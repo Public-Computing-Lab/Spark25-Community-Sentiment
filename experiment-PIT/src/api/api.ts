@@ -80,7 +80,7 @@ async function sendPostRequest(url: string, payload: any, headers: any) {
  *   Throws an error if the request fails, which can be caught by the caller.
  */
 export async function sendChatMessage(message: string, history: Message[], is_spatial: boolean = false): Promise<{ text: string; mapData?: any }> {
-  const urlChat = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.7.0&structured_response=False&is_spatial=${is_spatial ? 'true' : 'false'}`;
+  const urlChat = `${import.meta.env.VITE_BASE_URL}/chat?request=experiment_pit&app_version=0.8.0&structured_response=False&is_spatial=${is_spatial ? 'true' : 'false'}`;
   const formattedHistory = history.map(message => JSON.stringify(message)).join('\n');
   const jsonChat = {
     "client_query": JSON.stringify([...formattedHistory, { text: message, sender: "user" }]),
@@ -116,7 +116,7 @@ export async function sendChatMessage(message: string, history: Message[], is_sp
  *   Throws an error if the request fails, which can be caught by the caller.
  */
 export async function getChatSummary(messages: Message[], is_spatial: boolean = false) {
-  const url = `${import.meta.env.VITE_BASE_URL}/chat/summary?app_version=0.7.0&is_spatial=${is_spatial ? 'true' : 'false'}`
+  const url = `${import.meta.env.VITE_BASE_URL}/chat/summary?app_version=0.8.0&is_spatial=${is_spatial ? 'true' : 'false'}`
   
   try {
     // Format the messages for the API request
@@ -148,7 +148,7 @@ export async function getShotsData(filtered_date?: string, is_spatial: boolean =
 
   // Set the parameters for the request
   const params = {
-    app_version: '0.7.0',
+    app_version: '0.8.0',
     request: '911_shots_fired',
     output_type:'json',
     date: filtered_date,
