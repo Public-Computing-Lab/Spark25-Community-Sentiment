@@ -145,7 +145,7 @@ const SurveyModal: React.FC<SurveyModalProps> = ({
       </DialogTitle>
 
       <DialogContent sx={{ pt: 2 }}>
-        {SURVEY_QUESTIONS.map((question, index) => (
+        {SURVEY_QUESTIONS.map((question) => (
           <Box key={question.id} sx={{ mb: 3 }}>
             <FormControl component="fieldset" fullWidth>
               <FormLabel
