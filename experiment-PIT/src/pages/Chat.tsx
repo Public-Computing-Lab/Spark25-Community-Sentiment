@@ -7,6 +7,7 @@
  * - Displaying chat history, with messages coming from either the user or the AI.
  * - Exporting the chat history to a PDF summary.
  * - Clearing the chat history stored in local storage.
+ * - Survey feedback collection after specified interactions.
  *
  * It uses Material UI for layout and UI elements, and integrates with an API to send messages and fetch summaries.
  */
@@ -18,13 +19,21 @@ import type { Message } from "../constants/chatMessages";
 import {
   opening_message,
   suggested_questions,
+  SURVEY_CONFIG,
 } from "../constants/chatMessages";
 import { BOTTOM_NAV_HEIGHT, SEND_BTN_SIZE } from "../constants/layoutConstants";
-import { sendChatMessage, getChatSummary } from "../api/api";
+import {
+  sendChatMessage,
+  getChatSummary,
+  submitSurveyResponse,
+} from "../api/api";
 import { jsPDF } from "jspdf";
 import { MdTextRender } from "jspdf-md-renderer";
 import { colorPalette } from "../assets/palette";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+
+// Import Survey Modal
+import SurveyModal from "../components/SurveyModal";
 
 // MUI components
 import {
@@ -49,12 +58,13 @@ import onLogo from "/public/on_the_porch_logo.png";
  *
  * A functional React component that renders a full chat interface where users can interact with an AI assistant.
  * This component handles the sending and receiving of messages, displays the conversation history,
- * and provides options to export the chat summary or clear the chat.
+ * provides options to export the chat summary or clear the chat, and collects user feedback through surveys.
  *
  * ### Dependencies:
  * - `useState`, `useRef`, `useEffect` from React for managing state and effects.
- * - `sendChatMessage` and `getChatSummary` from the `api/api` module to interact with the backend.
+ * - `sendChatMessage`, `getChatSummary`, and `submitSurveyResponse` from the `api/api` module to interact with the backend.
  * - `jsPDF` and `MdTextRender` for generating a PDF summary of the chat.
+ * - `SurveyModal` component for collecting user feedback.
  * - `Box`, `Typography`, `TextField`, `IconButton`, and other MUI components for the UI.
  * - `colorPalette` from local theme assets for custom styling.
  * - `BOTTOM_NAV_HEIGHT` for consistent layout height across the app.
@@ -66,6 +76,8 @@ import onLogo from "/public/on_the_porch_logo.png";
  * - `confirmClearOpen` (boolean): Whether the clear chat confirmation dialog is open.
  * - `confirmExportOpen` (boolean): Whether the export chat summary confirmation dialog is open.
  * - `summaryError` (boolean): Whether there was an error generating the chat summary.
+ * - `interactionCount` (number): Counter for user-bot interactions.
+ * - `surveyOpen` (boolean): Whether the survey modal is open.
  *
  * ### Returns:
  * - A JSX element representing the full chat interface with:
@@ -74,12 +86,14 @@ import onLogo from "/public/on_the_porch_logo.png";
  *   - Send button.
  *   - Option to clear the chat or export the summary.
  *   - Dialogs for clearing chat or exporting the summary.
+ *   - Survey modal for user feedback collection.
  *
  * ### Side Effects:
  * - Calls the backend API to get the AI's response when a message is sent.
  * - Automatically scrolls to the bottom of the chat history when a new message is added.
  * - Displays loading indicators while waiting for the AI's response.
  * - Opens confirmation dialogs for clearing the chat or exporting the summary.
+ * - Triggers survey modal after specified number of interactions.
  *
  * ### Raises:
  * - If there is an error in generating the summary, displays a summary error dialog.
@@ -96,6 +110,14 @@ function Chat() {
     return stored ? JSON.parse(stored) : opening_message;
   };
 
+  /**
+   * Gets the current interaction count from localStorage
+   */
+  const getInteractionCount = (): number => {
+    const stored = localStorage.getItem("interactionCount");
+    return stored ? parseInt(stored, 10) : 0;
+  };
+
   // States for chat, input, sending status, etc.
   const [messages, setMessages] = useState<Message[]>(getInitialMessages);
   const [input, setInput] = useState("");
@@ -106,6 +128,55 @@ function Chat() {
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [confirmExportOpen, setConfirmExportOpen] = useState(false);
   const [summaryError, setSummaryError] = useState(false);
+
+  // Survey states
+  const [interactionCount, setInteractionCount] =
+    useState<number>(getInteractionCount);
+  const [surveyOpen, setSurveyOpen] = useState(false);
+
+  // ─── Survey helpers ────────────────────────────────────────────────
+  /**
+   * Increments interaction count and checks if survey should be shown
+   * Logic: Show after 5 interactions, then every 10 interactions after that
+   */
+  const incrementInteractionCount = () => {
+    const newCount = interactionCount + 1;
+    setInteractionCount(newCount);
+    localStorage.setItem("interactionCount", newCount.toString());
+
+    // Chris's suggestion: First trigger at 5, then every 10 after that
+    if (newCount === SURVEY_CONFIG.FIRST_TRIGGER) {
+      // Show after 5 interactions
+      setSurveyOpen(true);
+    } else if (
+      newCount > SURVEY_CONFIG.FIRST_TRIGGER &&
+      (newCount - SURVEY_CONFIG.FIRST_TRIGGER) %
+        SURVEY_CONFIG.RECURRING_TRIGGER ===
+        0
+    ) {
+      // Show every 10 interactions after the first trigger (15, 25, 35, etc.)
+      setSurveyOpen(true);
+    }
+  };
+
+  /**
+   * Handles survey submission
+   */
+  const handleSurveySubmit = async (responses: Record<string, string>) => {
+    try {
+      await submitSurveyResponse(responses, interactionCount);
+      console.log("✅ Survey submitted successfully");
+    } catch (error) {
+      console.error("❌ Error submitting survey:", error);
+    }
+  };
+
+  /**
+   * Handles survey close (when user skips or closes without answering)
+   */
+  const handleSurveyClose = () => {
+    setSurveyOpen(false);
+  };
 
   // ─── send handler ─────────────────────────────────────────────────
   /**
@@ -129,6 +200,9 @@ function Chat() {
       // Append the server's response to the chat
       if (data.text) {
         setMessages((prev) => [...prev, { text: data.text, sender: "Gemini" }]);
+
+        // Increment interaction count after bot responds (user message + bot response = 1 interaction)
+        incrementInteractionCount();
       } else {
         setMessages((prev) => [
           ...prev,
@@ -160,10 +234,13 @@ function Chat() {
 
   /**
    * Clears the chat history from local storage and resets the message list.
+   * Also resets interaction count.
    */
   const handleClearChat = () => {
     localStorage.removeItem("chatMessages");
+    localStorage.removeItem("interactionCount");
     setMessages(getInitialMessages());
+    setInteractionCount(0);
   };
 
   /**
@@ -228,6 +305,11 @@ function Chat() {
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Save messages to localStorage whenever messages change
+  useEffect(() => {
+    localStorage.setItem("chatMessages", JSON.stringify(messages));
   }, [messages]);
 
   // ─── render ───────────────────────────────────────────────────────
@@ -494,6 +576,13 @@ function Chat() {
         </Typography>
       </Box>
 
+      {/* ─── Survey Modal ─────────────────────────────────────────── */}
+      <SurveyModal
+        open={surveyOpen}
+        onClose={handleSurveyClose}
+        onSubmit={handleSurveySubmit}
+      />
+
       {/* ─── Dialogs ──────────────────────────────────────────────── */}
       <Dialog
         open={confirmClearOpen}
@@ -511,7 +600,8 @@ function Chat() {
 
         <DialogContent>
           <DialogContentText>
-            This will remove all chat messages. Are you sure?
+            This will remove all chat messages and reset the interaction
+            counter. Are you sure?
           </DialogContentText>
         </DialogContent>
 

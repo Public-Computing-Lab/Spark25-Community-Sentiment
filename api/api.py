@@ -1246,17 +1246,7 @@ def check_session():
     """
     Middleware to check if a session exists and create one if it doesn't.
     This function also logs the incoming request and handles CORS preflight requests.
-
-    Args:
-        None
-    
-    Returns:
-        None: This function does not return a value, but modifies the session and logs the request
-    
-    Raises:
-        None
     """
-
     # Handle CORS preflight requests
     if request.method == "OPTIONS":
         return ("", 204)
@@ -1268,32 +1258,14 @@ def check_session():
         not rethinkai_api_client_key
         or rethinkai_api_client_key not in Config.RETHINKAI_API_KEYS
     ):
-
         return jsonify({"Error": "Invalid or missing API key"}), 401
 
-    # Ensure session exists
+    # Ensure session exists - NO LOGGING
     if "session_id" not in session:
         session.permanent = True
         session["session_id"] = str(uuid.uuid4())
-        if request.endpoint not in ['route_chat', 'chat_summary', 'identify_places']:
-            log_event(
-                session_id=session["session_id"],
-                app_version=app_version,
-                data_attributes=Config.API_VERSION,
-                app_response="New session created",
-            )
 
-
-    # Create g.log_entry for all endpoints BUT don't log for chat endpoints
-    if request.endpoint not in ['route_chat', 'chat_summary', 'identify_places']:
-        g.log_entry = log_event(
-            session_id=session["session_id"],
-            app_version=app_version,
-            data_attributes=Config.API_VERSION,
-            client_query=f"Request: [{request.method}] {request.url}",
-        )
-    else:
-        g.log_entry = None  # Set to None for chat endpoints
+    g.log_entry = None
 
 
 #
@@ -1405,12 +1377,12 @@ def route_data_query():
             )
         # Return non-streaming
         else:
-            log_event(
-                session_id=session_id,
-                app_version=app_version,
-                log_id=g.log_entry,
-                app_response="SUCCESS",
-            )
+            # log_event(
+            #     session_id=session_id,
+            #     app_version=app_version,
+            #     log_id=g.log_entry,
+            #     app_response="SUCCESS",
+            # )
             result = get_query_results(query=query, output_type=output_type)
             if output_type == "csv" and result:
                 output = result.getvalue()
@@ -1635,12 +1607,6 @@ def route_chat_context():
                 if context_request == cache.display_name or context_request == "all":
                     genai_client.caches.delete(name=cache.name)
 
-            log_event(
-                session_id=session_id,
-                app_version=app_version,
-                log_id=g.log_entry,
-                app_response="SUCCESS",
-            )
             return jsonify({"Success": "Context cache cleared."})
         else:
             data = request.get_json()
@@ -1655,12 +1621,6 @@ def route_chat_context():
                 is_spatial=is_spatial,
             )
 
-            log_event(
-                session_id=session_id,
-                app_version=app_version,
-                log_id=g.log_entry,
-                app_response="SUCCESS",
-            )
             return jsonify(response)
 
 
@@ -1811,12 +1771,6 @@ def route_log():
             log_id=data.get("log_id", ""),
         )
         if log_id != 0:
-            log_event(
-                session_id=session_id,
-                app_version=app_version,
-                log_id=g.log_entry,
-                app_response="SUCCESS",
-            )
             return (
                 jsonify(
                     {"message": "Log entry created successfully", "log_id": log_id}
@@ -1847,12 +1801,6 @@ def route_log():
             log_id=data.get("log_id", ""),
         )
         if log_id != 0:
-            log_event(
-                session_id=session_id,
-                app_version=app_version,
-                log_id=g.log_entry,
-                app_response="SUCCESS",
-            )
             return (
                 jsonify(
                     {"message": "Log entry updated successfully", "log_id": log_id}
@@ -1913,12 +1861,6 @@ def route_llm_summary():
             )
             return jsonify({"summary": "[No summary available for this month]"}), 404
 
-        log_event(
-            session_id=session_id,
-            app_version=app_version,
-            log_id=g.log_entry,
-            app_response="SUCCESS",
-        )
         return jsonify({"month": month, "summary": row["summary"]})
 
     except Exception as e:
@@ -1959,17 +1901,10 @@ def route_all_llm_summaries():
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute(
+        cursor.exebefore_requestcute(
             "SELECT month_label, summary FROM llm_summaries ORDER BY month_label ASC"
         )
         rows = cursor.fetchall()
-
-        log_event(
-            session_id=session_id,
-            app_version=app_version,
-            log_id=g.log_entry,
-            app_response="SUCCESS",
-        )
 
         return jsonify(rows)
 

@@ -130,6 +130,47 @@ export async function getChatSummary(messages: Message[], is_spatial: boolean = 
 }
 
 /*
+ * submitSurveyResponse:
+ * Submits survey feedback to the RethinkAI API using the /log endpoint.
+ *
+ * Args:
+ *   surveyResponses: An object containing the user's survey responses.
+ *   interactionCount: The number of interactions when the survey was triggered.
+ *
+ * Returns:
+ *   A promise that resolves to the response data if successful.
+ *
+ * Raises:
+ *   Throws an error if the request fails, which can be caught by the caller.
+ */
+export async function submitSurveyResponse(surveyResponses: Record<string, string>, interactionCount: number) {
+  const url = `${import.meta.env.VITE_BASE_URL}/log?app_version=0.8.0`;
+  
+  // Format survey data as requested by Chris - use client_query field
+  const surveyData = {
+    survey_responses: surveyResponses,
+    interaction_count: interactionCount,
+    timestamp: new Date().toISOString(),
+    survey_type: "feedback_survey"
+  };
+
+  const payload = {
+    client_query: JSON.stringify(surveyData),
+    data_selected: "survey_feedback",
+    data_attributes: "user_feedback_collection"
+  };
+
+  try {
+    const response = await sendPostRequest(url, payload, header);
+    console.log("✅ Survey response submitted successfully:", response);
+    return response;
+  } catch (error) {
+    console.error("❌ Error submitting survey response:", error);
+    throw error;
+  }
+}
+
+/*
  * getShotsData:
  * Fetches 911 shots fired data from the RethinkAI API.
  *
