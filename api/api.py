@@ -964,17 +964,13 @@ def get_gemini_response(
         prompt (str): The prompt to send to the Gemini model.
         cache_name (str): The name of the cache to use for the response.
         structured_response (bool): Whether to expect a structured response (default is False).
-    
-    Returns:
-        str: The cleaned response text from the Gemini model, or an error message if an exception occurs.
-    
-    Raises:
-        Exception: If there is an error generating the response from the Gemini model.
-    """
 
+    Returns:
+        str: The cleaned response text from the Gemini model.
+    """
     try:
         model = Config.GEMINI_MODEL
-        if structured_response is True:
+        if structured_response:
             config = types.GenerateContentConfig(
                 cached_content=cache_name if cache_name else None,
                 response_schema=list[Structured_Data],
@@ -985,7 +981,6 @@ def get_gemini_response(
                 cached_content=cache_name if cache_name else None
             )
 
-        # Direct synchronous call instead of asyncio.to_thread
         response = genai_client.models.generate_content(
             model=model,
             contents=prompt,
@@ -993,16 +988,41 @@ def get_gemini_response(
         )
 
         raw_output = response.text.strip()
+        cleaned_output = raw_output
 
-        # Process to remove unwanted trailing sender tag if present
-        cleaned_output = re.sub(r'["\']?,\s*"?sender":"Gemini"?["}]?$', "", raw_output)
+        
+        try:
+            parsed = json.loads(raw_output)
+            if isinstance(parsed, dict):
+                cleaned_output = parsed.get("response") or parsed.get("text") or raw_output
+            elif isinstance(parsed, list) and all(isinstance(p, dict) and "response" in p for p in parsed):
+                cleaned_output = "\n\n".join(p["response"] for p in parsed)
+        except Exception:
+            
+            json_removal_patterns = [
+                r',\s*"sender"\s*:\s*"[^"]*"\s*\}?\s*\]?\s*$',      # sender at end
+                r',\s*"group"\s*:\s*"[^"]*"\s*\}?\s*\]?\s*$',       # group at end
+                r',\s*"model"\s*:\s*"[^"]*"\s*\}?\s*\]?\s*$',       # model at end
+                r'\}\s*\]$',                                        # closing object brackets
+                r'"sender"\s*:\s*"[^"]*"',                          # inline sender
+                r'"group"\s*:\s*"[^"]*"',                           # inline group
+                r'"model"\s*:\s*"[^"]*"',                           # inline model
+                r'"role"\s*:\s*"[^"]*"',                            # leaked role field
+                r',?\s*\{[^{}]*\}\s*$',                             # trailing object
+                r',?\s*\[?[^"\]]*"\]?\s*$',                         # malformed list ending
+            ]
 
-        return cleaned_output
+            for pattern in json_removal_patterns:
+                cleaned_output = re.sub(pattern, '', cleaned_output, flags=re.DOTALL | re.IGNORECASE)
+
+            
+            cleaned_output = re.sub(r'[\s,;:.\\/\]\}"]+$', '', cleaned_output).strip()
+            cleaned_output = re.sub(r'\s+', ' ', cleaned_output).strip()
+
+        return cleaned_output if cleaned_output else raw_output
 
     except Exception as e:
-        print(
-            f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}"
-        )
+        print(f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}")
         return f"{Font_Colors.FAIL}{Font_Colors.BOLD}✖ Error generating response:{Font_Colors.ENDC} {e}"
 
 
