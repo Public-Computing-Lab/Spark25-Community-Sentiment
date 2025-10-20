@@ -1,0 +1,285 @@
+{
+  "_911_data_boston_arrests": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table '_911_data_boston_arrests' imported from CSV '911_data\\Boston_Arrests.csv'",
+    "all_columns": [
+      "OBJECTID",
+      "ARREST_NUM",
+      "INC_NUM",
+      "CHARGE_SEQ_NUM",
+      "CHARGE_CODE",
+      "CHARGE_DESC",
+      "NIBRS_CODE",
+      "NIBRS_DESC",
+      "ARR_DATE",
+      "GENDER_DESC",
+      "RACE_DESC",
+      "ETHNICITY_DESC",
+      "AGE",
+      "JUVENILE",
+      "HOUR_OF_DAY",
+      "DAY_OF_WEEK",
+      "YEAR",
+      "QUARTER",
+      "MONTH",
+      "NEIGHBORHOOD",
+      "DISTRICT"
+    ]
+  },
+  "_911_data_boston_homicides": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table '_911_data_boston_homicides' imported from CSV '911_data\\Boston_Homicides.csv'",
+    "all_columns": [
+      "OBJECTID",
+      "reporting_event_number",
+      "RuledDate",
+      "HomicideDate",
+      "District",
+      "VictimAge",
+      "Race",
+      "Gender",
+      "Weapon",
+      "HOUR_OF_DAY",
+      "DAY_OF_WEEK",
+      "YEAR",
+      "QUARTER",
+      "MONTH",
+      "NEIGHBORHOOD",
+      "Ethnicity_NIBRS"
+    ]
+  },
+  "_911_data_boston_offenses": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table '_911_data_boston_offenses' imported from CSV '911_data\\Boston_offenses.csv'",
+    "all_columns": [
+      "OBJECTID",
+      "Incident_Number",
+      "Crime",
+      "Offense_Code",
+      "Offense_Description",
+      "Block_Address",
+      "City",
+      "Zip_Code",
+      "BPD_District",
+      "Premise_Description",
+      "Weapon_Description",
+      "Crime_Part",
+      "Crime_Category",
+      "Report_Date",
+      "From_Date",
+      "To_Date",
+      "Hour_of_Day",
+      "Day_of_Week",
+      "Year",
+      "Quarter",
+      "Month",
+      "Neighborhood"
+    ]
+  },
+  "_911_data_firearms_counts": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table '_911_data_firearms_counts' imported from CSV '911_data\\Firearms_counts.csv'",
+    "all_columns": [
+      "collection_date",
+      "crime_guns_recovered",
+      "guns_recovered_safeguard",
+      "buyback_guns_recovered"
+    ]
+  },
+  "_911_data_person_shot": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table '_911_data_person_shot' imported from CSV '911_data\\Person_Shot.csv'",
+    "all_columns": [
+      "OBJECTID",
+      "Incident_Num",
+      "Shooting_Date",
+      "District",
+      "Shooting_Type_V2",
+      "Victim_Gender",
+      "Victim_Race",
+      "Victim_Ethnicity_NIBRS",
+      "Multi_Victim",
+      "IsPrimaryIncident",
+      "HOUR_OF_DAY",
+      "DAY_OF_WEEK",
+      "YEAR",
+      "QUARTER",
+      "MONTH",
+      "NEIGHBORHOOD"
+    ]
+  },
+  "_911_data_shots_fired": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table '_911_data_shots_fired' imported from CSV '911_data\\Shots_fired.csv'",
+    "all_columns": [
+      "incident_num",
+      "incident_date",
+      "district",
+      "ballistics_evidence"
+    ]
+  },
+  "_911_data_shots_fired_data_dictionary": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table '_911_data_shots_fired_data_dictionary' imported from CSV '911_data\\shots-fired-data-dictionary.csv'",
+    "all_columns": [
+      "Incident_Num",
+      "Incident_Number"
+    ]
+  },
+  "dorchester_311": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table 'dorchester_311' imported from CSV 'Dorchester_311.csv'",
+    "all_columns": [
+      "Unnamed__0",
+      "case_enquiry_id",
+      "open_dt",
+      "sla_target_dt",
+      "closed_dt",
+      "on_time",
+      "case_status",
+      "closure_reason",
+      "case_title",
+      "subject",
+      "reason",
+      "type",
+      "queue",
+      "department",
+      "submitted_photo",
+      "closed_photo",
+      "location",
+      "fire_district",
+      "pwd_district",
+      "city_council_district",
+      "police_district",
+      "neighborhood",
+      "neighborhood_services_district",
+      "ward",
+      "precinct",
+      "location_street_name",
+      "location_zipcode",
+      "latitude",
+      "longitude",
+      "geom_4326",
+      "source"
+    ]
+  },
+  "dorchester_boston_arrests": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table 'dorchester_boston_arrests' imported from CSV 'Dorchester_Boston_Arrests.csv'",
+    "all_columns": [
+      "OBJECTID",
+      "ARREST_NUM",
+      "INC_NUM",
+      "CHARGE_SEQ_NUM",
+      "CHARGE_CODE",
+      "CHARGE_DESC",
+      "NIBRS_CODE",
+      "NIBRS_DESC",
+      "ARR_DATE",
+      "GENDER_DESC",
+      "RACE_DESC",
+      "ETHNICITY_DESC",
+      "AGE",
+      "JUVENILE",
+      "HOUR_OF_DAY",
+      "DAY_OF_WEEK",
+      "YEAR",
+      "QUARTER",
+      "MONTH",
+      "NEIGHBORHOOD",
+      "DISTRICT"
+    ]
+  },
+  "dorchester_boston_homicides": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table 'dorchester_boston_homicides' imported from CSV 'Dorchester_Boston_Homicides.csv'",
+    "all_columns": [
+      "OBJECTID",
+      "reporting_event_number",
+      "RuledDate",
+      "HomicideDate",
+      "District",
+      "VictimAge",
+      "Race",
+      "Gender",
+      "Weapon",
+      "HOUR_OF_DAY",
+      "DAY_OF_WEEK",
+      "YEAR",
+      "QUARTER",
+      "MONTH",
+      "NEIGHBORHOOD",
+      "Ethnicity_NIBRS"
+    ]
+  },
+  "dorchester_boston_offenses": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table 'dorchester_boston_offenses' imported from CSV 'Dorchester_Boston_offenses.csv'",
+    "all_columns": [
+      "OBJECTID",
+      "Incident_Number",
+      "Crime",
+      "Offense_Code",
+      "Offense_Description",
+      "Block_Address",
+      "City",
+      "Zip_Code",
+      "BPD_District",
+      "Premise_Description",
+      "Weapon_Description",
+      "Crime_Part",
+      "Crime_Category",
+      "Report_Date",
+      "From_Date",
+      "To_Date",
+      "Hour_of_Day",
+      "Day_of_Week",
+      "Year",
+      "Quarter",
+      "Month",
+      "Neighborhood"
+    ]
+  },
+  "dorchester_firearms_counts": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table 'dorchester_firearms_counts' imported from CSV 'Dorchester_Firearms_counts.csv'",
+    "all_columns": [
+      "collection_date",
+      "crime_guns_recovered",
+      "guns_recovered_safeguard",
+      "buyback_guns_recovered"
+    ]
+  },
+  "dorchester_person_shot": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table 'dorchester_person_shot' imported from CSV 'Dorchester_Person_Shot.csv'",
+    "all_columns": [
+      "OBJECTID",
+      "Incident_Num",
+      "Shooting_Date",
+      "District",
+      "Shooting_Type_V2",
+      "Victim_Gender",
+      "Victim_Race",
+      "Victim_Ethnicity_NIBRS",
+      "Multi_Victim",
+      "IsPrimaryIncident",
+      "HOUR_OF_DAY",
+      "DAY_OF_WEEK",
+      "YEAR",
+      "QUARTER",
+      "MONTH",
+      "NEIGHBORHOOD"
+    ]
+  },
+  "dorchester_shots_fired": {
+    "type": "sql",
+    "description": "Auto-generated metadata for table 'dorchester_shots_fired' imported from CSV 'Dorchester_Shots_fired.csv'",
+    "all_columns": [
+      "incident_num",
+      "incident_date",
+      "district",
+      "ballistics_evidence"
+    ]
+  }
+}
