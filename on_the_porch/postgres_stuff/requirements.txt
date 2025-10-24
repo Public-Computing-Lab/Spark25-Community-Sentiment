@@ -1,0 +1,9 @@
+pandas
+sqlalchemy
+psycopg2-binary
+requests
+vanna
+flask
+openai
+chromadb
+python-dotenv

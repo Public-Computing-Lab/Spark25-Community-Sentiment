@@ -1,0 +1,441 @@
+{
+  "table_name": "Dorchester_311",
+  "description": "Placeholder description for 'Dorchester_311'.",
+  "columns": [
+    {
+      "name": "case_enquiry_id",
+      "dtype": "int64",
+      "description": "Placeholder description for 'case_enquiry_id'.",
+      "is_categorical": false
+    },
+    {
+      "name": "open_dt",
+      "dtype": "object",
+      "description": "Placeholder description for 'open_dt'.",
+      "is_categorical": false
+    },
+    {
+      "name": "sla_target_dt",
+      "dtype": "object",
+      "description": "Placeholder description for 'sla_target_dt'.",
+      "is_categorical": false
+    },
+    {
+      "name": "closed_dt",
+      "dtype": "object",
+      "description": "Placeholder description for 'closed_dt'.",
+      "is_categorical": false
+    },
+    {
+      "name": "on_time",
+      "dtype": "object",
+      "description": "Placeholder description for 'on_time'.",
+      "is_categorical": true,
+      "unique_values": [
+        "ONTIME",
+        "OVERDUE"
+      ]
+    },
+    {
+      "name": "case_status",
+      "dtype": "object",
+      "description": "Placeholder description for 'case_status'.",
+      "is_categorical": true,
+      "unique_values": [
+        "Closed",
+        "Open"
+      ]
+    },
+    {
+      "name": "closure_reason",
+      "dtype": "object",
+      "description": "Placeholder description for 'closure_reason'.",
+      "is_categorical": false
+    },
+    {
+      "name": "case_title",
+      "dtype": "object",
+      "description": "Placeholder description for 'case_title'.",
+      "is_categorical": true,
+      "unique_values": [
+        "Parking Enforcement",
+        "Requests for Street Cleaning",
+        "Improper Storage of Trash (Barrels)",
+        "Poor Conditions of Property",
+        "Abandoned Vehicles",
+        "Pick up Dead Animal",
+        "Request for Pothole Repair",
+        "CE Collection",
+        "Request for Recycling Cart",
+        "Needle Pickup",
+        "Sign Repair",
+        "Rodent Activity",
+        "Tree Maintenance Requests",
+        "Recycling Cart Return",
+        "Sidewalk Repair (Make Safe)",
+        "Unshoveled Sidewalk",
+        "Animal Generic Request",
+        "Sticker Request",
+        "Missed Trash: District 07",
+        "Illegal Dumping",
+        "Ground Maintenance",
+        "Traffic Signal Inspection",
+        "Missed Trash: District 03",
+        "Missed Leaf or Yard Trash: District 07",
+        "Street Light Outages",
+        "Pest Infestation - Residential",
+        "Equipment Repair",
+        "Street Cleaning",
+        "New Tree Requests",
+        "Empty Litter Basket",
+        "Tree Maintenance",
+        "Missed Leaf or Yard Trash: District 03",
+        "Contractor Complaints",
+        "Graffiti Removal",
+        "New Sign  Crosswalk or Pavement Marking",
+        "Work w/out Permit",
+        "Unsatisfactory Living Conditions",
+        "Loud Parties/Music/People",
+        "Public Works General Request",
+        "Missed Recycling: District 07",
+        "Tree Emergencies",
+        "Missed Trash/Recycling/Yard Waste/Bulk Item",
+        "Contractors Complaint",
+        "Missed Recycling: District 03",
+        "Pothole",
+        "Abandoned Bicycle",
+        "Request for Snow Plowing",
+        "Catchbasin",
+        "Transportation General Request",
+        "Building Inspection Request"
+      ]
+    },
+    {
+      "name": "subject",
+      "dtype": "object",
+      "description": "Placeholder description for 'subject'.",
+      "is_categorical": true,
+      "unique_values": [
+        "Public Works Department",
+        "Transportation - Traffic Division",
+        "Inspectional Services",
+        "Parks & Recreation Department",
+        "Mayor's 24 Hour Hotline",
+        "Animal Control",
+        "Boston Water & Sewer Commission",
+        "Property Management",
+        "Boston Police Department",
+        "Neighborhood Services"
+      ]
+    },
+    {
+      "name": "reason",
+      "dtype": "object",
+      "description": "Placeholder description for 'reason'.",
+      "is_categorical": true,
+      "unique_values": [
+        "Enforcement & Abandoned Vehicles",
+        "Street Cleaning",
+        "Code Enforcement",
+        "Highway Maintenance",
+        "Sanitation",
+        "Recycling",
+        "Signs & Signals",
+        "Housing",
+        "Trees",
+        "Park Maintenance & Safety",
+        "Needle Program",
+        "Street Lights",
+        "Environmental Services",
+        "Building",
+        "Animal Issues",
+        "Administrative & General Requests",
+        "Graffiti",
+        "Health",
+        "Noise Disturbance",
+        "Abandoned Bicycle",
+        "Catchbasin",
+        "Traffic Management & Engineering",
+        "Notification",
+        "Employee & General Comments",
+        "Fire Hydrant",
+        "Sidewalk Cover / Manhole",
+        "Quality of Life",
+        "Generic Noise Disturbance",
+        "Weights and Measures",
+        "Pothole",
+        "Operations",
+        "Boston Bikes",
+        "General Request",
+        "Air Pollution Control",
+        "Parking Complaints",
+        "Programs",
+        "Billing",
+        "Neighborhood Services Issues",
+        "Massport"
+      ]
+    },
+    {
+      "name": "type",
+      "dtype": "object",
+      "description": "Placeholder description for 'type'.",
+      "is_categorical": true,
+      "unique_values": [
+        "Parking Enforcement",
+        "Requests for Street Cleaning",
+        "Improper Storage of Trash (Barrels)",
+        "Missed Trash/Recycling/Yard Waste/Bulk Item",
+        "Poor Conditions of Property",
+        "Request for Pothole Repair",
+        "Abandoned Vehicles",
+        "Pick up Dead Animal",
+        "CE Collection",
+        "Tree Maintenance Requests",
+        "Request for Recycling Cart",
+        "Needle Pickup",
+        "Sign Repair",
+        "Rodent Activity",
+        "Sidewalk Repair (Make Safe)",
+        "Ground Maintenance",
+        "Recycling Cart Return",
+        "Street Light Outages",
+        "Unshoveled Sidewalk",
+        "Animal Generic Request",
+        "Unsatisfactory Living Conditions",
+        "Sticker Request",
+        "Illegal Dumping",
+        "Equipment Repair",
+        "Traffic Signal Inspection",
+        "Pest Infestation - Residential",
+        "New Tree Requests",
+        "Empty Litter Basket",
+        "Contractor Complaints",
+        "Graffiti Removal",
+        "New Sign  Crosswalk or Pavement Marking",
+        "Work w/out Permit",
+        "Public Works General Request",
+        "Loud Parties/Music/People",
+        "Tree Emergencies",
+        "Heat - Excessive  Insufficient",
+        "Contractors Complaint",
+        "General Lighting Request",
+        "Abandoned Bicycle",
+        "Maintenance Complaint - Residential",
+        "Request for Snow Plowing",
+        "Catchbasin",
+        "Transportation General Request",
+        "Building Inspection Request",
+        "Notification",
+        "Working Beyond Hours",
+        "Unsanitary Conditions - Establishment",
+        "Street Light Knock Downs",
+        "Roadway Repair",
+        "Mice Infestation - Residential"
+      ]
+    },
+    {
+      "name": "queue",
+      "dtype": "object",
+      "description": "Placeholder description for 'queue'.",
+      "is_categorical": false
+    },
+    {
+      "name": "department",
+      "dtype": "object",
+      "description": "Placeholder description for 'department'.",
+      "is_categorical": true,
+      "unique_values": [
+        "PWDx",
+        "BTDT",
+        "ISD",
+        "PARK",
+        "INFO",
+        "GEN_",
+        "BWSC",
+        "PROP",
+        "ANML",
+        "BPD_",
+        "BPS_",
+        "DND_",
+        "ONS_",
+        "BHA_",
+        "DISB",
+        "GRNi",
+        "No Q"
+      ]
+    },
+    {
+      "name": "submitted_photo",
+      "dtype": "object",
+      "description": "Placeholder description for 'submitted_photo'.",
+      "is_categorical": false
+    },
+    {
+      "name": "closed_photo",
+      "dtype": "object",
+      "description": "Placeholder description for 'closed_photo'.",
+      "is_categorical": false
+    },
+    {
+      "name": "location",
+      "dtype": "object",
+      "description": "Placeholder description for 'location'.",
+      "is_categorical": false
+    },
+    {
+      "name": "fire_district",
+      "dtype": "object",
+      "description": "Placeholder description for 'fire_district'.",
+      "is_categorical": true,
+      "unique_values": [
+        "7",
+        "8",
+        "6",
+        "9",
+        "12",
+        " "
+      ]
+    },
+    {
+      "name": "pwd_district",
+      "dtype": "object",
+      "description": "Placeholder description for 'pwd_district'.",
+      "is_categorical": true,
+      "unique_values": [
+        "03",
+        "07",
+        "10B",
+        "02",
+        "1C",
+        "05",
+        "3",
+        " ",
+        "7"
+      ]
+    },
+    {
+      "name": "city_council_district",
+      "dtype": "int64",
+      "description": "Placeholder description for 'city_council_district'.",
+      "is_categorical": true,
+      "unique_values": [
+        "3",
+        "4",
+        "2",
+        "7",
+        "5",
+        "0"
+      ]
+    },
+    {
+      "name": "police_district",
+      "dtype": "object",
+      "description": "Placeholder description for 'police_district'.",
+      "is_categorical": true,
+      "unique_values": [
+        "C11",
+        "B3",
+        "C6",
+        "B2",
+        " ",
+        "E13"
+      ]
+    },
+    {
+      "name": "neighborhood",
+      "dtype": "object",
+      "description": "Placeholder description for 'neighborhood'.",
+      "is_categorical": true,
+      "unique_values": [
+        "Dorchester"
+      ]
+    },
+    {
+      "name": "neighborhood_services_district",
+      "dtype": "int64",
+      "description": "Placeholder description for 'neighborhood_services_district'.",
+      "is_categorical": true,
+      "unique_values": [
+        "7",
+        "8",
+        "9",
+        "5",
+        "13",
+        "0"
+      ]
+    },
+    {
+      "name": "ward",
+      "dtype": "object",
+      "description": "Placeholder description for 'ward'.",
+      "is_categorical": true,
+      "unique_values": [
+        "Ward 16",
+        "Ward 17",
+        "Ward 13",
+        "Ward 15",
+        "16",
+        "Ward 7",
+        "13",
+        "17",
+        "15",
+        "14",
+        "7",
+        "Ward 14",
+        "07",
+        "12",
+        "08",
+        "18"
+      ]
+    },
+    {
+      "name": "precinct",
+      "dtype": "object",
+      "description": "Placeholder description for 'precinct'.",
+      "is_categorical": false
+    },
+    {
+      "name": "location_street_name",
+      "dtype": "object",
+      "description": "Placeholder description for 'location_street_name'.",
+      "is_categorical": false
+    },
+    {
+      "name": "location_zipcode",
+      "dtype": "float64",
+      "description": "Placeholder description for 'location_zipcode'.",
+      "is_categorical": false
+    },
+    {
+      "name": "latitude",
+      "dtype": "float64",
+      "description": "Placeholder description for 'latitude'.",
+      "is_categorical": false
+    },
+    {
+      "name": "longitude",
+      "dtype": "float64",
+      "description": "Placeholder description for 'longitude'.",
+      "is_categorical": false
+    },
+    {
+      "name": "geom_4326",
+      "dtype": "object",
+      "description": "Placeholder description for 'geom_4326'.",
+      "is_categorical": false
+    },
+    {
+      "name": "source",
+      "dtype": "object",
+      "description": "Placeholder description for 'source'.",
+      "is_categorical": true,
+      "unique_values": [
+        "Citizens Connect App",
+        "Constituent Call",
+        "Employee Generated",
+        "City Worker App",
+        "Self Service"
+      ]
+    }
+  ]
+}
