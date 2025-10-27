@@ -1,0 +1,30 @@
+{
+  "schema": "public",
+  "table": "dorchester_shots_fired",
+  "columns": {
+    "incident_num": {
+      "data_type": "text",
+      "is_numeric": false
+    },
+    "incident_date": {
+      "data_type": "text",
+      "is_numeric": false
+    },
+    "district": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "B3",
+        "C11"
+      ]
+    },
+    "ballistics_evidence": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "t",
+        "f"
+      ]
+    }
+  }
+}

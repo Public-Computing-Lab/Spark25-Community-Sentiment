@@ -1,0 +1,26 @@
+{
+  "schema": "public",
+  "table": "dorchester_firearms_counts",
+  "columns": {
+    "collection_date": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": []
+    },
+    "crime_guns_recovered": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": []
+    },
+    "guns_recovered_safeguard": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": []
+    },
+    "buyback_guns_recovered": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": []
+    }
+  }
+}

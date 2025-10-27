@@ -1,0 +1,72 @@
+[
+  {
+    "table": "arrests",
+    "description": "Has arrest data for the city of Boston",
+    "metadata_file": "arrests.json"
+  },
+  {
+    "table": "dorchester_311",
+    "description": "Has 311 data for the city of Dorchester",
+    "metadata_file": "dorchester_311.json"
+  },
+  {
+    "table": "dorchester_boston_arrests",
+    "description": "Has arrest data for the city of Boston and Dorchester",
+    "metadata_file": "dorchester_boston_arrests.json"
+  },
+  {
+    "table": "dorchester_boston_homicides",
+    "description": "Has homicide data for the city of Boston and Dorchester",
+    "metadata_file": "dorchester_boston_homicides.json"
+  },
+  {
+    "table": "dorchester_boston_offenses",
+    "description": "Has offense data for the city of Boston and Dorchester",
+    "metadata_file": "dorchester_boston_offenses.json"
+  },
+  {
+    "table": "dorchester_firearms_counts",
+    "description": "Has firearm data for the city of Dorchester",
+    "metadata_file": "dorchester_firearms_counts.json"
+  },
+  {
+    "table": "dorchester_person_shot",
+    "description": "Has person shot data for the city of Dorchester",
+    "metadata_file": "dorchester_person_shot.json"
+  },
+  {
+    "table": "dorchester_shots_fired",
+    "description": "Has shots fired data for the city of Dorchester",
+    "metadata_file": "dorchester_shots_fired.json"
+  },
+  {
+    "table": "firearms",
+    "description": "Has firearm data for the city of Boston",
+    "metadata_file": "firearms.json"
+  },
+  {
+    "table": "homicides",
+    "description": "Has homicide data for the city of Boston",
+    "metadata_file": "homicides.json"
+  },
+  {
+    "table": "offenses",
+    "description": "Has offense data for the city of Boston",
+    "metadata_file": "offenses.json"
+  },
+  {
+    "table": "person_shot",
+    "description": "Has person shot data for the city of Boston",
+    "metadata_file": "person_shot.json"
+  },
+  {
+    "table": "service_requests",
+    "description": "has service requests data for the city of Boston",
+    "metadata_file": "service_requests.json"
+  },
+  {
+    "table": "shots_fired",
+    "description": "has shots fired data for the city of Boston",
+    "metadata_file": "shots_fired.json"
+  }
+]

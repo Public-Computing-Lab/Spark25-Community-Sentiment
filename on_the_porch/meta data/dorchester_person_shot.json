@@ -1,0 +1,101 @@
+{
+  "schema": "public",
+  "table": "dorchester_person_shot",
+  "columns": {
+    "OBJECTID": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "Incident_Num": {
+      "data_type": "text",
+      "is_numeric": false
+    },
+    "Shooting_Date": {
+      "data_type": "text",
+      "is_numeric": false
+    },
+    "District": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "B2",
+        "B3",
+        "C11",
+        "C6"
+      ]
+    },
+    "Shooting_Type_V2": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "Fatal",
+        "Non-Fatal"
+      ]
+    },
+    "Victim_Gender": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "Unknown",
+        "Male",
+        "Female"
+      ]
+    },
+    "Victim_Race": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "Asian",
+        "White",
+        "Unknown",
+        "Black or African American"
+      ]
+    },
+    "Victim_Ethnicity_NIBRS": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "Unknown",
+        "Hispanic or Latinx",
+        "Not Hispanic or Latinx"
+      ]
+    },
+    "Multi_Victim": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "IsPrimaryIncident": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "HOUR_OF_DAY": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "DAY_OF_WEEK": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "YEAR": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "QUARTER": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "MONTH": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "NEIGHBORHOOD": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "Roslindale",
+        "Dorchester",
+        "Mattapan"
+      ]
+    }
+  }
+}
