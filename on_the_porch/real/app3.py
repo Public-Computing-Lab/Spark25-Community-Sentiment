@@ -250,9 +250,17 @@ def _build_question_metadata(question: str) -> str:
 def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: str = "") -> str:
     system_prompt = (
         "You are a helpful data analyst. Generate a single, syntactically correct PostgreSQL "
-        "SELECT statement based strictly on the provided schema. Do not include explanations. "
-        "Only output SQL. Use table and column names exactly as shown, and ALWAYS wrap all "
-        "identifiers (schema, table, and column names) in double quotes, e.g., \"public\".\"Table\".\"Column\"."
+        "SELECT statement based strictly on the provided schema snapshot and optional metadata JSON. "
+        "Do not include explanations. Only output SQL.\n\n"
+        "Rules:\n"
+        "- USE ONLY tables and columns present in the schema snapshot; DO NOT invent new names (e.g., never create \"street_violations\").\n"
+        "- If metadata indicates certain columns are UNIQUE/identifiers (e.g., primary keys or constrained categories), prefer those columns for exact filtering, grouping, or joining.\n"
+        "- Prefer columns indicated in metadata (JSON) when filtering (e.g., request_type, category, subject, description).\n"
+        "- When the question uses non-schema phrases (e.g., \"street violations\"), map them to appropriate text/category columns and use case-insensitive matches (ILIKE) rather than fabricating table names.\n"
+        "- For 311 tables (\"service_requests\" or \"dorchester_311\"): use \"type\" or \"reason\" for category/topic filtering; avoid using \"subject\" (department) for problem categories.\n"
+        "- For police offenses (\"offenses\"): map \"violation\" terms to the \"Crime\" field (e.g., 'LICENSE VIOLATION', 'VIOLATIONS') using ILIKE when appropriate.\n"
+        "- IMPORTANT: Do NOT search generically for the literal word 'violation' (e.g., avoid WHERE col ILIKE '%violation%'). Instead, select concrete categories/values from the appropriate columns (e.g., specific 311 'type'/'reason' values, or explicit 'Crime' values such as 'LICENSE VIOLATION').\n"
+        "- ALWAYS wrap schema, table, and column identifiers in double quotes."
     )
 
     if metadata:
@@ -299,10 +307,16 @@ def _llm_refine_sql(
     metadata: str = "",
 ) -> str:
     system_prompt = (
-        "You are a helpful data analyst. Given a PostgreSQL error and the database schema, "
-        "correct the SQL so it runs successfully. Output only a single PostgreSQL SELECT "
-        "statement with no explanations. Use table and column names exactly as shown, and "
-        "ALWAYS wrap all identifiers (schema, table, column) in double quotes."
+        "You are a helpful data analyst. Given a PostgreSQL error, the schema snapshot, and optional metadata JSON, "
+        "correct the SQL so it runs successfully. Output only a single PostgreSQL SELECT statement with no explanations.\n\n"
+        "Rules:\n"
+        "- USE ONLY tables/columns present in the schema snapshot; DO NOT invent names.\n"
+        "- If metadata marks certain columns as UNIQUE/identifiers, prefer those for exact filters/joins instead of free-text conditions.\n"
+        "- Prefer text/category columns identified in metadata for filtering ambiguous phrases (use ILIKE).\n"
+        "- For 311 tables (\"service_requests\" or \"dorchester_311\"): prefer filtering on \"type\" or \"reason\" for categories; avoid \"subject\" when searching for problem types.\n"
+        "- For police offenses (\"offenses\"): consider \"Crime\" values like 'LICENSE VIOLATION' or 'VIOLATIONS' when the user mentions violations.\n"
+        "- IMPORTANT: Do NOT use a generic ILIKE '%violation%' filter. Choose specific, valid category/value filters instead.\n"
+        "- ALWAYS wrap identifiers (schema, table, column) in double quotes."
     )
 
     if metadata:
@@ -373,7 +387,29 @@ def _execute_with_retries(
             else:
                 print(f"\n[SQL Retry {attempt_idx - 1}]\n" + sql + "\n")
             result = _execute_sql(sql)
-            return {"result": result, "sql": sql}
+            # If query succeeded but returned no rows, try to refine and broaden the query
+            try:
+                rows = result.get("rows", []) if isinstance(result, dict) else []
+            except Exception:
+                rows = []
+            if rows:
+                return {"result": result, "sql": sql}
+            # No rows; refine unless at last attempt
+            if attempt_idx == max_attempts:
+                return {"result": result, "sql": sql}
+            sql = _llm_refine_sql(
+                question=question,
+                schema=schema,
+                previous_sql=sql or "",
+                error_text=(
+                    "No rows returned. Broaden or correct filters based on metadata: "
+                    "For 311 tables use \"type\"/\"reason\" categories (avoid \"subject\"), "
+                    "and use ILIKE for ambiguous phrases. For \"offenses\", consider \"Crime\" values "
+                    "like 'LICENSE VIOLATION'/'VIOLATIONS'."
+                ),
+                default_model=OPENAI_MODEL,
+                metadata=metadata,
+            )
         except Exception as exc:  # noqa: BLE001
             last_err = exc
             if attempt_idx == max_attempts:
