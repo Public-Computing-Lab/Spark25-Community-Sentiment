@@ -12,7 +12,7 @@ env/
 pip-log.txt
 pip-delete-this-directory.txt
 conda
-
+on_the_porch/rag stuff/rags/*
 # 3️⃣ Environment Variables (SECURITY: Protect API Keys & Secrets)
 .env
 *.env
@@ -84,6 +84,7 @@ cookies.txt
 !experiment-PIT/public/data/process_311.ts
 !experiment-PIT/public/data/process_911.ts
 api/datastore/*
+on_the_porch/rag_stuff/data/*
 
 # exception to the rule
 **/cache/.gitkeep
