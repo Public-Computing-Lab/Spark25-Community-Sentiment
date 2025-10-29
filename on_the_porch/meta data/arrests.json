@@ -1,0 +1,239 @@
+{
+  "schema": "public",
+  "table": "arrests",
+  "columns": {
+    "OBJECTID": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "ARREST_NUM": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "INC_NUM": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "CHARGE_SEQ_NUM": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "CHARGE_CODE": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "CHARGE_DESC": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "LARCENY $50 TO $250",
+        "DRINKING ALCOHOLIC BEVERAGES IN PUBLIC",
+        "CRUELTY TO ANIMALS",
+        "UNLAWFUL POSSESSION OF AMMUNITION",
+        "OTHER",
+        "RECEIVING STOLEN MOTOR VEHICLE",
+        "OPERATING AFTER REVOCATION OR SUSPENSION",
+        "FAILURE TO STOP FOR A POLICE OFFICER",
+        "UNLAWFUL POSSESSION OF FIREARM",
+        "ASSAULT BY MEANS OF A DANGEROUS WEAPON (GUN)",
+        "DRIVING TO ENDANGER",
+        "TRAFFICKING; CLASS B, DRUGS 28-99 GRAMS",
+        "CONSPIRACY TO VIOLATE DRUG LAWS",
+        "LARCENY",
+        "SHOPLIFTING - $50 TO $200",
+        "BREAKING & ENTERING A MOTOR VEHICLE, DAY",
+        "DISTRIBUTION OF CLASS B, DRUGS",
+        "SHOPLIFTING - $200&OVER",
+        "ATTEMPTED B&E RESIDENCE, NIGHT",
+        "ASSAULT AND BATTERY (INJURIES)",
+        "LARCENY FROM THE PERSON (PICK POCKET)",
+        "DWELLING HOUSE; DAY BREAKING AND ENTERING",
+        "RESISTING ARREST",
+        "ASSAULT & BATTERY, DANGEROUS WEAPON (209A)",
+        "ARMED ROBBERY (VARIETY STORE)",
+        "ASSAULT AND BATTERY",
+        "ASSAULT AND BATTERY ON AN EMERGENCY MEDICAL TECHNICIAN",
+        "BUYING, RECEIVING OR CONCEALING STOLEN GOODS",
+        "ASSAULT AND BATTERY BY MEANS OF A DANGEROUS WEAPON (KNIFE)",
+        "ASSAULT AND BATTERY ON A POLICE OFFICER (INJURIES)",
+        "INDECENT A&B ON A PERSON WHO HAS ATTAINED 14",
+        "ASSAULT & BATTERY (209A) FELONY SECTION",
+        "ASSAULT AND BATTERY BY MEANS OF A DANGEROUS WEAPON",
+        "FIREARM DISCHARGED WITHIN 500 FT. OF DWELLING",
+        "ASSAULT BY MEANS OF A DANGEROUS WEAPON (KNIFE)",
+        "ASSAULT AND BATTERY, VICTIM OVER 65 YRS",
+        "CRIMINAL INQUIRY ONLY",
+        "POSSESSION OF CLASS A, DRUGS",
+        "POSSESSION OF CLASS B, DRUGS",
+        "DISTRIBUTION OF CLASS D, DRUGS",
+        "PROBATION / PAROLE VIOLATION",
+        "OPERATING UNINSURED MOTOR VEHICLE",
+        "DANGEROUS WEAPONS UNLAWFULLY CARRIED",
+        "OPERATING M/V WITHOUT A LICENSE",
+        "DISORDERLY CONDUCT, OTHER",
+        "TRESPASSING",
+        "LARCENY OVER $250",
+        "OPERATING UNDER THE INFLUENCE OF ALCOHOL",
+        "PERSON, DISORDERLY",
+        "VIOLATION OF AN EXISTING RESTRAINING ORDER",
+        "CARJACKING",
+        "UNARMED ROBBERY",
+        "ARMED ROBBERY",
+        "UNARMED ASSAULT",
+        "INTENT TO ROB WHILE ARMED",
+        "SHOPLIFTING UNDER $50",
+        "POSSESSION W/I TO DISTRIBUTE, CLASS A, DRUGS",
+        "POSSESSION W/I TO DISTRIBUTE, CLASS B, DRUGS",
+        "BREAKING AND ENTERING A BUILDING OR SHIP; INTENT TO COMMIT A FELONY",
+        "FIREARM WITH ALTERED SERIAL NUMBERS; POSSESSION",
+        "LEAVING THE SCENE PROPERTY DAMAGE",
+        "LARCENY OF A MOTOR VEHICLE",
+        "TRAFFICKING; CLASS A, DRUGS 28-99 GRAMS",
+        "BREAKING & ENTERING A MOTOR VEHICLE, NIGHT",
+        "POSSESSION W/I TO DISTRIBUTE, CLASS D, DRUGS",
+        "ASSAULT AND BATTERY BY MEANS OF A DANGEROUS WEAPON (GUN)",
+        "ASSAULT & BATTERY (209A)",
+        "ASSAULT BY MEANS OF A DANGEROUS WEAPON",
+        "ASSAULT (209A)",
+        "DESTRUCTION OR INJURY OF PERSONAL PROPERTY",
+        "OPERATING UNREGISTERED MOTOR VEHICLE",
+        "ASSAULT AND BATTERY ON A POLICE OFFICER (NO INJURIES)"
+      ]
+    },
+    "NIBRS_CODE": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "220",
+        "90D",
+        "23H",
+        "280",
+        "23A",
+        "90J",
+        "26A",
+        "290",
+        "23C",
+        "23G",
+        "90C",
+        "120",
+        "35A",
+        "13A",
+        "520",
+        "23D",
+        "90Z",
+        "NR",
+        "13B"
+      ]
+    },
+    "NIBRS_DESC": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "STOLEN PROPERTY OFFENSES",
+        "POCKET PICKING",
+        "OTHER",
+        "DESTRUCTION/DAMAGE/VANDALISM OF PROPERTY",
+        "AGGRAVATED ASSAULT",
+        "BURGLARY/B&E",
+        "OTHER PART II",
+        "THEFT OF MOTOR VEHICLE PARTS OR ACCESSORIES",
+        "DISORDERLY CONDUCT",
+        "ALL OTHER LARCENY",
+        "DRIVING UNDER THE INFLUENCE",
+        "DRUG/NARCOTIC VIOLATIONS",
+        "WEAPON LAW VIOLATIONS",
+        "MOTOR VEHICLE VIOLATIONS",
+        "ROBBERY",
+        "FALSE PRETENSE/SWINDLE/CONFIDENCE GAMES",
+        "THEFT FROM BUILDING",
+        "SHOPLIFITING",
+        "TRESSPASSING",
+        "ALL OTHER OFFENSES",
+        "SIMPLE ASSAULT"
+      ]
+    },
+    "ARR_DATE": {
+      "data_type": "timestamp with time zone",
+      "is_numeric": false
+    },
+    "GENDER_DESC": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "MALE",
+        "FEMALE"
+      ]
+    },
+    "RACE_DESC": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "BLACK OR AFRICAN AMERICAN",
+        "ASIAN",
+        "UNKNOWN",
+        "WHITE"
+      ]
+    },
+    "ETHNICITY_DESC": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "HISPANIC OR LATINX",
+        "UNKOWN",
+        "NOT HISPANIC OR LATINX"
+      ]
+    },
+    "AGE": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "JUVENILE": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "YES",
+        "NO"
+      ]
+    },
+    "HOUR_OF_DAY": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "DAY_OF_WEEK": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "YEAR": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "QUARTER": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "MONTH": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "NEIGHBORHOOD": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "Roxbury",
+        "Roslindale",
+        "Dorchester",
+        "Mattapan"
+      ]
+    },
+    "DISTRICT": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "B2",
+        "C11",
+        "B3",
+        "C6"
+      ]
+    }
+  }
+}

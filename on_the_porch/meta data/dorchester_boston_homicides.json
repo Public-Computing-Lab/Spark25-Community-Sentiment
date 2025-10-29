@@ -1,0 +1,101 @@
+{
+  "schema": "public",
+  "table": "dorchester_boston_homicides",
+  "columns": {
+    "OBJECTID": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "reporting_event_number": {
+      "data_type": "text",
+      "is_numeric": false
+    },
+    "RuledDate": {
+      "data_type": "text",
+      "is_numeric": false
+    },
+    "HomicideDate": {
+      "data_type": "text",
+      "is_numeric": false
+    },
+    "District": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "B2",
+        "B3",
+        "C11",
+        "C6"
+      ]
+    },
+    "VictimAge": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "Race": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "Asian",
+        "White",
+        "Unknown",
+        "Black or African American"
+      ]
+    },
+    "Gender": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "Female",
+        "Male"
+      ]
+    },
+    "Weapon": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "Other",
+        "Trauma",
+        "STAB",
+        "GSW"
+      ]
+    },
+    "HOUR_OF_DAY": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "DAY_OF_WEEK": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "YEAR": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "QUARTER": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "MONTH": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "NEIGHBORHOOD": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "Mattapan",
+        "Dorchester"
+      ]
+    },
+    "Ethnicity_NIBRS": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "Unknown",
+        "Hispanic or Latinx",
+        "Not Hispanic or Latinx"
+      ]
+    }
+  }
+}

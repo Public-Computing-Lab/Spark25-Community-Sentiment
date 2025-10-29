@@ -1,0 +1,4 @@
+openai
+pocketflow
+psycopg2-binary
+langsmith
