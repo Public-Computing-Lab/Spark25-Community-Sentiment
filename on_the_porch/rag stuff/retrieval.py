@@ -2,7 +2,7 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from pathlib import Path
 
-VECTORDB_DIR = Path("Data/vectordb_new")
+VECTORDB_DIR = Path("../vectordb_new")
 
 
 def load_vectordb():
