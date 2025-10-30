@@ -39,7 +39,7 @@ _load_local_env()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_SUMMARY_MODEL = os.getenv("OPENAI_SUMMARY_MODEL", OPENAI_MODEL)
-SQL_MAX_RETRIES = int(os.getenv("SQL_MAX_RETRIES", "3"))
+SQL_MAX_RETRIES = int(os.getenv("SQL_MAX_RETRIES", "2"))  # Reduced default to 2 for faster execution
 
 # Optional LangSmith tracing
 try:
@@ -115,8 +115,9 @@ def _get_unique_values(table_name: str, column_name: str, schema: str = "public"
     """Get unique values from a column to help users see available options."""
     conn = _get_db_connection()
     try:
+        # Set a statement timeout to prevent hanging (5 seconds)
         with conn.cursor() as cur:
-            # Extract table name from schema if needed
+            cur.execute("SET statement_timeout = '5s'")
             cur.execute(
                 f'''
                 SELECT DISTINCT "{column_name}"
@@ -129,7 +130,9 @@ def _get_unique_values(table_name: str, column_name: str, schema: str = "public"
             )
             rows = cur.fetchall()
             return [row[0] for row in rows]
-    except Exception:
+    except Exception as exc:
+        # If query times out or fails, return empty list
+        print(f"[Warning] Could not fetch unique values for {table_name}.{column_name}: {exc}", file=sys.stderr)
         return []
     finally:
         conn.close()
@@ -363,11 +366,26 @@ def _llm_refine_sql(
     default_model: str,
     metadata: str = "",
 ) -> str:
+    # Always rebuild metadata if not provided to ensure we have table information
+    if not metadata:
+        metadata = _build_question_metadata(question)
+    
+    # Parse error to extract key information
+    error_lower = error_text.lower()
+    missing_column = None
+    if "does not exist" in error_lower:
+        # Try to extract column name from error
+        col_match = re.search(r'column\s+"([^"]+)"\s+does not exist|column\s+(\w+)\s+does not exist', error_lower, re.IGNORECASE)
+        if col_match:
+            missing_column = col_match.group(1) or col_match.group(2)
+    
     system_prompt = (
-        "You are a helpful data analyst. Given a PostgreSQL error, the schema snapshot, and optional metadata JSON, "
+        "You are a helpful data analyst. Given a PostgreSQL error, the schema snapshot, and metadata JSON, "
         "correct the SQL so it runs successfully. Output only a single PostgreSQL SELECT statement with no explanations.\n\n"
-        "Rules:\n"
+        "CRITICAL RULES:\n"
         "- USE ONLY tables/columns present in the schema snapshot; DO NOT invent names.\n"
+        "- If the error mentions a column that 'does not exist', REMOVE that column from the SELECT statement immediately.\n"
+        "- ALWAYS check the schema snapshot to verify which columns actually exist before using them.\n"
         "- If metadata marks certain columns as UNIQUE/identifiers, prefer those for exact filters/joins instead of free-text conditions.\n"
         "- Prefer text/category columns identified in metadata for filtering ambiguous phrases (use ILIKE).\n"
         "- For 311 tables (\"service_requests\" or \"dorchester_311\"): prefer filtering on \"type\" or \"reason\" for categories; avoid \"subject\" when searching for problem types.\n"
@@ -377,26 +395,21 @@ def _llm_refine_sql(
         "- IMPORTANT: Do NOT use a generic ILIKE '%violation%' filter. Choose specific, valid category/value filters instead.\n"
         "- ALWAYS wrap identifiers (schema, table, column) in double quotes."
     )
-
-    if metadata:
-        user_prompt = (
-            "Schema:\n" + schema + "\n\n"
-            "Additional metadata (JSON):\n" + metadata + "\n\n"
-            "Question:\n" + question + "\n\n"
-            "Previous SQL (may have errors):\n```sql\n" + previous_sql + "\n```\n\n"
-            "Observed error message:\n" + error_text + "\n\n"
-            "Instruction: Provide a corrected single PostgreSQL SELECT statement that resolves the error. "
-            "Always double-quote all identifiers (schema, table, column)."
-        )
-    else:
-        user_prompt = (
-            "Schema:\n" + schema + "\n\n"
-            "Question:\n" + question + "\n\n"
-            "Previous SQL (may have errors):\n```sql\n" + previous_sql + "\n```\n\n"
-            "Observed error message:\n" + error_text + "\n\n"
-            "Instruction: Provide a corrected single PostgreSQL SELECT statement that resolves the error. "
-            "Always double-quote all identifiers (schema, table, column)."
-        )
+    
+    # Build enhanced error analysis
+    error_analysis = f"Error: {error_text}"
+    if missing_column:
+        error_analysis += f"\n\nANALYSIS: The column '{missing_column}' does not exist in the table. Remove it from the SELECT statement and use only columns listed in the schema snapshot above."
+    
+    user_prompt = (
+        "Schema (shows all available tables and columns):\n" + schema + "\n\n"
+        "Metadata (JSON) for tables:\n" + (metadata if metadata else "{}") + "\n\n"
+        "Question:\n" + question + "\n\n"
+        "Previous SQL (has errors):\n```sql\n" + previous_sql + "\n```\n\n"
+        "PostgreSQL Error:\n" + error_analysis + "\n\n"
+        "Instruction: Provide a corrected single PostgreSQL SELECT statement that resolves the error. "
+        "Only use columns that exist in the schema snapshot. Always double-quote all identifiers (schema, table, column)."
+    )
 
     client = _get_openai_client()
     resp = client.chat.completions.create(
@@ -416,6 +429,8 @@ def _execute_sql(sql: str) -> Dict[str, Any]:
     conn = _get_db_connection()
     try:
         with conn.cursor() as cur:
+            # Set statement timeout to prevent hanging (30 seconds)
+            cur.execute("SET statement_timeout = '30s'")
             cur.execute(sql)
             rows = cur.fetchall()
             cols = [d[0] for d in cur.description] if cur.description else []
@@ -437,14 +452,30 @@ def _execute_with_retries(
     metadata: str,
     max_attempts: int = SQL_MAX_RETRIES,
 ) -> Dict[str, Any]:
+    # Clamp max attempts to prevent infinite loops
+    max_attempts = max(1, min(int(max_attempts or 1), 5))
     sql = initial_sql
     last_err: Exception | None = None
+    previous_sqls = []  # Track previous SQL attempts to avoid infinite loops
+    error_count = {}  # Track how many times we've seen the same error
+    
     for attempt_idx in range(1, max_attempts + 1):
         try:
             if attempt_idx == 1:
                 print("\n[SQL]\n" + sql + "\n")
             else:
                 print(f"\n[SQL Retry {attempt_idx - 1}]\n" + sql + "\n")
+            
+            # Normalize SQL for comparison (remove extra whitespace)
+            sql_normalized = " ".join(sql.split())
+            if sql_normalized in previous_sqls:
+                # Same SQL as before - avoid infinite loop, return early
+                print(f"\n[Warning] SQL same as previous attempt, stopping to avoid infinite loop\n")
+                result = {"columns": [], "rows": []}
+                return {"result": result, "sql": sql}
+            
+            previous_sqls.append(sql_normalized)
+            
             result = _execute_sql(sql)
             # If query succeeded but returned no rows, try to refine and broaden the query
             try:
@@ -455,60 +486,62 @@ def _execute_with_retries(
                 return {"result": result, "sql": sql}
             
             # No rows returned - gather unique values from key columns to help user
+            # Skip this if we're on attempt 2+ to speed things up
             unique_values_info = {}
-            try:
-                # Extract table and key columns from SQL and schema
-                import re
-                table_name = None
-                schema_name = os.environ.get("PGSCHEMA", "public")
-                
-                # Find table name from FROM clause - handle schema.table format
-                from_match = re.search(r'FROM\s+"([^"]+)"\s*\.\s*"([^"]+)"|FROM\s+"([^"]+)"', sql, re.IGNORECASE)
-                if from_match:
-                    if from_match.group(2):  # schema.table format
-                        schema_name = from_match.group(1).strip('"').strip()
-                        table_name = from_match.group(2).strip('"').strip()
-                    else:  # Just table name
-                        table_name = from_match.group(3).strip('"').strip() if from_match.group(3) else from_match.group(1).strip('"').strip()
-                else:
-                    # Try without quotes
-                    from_match2 = re.search(r'FROM\s+(\w+)\.(\w+)|FROM\s+(\w+)', sql, re.IGNORECASE)
-                    if from_match2:
-                        if from_match2.group(2):  # schema.table format
-                            schema_name = from_match2.group(1)
-                            table_name = from_match2.group(2)
-                        else:  # Just table name
-                            table_name = from_match2.group(3) or from_match2.group(1)
-                
-                if table_name:
-                    # Try to find key category/type columns from schema
-                    schema_lines = schema.split('\n')
-                    key_columns = []
-                    for line in schema_lines:
-                        if table_name.lower() in line.lower():
-                            # Extract column names from this table's line
-                            cols_match = re.search(r'\(([^)]+)\)', line)
-                            if cols_match:
-                                cols = [c.strip().strip('"') for c in cols_match.group(1).split(',')]
-                                # Prioritize common category/type columns
-                                for col in cols:
-                                    col_lower = col.lower()
-                                    if any(kw in col_lower for kw in ['type', 'reason', 'category', 'subject', 'crime', 'status', 'state']):
-                                        key_columns.append(col)
-                                # If no specific columns found, take first few columns
-                                if not key_columns and cols:
-                                    key_columns = cols[:3]
+            if attempt_idx == 1:  # Only fetch unique values on first attempt
+                try:
+                    # Extract table and key columns from SQL and schema
+                    import re
+                    table_name = None
+                    schema_name = os.environ.get("PGSCHEMA", "public")
                     
-                    # Get unique values from these columns
-                    for col in key_columns[:3]:  # Limit to 3 columns
-                        try:
-                            unique_vals = _get_unique_values(table_name, col, schema_name, limit=20)
-                            if unique_vals:
-                                unique_values_info[col] = unique_vals
-                        except Exception:
-                            pass
-            except Exception:
-                pass
+                    # Find table name from FROM clause - handle schema.table format
+                    from_match = re.search(r'FROM\s+"([^"]+)"\s*\.\s*"([^"]+)"|FROM\s+"([^"]+)"', sql, re.IGNORECASE)
+                    if from_match:
+                        if from_match.group(2):  # schema.table format
+                            schema_name = from_match.group(1).strip('"').strip()
+                            table_name = from_match.group(2).strip('"').strip()
+                        else:  # Just table name
+                            table_name = from_match.group(3).strip('"').strip() if from_match.group(3) else from_match.group(1).strip('"').strip()
+                    else:
+                        # Try without quotes
+                        from_match2 = re.search(r'FROM\s+(\w+)\.(\w+)|FROM\s+(\w+)', sql, re.IGNORECASE)
+                        if from_match2:
+                            if from_match2.group(2):  # schema.table format
+                                schema_name = from_match2.group(1)
+                                table_name = from_match2.group(2)
+                            else:  # Just table name
+                                table_name = from_match2.group(3) or from_match2.group(1)
+                    
+                    if table_name:
+                        # Try to find key category/type columns from schema
+                        schema_lines = schema.split('\n')
+                        key_columns = []
+                        for line in schema_lines:
+                            if table_name.lower() in line.lower():
+                                # Extract column names from this table's line
+                                cols_match = re.search(r'\(([^)]+)\)', line)
+                                if cols_match:
+                                    cols = [c.strip().strip('"') for c in cols_match.group(1).split(',')]
+                                    # Prioritize common category/type columns
+                                    for col in cols:
+                                        col_lower = col.lower()
+                                        if any(kw in col_lower for kw in ['type', 'reason', 'category', 'subject', 'crime', 'status', 'state']):
+                                            key_columns.append(col)
+                                    # If no specific columns found, take first few columns
+                                    if not key_columns and cols:
+                                        key_columns = cols[:3]
+                        
+                        # Get unique values from these columns (limit to 2 columns and 10 values each to speed up)
+                        for col in key_columns[:2]:  # Limit to 2 columns
+                            try:
+                                unique_vals = _get_unique_values(table_name, col, schema_name, limit=10)
+                                if unique_vals:
+                                    unique_values_info[col] = unique_vals
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
             
             # Add unique values to result for display
             if unique_values_info:
@@ -519,7 +552,12 @@ def _execute_with_retries(
             if attempt_idx == max_attempts:
                 return {"result": result, "sql": sql}
             
-            # Build error text with unique values info
+            # On second attempt with no rows, return early to avoid expensive retries
+            if attempt_idx >= 2:
+                print(f"\n[Info] After {attempt_idx} attempts with no rows, stopping to avoid delays\n")
+                return {"result": result, "sql": sql}
+            
+            # Build error text with unique values info (only on first retry)
             error_parts = [
                 "No rows returned. Broaden or correct filters based on metadata: "
                 "For 311 tables use \"type\"/\"reason\" categories (avoid \"subject\"), "
@@ -532,37 +570,59 @@ def _execute_with_retries(
                     error_parts.append(f"  - {col}: {', '.join(str(v)[:50] for v in vals[:10])}{'...' if len(vals) > 10 else ''}")
                 error_parts.append("\nConsider using these actual values from the database in your filters.")
             
+            # Always ensure metadata is available
+            current_metadata = metadata if metadata else _build_question_metadata(question)
+            
             sql = _llm_refine_sql(
                 question=question,
                 schema=schema,
                 previous_sql=sql or "",
                 error_text="\n".join(error_parts),
                 default_model=OPENAI_MODEL,
-                metadata=metadata,
+                metadata=current_metadata,
             )
         except Exception as exc:  # noqa: BLE001
             last_err = exc
             if attempt_idx == max_attempts:
                 raise
+            
+            err_text = str(exc)
+            
+            # Track error patterns to detect loops
+            error_key = err_text[:200]  # Use first 200 chars as key
+            error_count[error_key] = error_count.get(error_key, 0) + 1
+            
+            # If we've seen this exact error 2+ times, stop to avoid infinite loop
+            if error_count[error_key] >= 2:
+                print(f"\n[Warning] Same error repeated {error_count[error_key]} times, stopping to avoid infinite loop\n")
+                result = {"columns": [], "rows": []}
+                return {"result": result, "sql": sql}
+            
             try:
                 # Augment certain common type errors with guidance
-                err_text = str(exc)
                 if "operator does not exist: text" in err_text and "timestamp" in err_text:
                     err_text += (
                         "\nHint: CAST text date columns to timestamp (e.g., \"open_dt\"::timestamp) "
                         "before comparing to NOW() or using intervals."
                     )
+                
+                # Always rebuild metadata to ensure we have latest table info
+                current_metadata = metadata if metadata else _build_question_metadata(question)
+                
                 sql = _llm_refine_sql(
                     question=question,
                     schema=schema,
                     previous_sql=sql or "",
                     error_text=err_text,
                     default_model=OPENAI_MODEL,
-                    metadata=metadata,
+                    metadata=current_metadata,
                 )
             except Exception as refine_exc:  # noqa: BLE001
                 last_err = refine_exc
-                raise
+                # If refinement itself fails, stop after 2 attempts
+                if attempt_idx >= 2:
+                    raise
+                continue
     # Should not reach here; re-raise last error if loop exits unexpectedly
     if last_err:
         raise last_err
