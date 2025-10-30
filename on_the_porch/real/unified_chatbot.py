@@ -245,7 +245,25 @@ def _run_sql(question: str) -> Dict[str, Any]:
 
     database = os.environ.get("PGSCHEMA", "public")
     schema = app3._fetch_schema_snapshot(database)
+    # Base metadata from catalog selection
     metadata = app3._build_question_metadata(question)
+    # If the prompt suggests mapping/locations, hint the generator to include coordinates
+    want_map = any(w in (question or "").lower() for w in ["map", "maps", "where", "location", "hotspot", "cluster", "show on a map", "geo", "geography"])
+    if want_map and metadata:
+        try:
+            meta_obj = json.loads(metadata)
+        except Exception:
+            meta_obj = {}
+        hints = (meta_obj.get("hints") if isinstance(meta_obj, dict) else None) or {}
+        hints.update({"need_location": True, "max_points": 500})
+        if isinstance(meta_obj, dict):
+            meta_obj["hints"] = hints
+        else:
+            meta_obj = {"hints": hints}
+        try:
+            metadata = json.dumps(meta_obj, ensure_ascii=False)
+        except Exception:
+            pass
     sql = app3._llm_generate_sql(question, schema, os.getenv("OPENAI_MODEL", getattr(app3, "OPENAI_MODEL", OPENAI_MODEL)), metadata)
     exec_out = app3._execute_with_retries(
         initial_sql=sql,

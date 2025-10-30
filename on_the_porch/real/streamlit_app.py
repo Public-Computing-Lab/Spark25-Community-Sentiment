@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import streamlit as st
+import folium
+from streamlit.components.v1 import html as st_html
 
 
 # Ensure repository-relative imports work
@@ -54,15 +56,49 @@ def _build_manual_plan(mode: str, k: int, tags_raw: str, sources_raw: str) -> Di
 def _display_sql_result(sql_result: Dict[str, Any]) -> None:
     rows = sql_result.get("rows", []) if isinstance(sql_result, dict) else []
     if rows:
-        st.dataframe(rows, use_container_width=True)
+        # Use width='stretch' to avoid deprecation warnings and layout flicker
+        st.dataframe(rows, width='stretch')
     else:
         st.write("No rows returned.")
+
+
+def _render_map_from_result(result: Dict[str, Any], key_suffix: str = "") -> None:
+    cols = result.get("columns", []) if isinstance(result, dict) else []
+    rows = result.get("rows", []) if isinstance(result, dict) else []
+    col_map = {c.lower(): c for c in cols}
+    lat_col = col_map.get("latitude") or col_map.get("lat")
+    lon_col = col_map.get("longitude") or col_map.get("lon")
+    if not (lat_col and lon_col and rows):
+        return
+    st.subheader("Map (sample of points)")
+    max_points = 500
+    pts = []
+    for r in rows[:max_points]:
+        lat_raw = r.get(lat_col)
+        lon_raw = r.get(lon_col)
+        try:
+            lat = float(lat_raw)
+            lon = float(lon_raw)
+        except Exception:
+            continue
+        if lat and lon:
+            pts.append((lat, lon))
+    if not pts:
+        st.info("No valid latitude/longitude values in result to plot.")
+        return
+    avg_lat = sum(p[0] for p in pts) / len(pts)
+    avg_lon = sum(p[1] for p in pts) / len(pts)
+    fmap = folium.Map(location=[avg_lat, avg_lon], zoom_start=12)
+    for lat, lon in pts:
+        folium.CircleMarker(location=[lat, lon], radius=3, color="#2a7", fill=True, fill_opacity=0.7).add_to(fmap)
+    # Render as static HTML to avoid component flicker on reruns
+    st_html(fmap._repr_html_(), height=500)
 
 
 def main() -> None:
     st.set_page_config(page_title="Unified SQL + RAG Chatbot", layout="wide")
     _init_runtime()
-
+    
     st.title("Unified SQL + RAG Chatbot")
     _ensure_env()
 
@@ -82,6 +118,7 @@ def main() -> None:
             height=80,
         )
         show_sql = st.checkbox("Show SQL and rows (when available)", value=False)
+        show_map = st.checkbox("Show map if latitude/longitude present", value=True)
 
     question = st.text_area("Your question", height=100)
     ask = st.button("Ask", type="primary")
@@ -112,6 +149,8 @@ def main() -> None:
                     st.code(out.get("sql", ""), language="sql")
                     st.subheader("Rows")
                     _display_sql_result(out.get("result", {}))
+                if show_map:
+                    _render_map_from_result(out.get("result", {}), key_suffix="sql")
 
             elif mode == "hybrid":
                 if not os.getenv("DATABASE_URL"):
@@ -134,6 +173,10 @@ def main() -> None:
                         st.code(sqlp.get("sql", ""), language="sql")
                         st.subheader("Rows")
                         _display_sql_result(sqlp.get("result", {}))
+                    if show_map:
+                        sqlp = out.get("sql", {})
+                        result = sqlp.get("result", {}) if isinstance(sqlp, dict) else {}
+                        _render_map_from_result(result, key_suffix="hybrid")
                     ragp = out.get("rag", {})
                     metas: List[Dict[str, Any]] = ragp.get("metadata", [])
                     if metas:
