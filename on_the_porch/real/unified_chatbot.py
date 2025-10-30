@@ -74,11 +74,13 @@ def _route_question(question: str) -> Dict[str, Any]:
     Decide whether to answer via SQL, RAG, or HYBRID.
     Returns a dict like: {"mode": "sql|rag|hybrid", "transcript_tags": [..]|null, "policy_sources": [..]|null, "k": int}
     """
-    # Lightweight heuristic: direct SQL for clearly quantitative queries
+    # Lightweight heuristic: prefer SQL for most data questions
     quantitative_phrases = [
-        "how many", "count", "counts", "number of", "avg", "average", "sum", "total",
-        "trend", "per year", "by year", "by month", "top", "rank", "distribution",
-        "percent", "percentage", "ratio", "rate", "compare", "comparison",
+        "how many", "how much", "count", "counts", "number of", "avg", "average", "sum", "total",
+        "trend", "per year", "by year", "by month", "year", "month", "week", "day",
+        "top", "rank", "distribution", "breakdown", "group by", "by ", "compare", "comparison",
+        "percent", "percentage", "ratio", "rate", "list", "show",
+        "map", "where", "location", "locations", "near", "recent", "latest",
     ]
     q_lower = (question or "").lower()
     if any(p in q_lower for p in quantitative_phrases):
@@ -88,7 +90,7 @@ def _route_question(question: str) -> Dict[str, Any]:
 
     system_prompt = (
         "You are a routing classifier for a chatbot that combines SQL (structured data) and RAG (text documents).\n"
-        "Classify the user's question into one of three modes: 'sql', 'rag', or 'hybrid'. If uncertain, choose 'rag'.\n\n"
+        "Classify the user's question into one of three modes: 'sql', 'rag', or 'hybrid'. If uncertain, choose 'sql'.\n\n"
         "Use the following logic with examples grounded in our data:\n"
         "- 'sql': for statistics, counts, trends, comparisons, numeric breakdowns from Postgres tables like\n"
         "  'service_requests' (311), 'arrests', 'offenses', 'homicides', 'shots_fired', or Dorchester-focused tables.\n"
@@ -116,7 +118,7 @@ def _route_question(question: str) -> Dict[str, Any]:
     )
 
     default_plan = {
-        "mode": "rag",
+        "mode": "sql",
         "transcript_tags": None,
         "policy_sources": None,
         "k": 5,
@@ -145,12 +147,18 @@ def _route_question(question: str) -> Dict[str, Any]:
         plan = default_plan
 
     # Normalize values
-    mode = str(plan.get("mode", "rag")).lower()
+    mode = str(plan.get("mode", "sql")).lower()
     if mode not in {"sql", "rag", "hybrid"}:
-        mode = "rag"
+        mode = "sql"
     tags = plan.get("transcript_tags")
     sources = plan.get("policy_sources")
     k = plan.get("k", 5)
+    # Safety override: if classification returned 'rag' but the question clearly asks for data/locations, use SQL
+    if mode == "rag" and any(p in q_lower for p in quantitative_phrases):
+        mode = "sql"
+    if mode == "rag" and any(p in q_lower for p in ["map", "where", "location", "locations", "near", "show", "list"]):
+        mode = "sql"
+
     return {
         "mode": mode,
         "transcript_tags": tags if isinstance(tags, list) or tags is None else None,

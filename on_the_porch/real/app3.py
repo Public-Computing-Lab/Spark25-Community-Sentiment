@@ -260,6 +260,7 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
         "- For 311 tables (\"service_requests\" or \"dorchester_311\"): use \"type\" or \"reason\" for category/topic filtering; avoid using \"subject\" (department) for problem categories.\n"
         "- For police offenses (\"offenses\"): map \"violation\" terms to the \"Crime\" field (e.g., 'LICENSE VIOLATION', 'VIOLATIONS') using ILIKE when appropriate.\n"
         "- IMPORTANT: Do NOT search generically for the literal word 'violation' (e.g., avoid WHERE col ILIKE '%violation%'). Instead, select concrete categories/values from the appropriate columns (e.g., specific 311 'type'/'reason' values, or explicit 'Crime' values such as 'LICENSE VIOLATION').\n"
+        "- Type correctness: NEVER compare text to timestamps. If a date/time column is text per metadata (e.g., 'open_dt' in 'dorchester_311'), CAST it to timestamp (e.g., \"open_dt\"::timestamp) before comparing to NOW() or intervals.\n"
         "- If metadata.hints.need_location is true and the selected table includes latitude/longitude columns (e.g., 'latitude', 'longitude'), INCLUDE them in the SELECT. If returning many rows, LIMIT to a reasonable sample (e.g., 500).\n"
         "- ALWAYS wrap schema, table, and column identifiers in double quotes."
     )
@@ -316,6 +317,7 @@ def _llm_refine_sql(
         "- Prefer text/category columns identified in metadata for filtering ambiguous phrases (use ILIKE).\n"
         "- For 311 tables (\"service_requests\" or \"dorchester_311\"): prefer filtering on \"type\" or \"reason\" for categories; avoid \"subject\" when searching for problem types.\n"
         "- For police offenses (\"offenses\"): consider \"Crime\" values like 'LICENSE VIOLATION' or 'VIOLATIONS' when the user mentions violations.\n"
+        "- Type correctness: If the error indicates comparing text to timestamp (e.g., 'operator does not exist: text >= timestamp with time zone'), CAST text date columns to timestamp (\"col\"::timestamp) before date math.\n"
         "- If metadata.hints.need_location is true and coordinates exist, INCLUDE latitude/longitude in the SELECT and consider applying a LIMIT (e.g., 500).\n"
         "- IMPORTANT: Do NOT use a generic ILIKE '%violation%' filter. Choose specific, valid category/value filters instead.\n"
         "- ALWAYS wrap identifiers (schema, table, column) in double quotes."
@@ -417,11 +419,18 @@ def _execute_with_retries(
             if attempt_idx == max_attempts:
                 raise
             try:
+                # Augment certain common type errors with guidance
+                err_text = str(exc)
+                if "operator does not exist: text" in err_text and "timestamp" in err_text:
+                    err_text += (
+                        "\nHint: CAST text date columns to timestamp (e.g., \"open_dt\"::timestamp) "
+                        "before comparing to NOW() or using intervals."
+                    )
                 sql = _llm_refine_sql(
                     question=question,
                     schema=schema,
                     previous_sql=sql or "",
-                    error_text=str(exc),
+                    error_text=err_text,
                     default_model=OPENAI_MODEL,
                     metadata=metadata,
                 )
