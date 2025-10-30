@@ -90,22 +90,25 @@ def _route_question(question: str) -> Dict[str, Any]:
 
     system_prompt = (
         "You are a routing classifier for a chatbot that combines SQL (structured data) and RAG (text documents).\n"
-        "Classify the user's question into one of three modes: 'sql', 'rag', or 'hybrid'. If uncertain, choose 'sql'.\n\n"
+        "Classify the user's question into one of three modes: 'sql', 'rag', or 'hybrid'. If uncertain, prefer 'hybrid'.\n\n"
         "Use the following logic with examples grounded in our data:\n"
-        "- 'sql': for statistics, counts, trends, comparisons, numeric breakdowns from Postgres tables like\n"
+        "- 'sql': for pure statistics, counts, trends, comparisons, numeric breakdowns from Postgres tables like\n"
         "  'service_requests' (311), 'arrests', 'offenses', 'homicides', 'shots_fired', or Dorchester-focused tables.\n"
         "  Examples: 'How many 311 service requests were filed in Dorchester last month?',\n"
         "  'What is the trend in shots fired by year in Boston?',\n"
         "  'Which neighborhoods have the highest arrests in 2023?'\n"
-        "- 'rag': for qualitative, descriptive, or policy questions answered by documents/transcripts, such as\n"
+        "- 'rag': ONLY for purely qualitative, descriptive, or policy questions answered by documents/transcripts, such as\n"
         "  'Boston Anti-Displacement Plan Analysis.txt', 'Boston Slow Streets Plan Analysis.txt', 'Imagine Boston 2030 Analysis.txt',\n"
         "  or interview transcripts tagged with 'safety', 'violence', 'youth', 'media', 'community', 'displacement', 'government', 'structural racism'.\n"
         "  Examples: 'What does the Slow Streets program aim to achieve?',\n"
         "  'How do community members describe media representation of Dorchester?',\n"
         "  'What strategies does the Anti-Displacement Plan propose?'\n"
-        "- 'hybrid': when both numbers and context are needed.\n"
+        "- 'hybrid': PREFERRED when both numbers and context are needed, OR when questions involve location/data visualization.\n"
         "  Examples: 'How many homicides were recorded in Dorchester last year, and what concerns about safety come up in interviews?',\n"
-        "  'What are the monthly trends in 311 requests about street safety and how does Slow Streets address these?'\n\n"
+        "  'What are the monthly trends in 311 requests about street safety and how does Slow Streets address these?',\n"
+        "  'Show me where crime incidents occurred in Dorchester',\n"
+        "  'What locations have the most service requests?'\n\n"
+        "IMPORTANT: When questions involve 'where', 'location', 'map', 'show', 'visualize', 'geography', or spatial data, prefer 'hybrid' mode to combine data with context.\n"
         "If you choose 'rag' or 'hybrid', you may suggest up to 2 transcript_tags and policy_sources when clearly relevant.\n"
         "Respond ONLY as compact JSON with keys: mode, transcript_tags, policy_sources, k."
     )
@@ -118,7 +121,7 @@ def _route_question(question: str) -> Dict[str, Any]:
     )
 
     default_plan = {
-        "mode": "sql",
+        "mode": "hybrid",
         "transcript_tags": None,
         "policy_sources": None,
         "k": 5,
@@ -167,7 +170,7 @@ def _route_question(question: str) -> Dict[str, Any]:
     }
 
 
-def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[str, Any]]) -> str:
+def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[str, Any]], conversation_history: Optional[List[Dict[str, str]]] = None) -> str:
     if not chunks:
         return "No relevant information found."
 
@@ -191,6 +194,7 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
         "Prefer quoting short phrases from the sources rather than paraphrasing too freely.\n"
         "If the question involves quantitative topics, note that RAG sources may be incomplete and avoid fabricating figures.\n"
         "Write in 2 short paragraphs. Cite sources as [Source X]."
+        + ("\n\nYou are in a conversation. Use previous messages for context when the current question references earlier topics or asks for follow-ups." if conversation_history else "")
     )
     user_prompt = (
         "SOURCES:\n" + context + "\n\n" +
@@ -198,14 +202,17 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
         "ANSWER (2 short paragraphs):"
     )
 
+    messages = [{"role": "system", "content": system_prompt}]
+    if conversation_history:
+        # Add conversation history (last 10 exchanges to avoid token limits)
+        messages.extend(conversation_history[-10:])
+    messages.append({"role": "user", "content": user_prompt})
+
     client = _get_llm_client()
     try:
         resp = client.chat.completions.create(
             model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=messages,
             temperature=0.3,
         )
         return (resp.choices[0].message.content or "").strip()
@@ -213,7 +220,7 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
         return "\n\n".join(context_parts[:10])  # fallback: show a sample of context
 
 
-def _run_rag(question: str, plan: Dict[str, Any]) -> Dict[str, Any]:
+def _run_rag(question: str, plan: Dict[str, Any], conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     k = int(plan.get("k", 5))
     tags = plan.get("transcript_tags")
     sources = plan.get("policy_sources")
@@ -243,11 +250,11 @@ def _run_rag(question: str, plan: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         pass
 
-    answer = _compose_rag_answer(question, combined_chunks, combined_meta)
+    answer = _compose_rag_answer(question, combined_chunks, combined_meta, conversation_history)
     return {"answer": answer, "chunks": combined_chunks, "metadata": combined_meta}
 
 
-def _run_sql(question: str) -> Dict[str, Any]:
+def _run_sql(question: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     # Import app3 only when SQL path is actually used, to avoid psycopg2 import errors otherwise
     import app3  # noqa: WPS433
 
@@ -255,15 +262,24 @@ def _run_sql(question: str) -> Dict[str, Any]:
     schema = app3._fetch_schema_snapshot(database)
     # Base metadata from catalog selection
     metadata = app3._build_question_metadata(question)
-    # If the prompt suggests mapping/locations, hint the generator to include coordinates
-    want_map = any(w in (question or "").lower() for w in ["map", "maps", "where", "location", "hotspot", "cluster", "show on a map", "geo", "geography"])
-    if want_map and metadata:
+    # Strongly encourage maps for location-related queries and many data queries
+    location_keywords = ["map", "maps", "where", "location", "locations", "hotspot", "cluster", "show on a map", "geo", "geography", "near", "place", "places", "area", "neighborhood", "neighborhoods"]
+    data_visualization_keywords = ["show", "display", "visualize", "see", "find", "list"]
+    question_lower = (question or "").lower()
+    want_map = any(w in question_lower for w in location_keywords) or any(w in question_lower for w in data_visualization_keywords)
+    
+    # Default to including location when possible
+    if metadata:
         try:
             meta_obj = json.loads(metadata)
         except Exception:
             meta_obj = {}
         hints = (meta_obj.get("hints") if isinstance(meta_obj, dict) else None) or {}
-        hints.update({"need_location": True, "max_points": 500})
+        if want_map:
+            hints.update({"need_location": True, "max_points": 500})
+        else:
+            # Even if not explicitly asked, suggest including location when tables have coordinates
+            hints.update({"prefer_location": True, "max_points": 500})
         if isinstance(meta_obj, dict):
             meta_obj["hints"] = hints
         else:
@@ -272,7 +288,14 @@ def _run_sql(question: str) -> Dict[str, Any]:
             metadata = json.dumps(meta_obj, ensure_ascii=False)
         except Exception:
             pass
-    sql = app3._llm_generate_sql(question, schema, os.getenv("OPENAI_MODEL", getattr(app3, "OPENAI_MODEL", OPENAI_MODEL)), metadata)
+    else:
+        # Even without metadata, create hints to encourage maps
+        try:
+            meta_obj = {"hints": {"prefer_location": True, "max_points": 500}}
+            metadata = json.dumps(meta_obj, ensure_ascii=False)
+        except Exception:
+            pass
+    sql = app3._llm_generate_sql(question, schema, os.getenv("OPENAI_MODEL", getattr(app3, "OPENAI_MODEL", OPENAI_MODEL)), metadata, conversation_history)
     exec_out = app3._execute_with_retries(
         initial_sql=sql,
         question=question,
@@ -286,13 +309,14 @@ def _run_sql(question: str) -> Dict[str, Any]:
         final_sql,
         result,
         os.getenv("OPENAI_SUMMARY_MODEL", getattr(app3, "OPENAI_SUMMARY_MODEL", OPENAI_SUMMARY_MODEL)),
+        conversation_history,
     )
     return {"answer": answer, "sql": final_sql, "result": result}
 
 
-def _run_hybrid(question: str, plan: Dict[str, Any]) -> Dict[str, Any]:
-    sql_part = _run_sql(question)
-    rag_part = _run_rag(question, plan)
+def _run_hybrid(question: str, plan: Dict[str, Any], conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
+    sql_part = _run_sql(question, conversation_history)
+    rag_part = _run_rag(question, plan, conversation_history)
 
     # Merge with a short LLM call
     client = _get_llm_client()
@@ -305,6 +329,7 @@ def _run_hybrid(question: str, plan: Dict[str, Any]) -> Dict[str, Any]:
         "- Second paragraph: explain relevant context or interpretation based on the RAG sources.\n"
         "Always cite RAG evidence as [Source X].\n"
         "Never invent data or trends not present in SQL or RAG inputs."
+        + ("\n\nYou are in a conversation. Use previous messages for context when the current question references earlier topics." if conversation_history else "")
     )
     blob = {
         "sql_answer": sql_part.get("answer"),
@@ -316,13 +341,16 @@ def _run_hybrid(question: str, plan: Dict[str, Any]) -> Dict[str, Any]:
         "Question:\n" + question + "\n\n" +
         "Inputs (JSON):\n" + json.dumps(blob, ensure_ascii=False, default=str)
     )
+    
+    messages = [{"role": "system", "content": merge_system}]
+    if conversation_history:
+        messages.extend(conversation_history[-10:])
+    messages.append({"role": "user", "content": merge_user})
+    
     try:
         resp = client.chat.completions.create(
             model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": merge_system},
-                {"role": "user", "content": merge_user},
-            ],
+            messages=messages,
             temperature=0,
         )
         answer = (resp.choices[0].message.content or "").strip()

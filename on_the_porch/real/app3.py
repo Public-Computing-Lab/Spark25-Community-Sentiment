@@ -111,6 +111,52 @@ def _fetch_schema_snapshot(database: str) -> str:
     return "\n".join(lines) if lines else "(no tables)"
 
 
+def _get_unique_values(table_name: str, column_name: str, schema: str = "public", limit: int = 50) -> List[Any]:
+    """Get unique values from a column to help users see available options."""
+    conn = _get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            # Extract table name from schema if needed
+            cur.execute(
+                f'''
+                SELECT DISTINCT "{column_name}"
+                FROM "{schema}"."{table_name}"
+                WHERE "{column_name}" IS NOT NULL
+                ORDER BY "{column_name}"
+                LIMIT %s
+                ''',
+                (limit,),
+            )
+            rows = cur.fetchall()
+            return [row[0] for row in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
+
+def _get_table_columns_from_sql(sql: str, schema_snapshot: str) -> Dict[str, List[str]]:
+    """Extract table and column names from SQL query to identify which columns to get unique values from."""
+    import re
+    # Simple extraction - look for table names in FROM/JOIN clauses
+    table_cols: Dict[str, List[str]] = {}
+    # Try to extract table name from FROM clause
+    from_match = re.search(r'FROM\s+"?(\w+)"?\s+"?(\w+)"?', sql, re.IGNORECASE)
+    if from_match:
+        schema_part = from_match.group(1)
+        table_name = from_match.group(2) if from_match.group(2) else from_match.group(1)
+        # Look for this table in schema snapshot
+        table_pattern = rf'{table_name}\s*\([^)]+\)'
+        match = re.search(table_pattern, schema_snapshot, re.IGNORECASE)
+        if match:
+            cols_str = match.group(0)
+            cols_match = re.search(r'\(([^)]+)\)', cols_str)
+            if cols_match:
+                cols = [c.strip().strip('"') for c in cols_match.group(1).split(',')]
+                table_cols[table_name] = cols
+    return table_cols
+
+
 def _extract_sql_from_text(text: str) -> str:
     t = text.strip()
     m = re.search(r"```[ \t]*(?:sql|mysql)?[ \t]*\n([\s\S]*?)```", t, flags=re.IGNORECASE)
@@ -247,7 +293,7 @@ def _build_question_metadata(question: str) -> str:
 
 
 @traceable(name="generate_sql")
-def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: str = "") -> str:
+def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: str = "", conversation_history: List[Dict[str, str]] | None = None) -> str:
     system_prompt = (
         "You are a helpful data analyst. Generate a single, syntactically correct PostgreSQL "
         "SELECT statement based strictly on the provided schema snapshot and optional metadata JSON. "
@@ -262,6 +308,8 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
         "- IMPORTANT: Do NOT search generically for the literal word 'violation' (e.g., avoid WHERE col ILIKE '%violation%'). Instead, select concrete categories/values from the appropriate columns (e.g., specific 311 'type'/'reason' values, or explicit 'Crime' values such as 'LICENSE VIOLATION').\n"
         "- Type correctness: NEVER compare text to timestamps. If a date/time column is text per metadata (e.g., 'open_dt' in 'dorchester_311'), CAST it to timestamp (e.g., \"open_dt\"::timestamp) before comparing to NOW() or intervals.\n"
         "- If metadata.hints.need_location is true and the selected table includes latitude/longitude columns (e.g., 'latitude', 'longitude'), INCLUDE them in the SELECT. If returning many rows, LIMIT to a reasonable sample (e.g., 500).\n"
+        "- If metadata.hints.prefer_location is true, strongly consider including latitude/longitude columns in the SELECT when available, especially for questions about locations, places, neighborhoods, or showing/visualizing data.\n"
+        "- For queries involving 'where', 'location', 'show', 'find', 'map', or spatial concepts, ALWAYS include latitude and longitude columns when available in the table schema.\n"
         "- ALWAYS wrap schema, table, and column identifiers in double quotes."
     )
 
@@ -283,14 +331,21 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
             f"Question: {question}"
         )
 
+    if conversation_history:
+        # Add note about conversation context
+        system_prompt += "\n\nNote: You are in a conversation. If the question references previous context, use it to better understand what the user is asking."
+    
+    messages = [{"role": "system", "content": system_prompt}]
+    if conversation_history:
+        # Add conversation history (last 8 exchanges to keep within token limits for SQL generation)
+        messages.extend(conversation_history[-8:])
+    messages.append({"role": "user", "content": user_prompt})
+
     client = _get_openai_client()
     try:
         resp = client.chat.completions.create(
             model=default_model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=messages,
             temperature=0,
         )
         content = resp.choices[0].message.content or ""
@@ -398,19 +453,90 @@ def _execute_with_retries(
                 rows = []
             if rows:
                 return {"result": result, "sql": sql}
+            
+            # No rows returned - gather unique values from key columns to help user
+            unique_values_info = {}
+            try:
+                # Extract table and key columns from SQL and schema
+                import re
+                table_name = None
+                schema_name = os.environ.get("PGSCHEMA", "public")
+                
+                # Find table name from FROM clause - handle schema.table format
+                from_match = re.search(r'FROM\s+"([^"]+)"\s*\.\s*"([^"]+)"|FROM\s+"([^"]+)"', sql, re.IGNORECASE)
+                if from_match:
+                    if from_match.group(2):  # schema.table format
+                        schema_name = from_match.group(1).strip('"').strip()
+                        table_name = from_match.group(2).strip('"').strip()
+                    else:  # Just table name
+                        table_name = from_match.group(3).strip('"').strip() if from_match.group(3) else from_match.group(1).strip('"').strip()
+                else:
+                    # Try without quotes
+                    from_match2 = re.search(r'FROM\s+(\w+)\.(\w+)|FROM\s+(\w+)', sql, re.IGNORECASE)
+                    if from_match2:
+                        if from_match2.group(2):  # schema.table format
+                            schema_name = from_match2.group(1)
+                            table_name = from_match2.group(2)
+                        else:  # Just table name
+                            table_name = from_match2.group(3) or from_match2.group(1)
+                
+                if table_name:
+                    # Try to find key category/type columns from schema
+                    schema_lines = schema.split('\n')
+                    key_columns = []
+                    for line in schema_lines:
+                        if table_name.lower() in line.lower():
+                            # Extract column names from this table's line
+                            cols_match = re.search(r'\(([^)]+)\)', line)
+                            if cols_match:
+                                cols = [c.strip().strip('"') for c in cols_match.group(1).split(',')]
+                                # Prioritize common category/type columns
+                                for col in cols:
+                                    col_lower = col.lower()
+                                    if any(kw in col_lower for kw in ['type', 'reason', 'category', 'subject', 'crime', 'status', 'state']):
+                                        key_columns.append(col)
+                                # If no specific columns found, take first few columns
+                                if not key_columns and cols:
+                                    key_columns = cols[:3]
+                    
+                    # Get unique values from these columns
+                    for col in key_columns[:3]:  # Limit to 3 columns
+                        try:
+                            unique_vals = _get_unique_values(table_name, col, schema_name, limit=20)
+                            if unique_vals:
+                                unique_values_info[col] = unique_vals
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+            
+            # Add unique values to result for display
+            if unique_values_info:
+                result["unique_values"] = unique_values_info
+                result["no_rows_with_suggestions"] = True
+            
             # No rows; refine unless at last attempt
             if attempt_idx == max_attempts:
                 return {"result": result, "sql": sql}
+            
+            # Build error text with unique values info
+            error_parts = [
+                "No rows returned. Broaden or correct filters based on metadata: "
+                "For 311 tables use \"type\"/\"reason\" categories (avoid \"subject\"), "
+                "and use ILIKE for ambiguous phrases. For \"offenses\", consider \"Crime\" values "
+                "like 'LICENSE VIOLATION'/'VIOLATIONS'."
+            ]
+            if unique_values_info:
+                error_parts.append("\n\nAvailable values in key columns:")
+                for col, vals in unique_values_info.items():
+                    error_parts.append(f"  - {col}: {', '.join(str(v)[:50] for v in vals[:10])}{'...' if len(vals) > 10 else ''}")
+                error_parts.append("\nConsider using these actual values from the database in your filters.")
+            
             sql = _llm_refine_sql(
                 question=question,
                 schema=schema,
                 previous_sql=sql or "",
-                error_text=(
-                    "No rows returned. Broaden or correct filters based on metadata: "
-                    "For 311 tables use \"type\"/\"reason\" categories (avoid \"subject\"), "
-                    "and use ILIKE for ambiguous phrases. For \"offenses\", consider \"Crime\" values "
-                    "like 'LICENSE VIOLATION'/'VIOLATIONS'."
-                ),
+                error_text="\n".join(error_parts),
                 default_model=OPENAI_MODEL,
                 metadata=metadata,
             )
@@ -444,10 +570,23 @@ def _execute_with_retries(
 
 
 @traceable(name="summarize_answer")
-def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], default_model: str) -> str:
+def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], default_model: str, conversation_history: List[Dict[str, str]] | None = None) -> str:
     cols = result.get("columns", [])
     rows = result.get("rows", [])
     if not rows:
+        unique_values = result.get("unique_values", {})
+        if unique_values:
+            # Build a helpful message with unique values
+            msg_parts = ["No results found matching your query."]
+            msg_parts.append("\n\nTo help refine your search, here are available values in key columns:")
+            for col, vals in list(unique_values.items())[:3]:  # Limit to 3 columns
+                sample_vals = vals[:10]  # Show first 10 values
+                vals_str = ", ".join(str(v)[:50] for v in sample_vals)
+                if len(vals) > 10:
+                    vals_str += f" (and {len(vals) - 10} more)"
+                msg_parts.append(f"\n- **{col}**: {vals_str}")
+            msg_parts.append("\n\nTry using one of these actual values from the database in your question.")
+            return "".join(msg_parts)
         return "No results found."
 
     max_rows = 30
@@ -463,6 +602,7 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
         "You are a data assistant. Provide a concise, human-readable answer based on the "
         "SQL result. If it is an aggregation, report key figures clearly. If it is tabular, "
         "briefly summarize notable rows or totals. Do not include SQL in the answer."
+        + ("\n\nYou are in a conversation. Reference previous context naturally when the question relates to earlier topics." if conversation_history else "")
     )
 
     user_prompt = (
@@ -471,14 +611,16 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
         "Result (JSON, possibly truncated):\n" + json.dumps(data_blob, ensure_ascii=False, default=str)
     )
 
+    messages = [{"role": "system", "content": system_prompt}]
+    if conversation_history:
+        messages.extend(conversation_history[-10:])
+    messages.append({"role": "user", "content": user_prompt})
+
     client = _get_openai_client()
     try:
         resp = client.chat.completions.create(
             model=default_model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=messages,
             temperature=0,
         )
         content = resp.choices[0].message.content or ""
