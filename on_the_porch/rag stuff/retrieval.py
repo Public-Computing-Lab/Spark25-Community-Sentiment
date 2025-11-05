@@ -4,7 +4,6 @@ from pathlib import Path
 
 VECTORDB_DIR = Path("../vectordb_new")
 
-
 def load_vectordb():
     """Load the existing vector database."""
     embeddings = OpenAIEmbeddings()

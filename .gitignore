@@ -13,6 +13,8 @@ pip-log.txt
 pip-delete-this-directory.txt
 conda
 on_the_porch/rag stuff/rags/*
+on_the_porch/pocEnv/*
+
 # 3️⃣ Environment Variables (SECURITY: Protect API Keys & Secrets)
 .env
 *.env
