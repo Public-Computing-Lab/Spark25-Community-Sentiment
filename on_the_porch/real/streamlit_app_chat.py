@@ -37,8 +37,8 @@ def _parse_sources(raw: str) -> Optional[List[str]]:
 
 
 def _ensure_env() -> None:
-    if not os.getenv("OPENAI_API_KEY"):
-        st.warning("OPENAI_API_KEY not set. Set it in your environment before asking.")
+    if not os.getenv("GEMINI_API_KEY"):
+        st.warning("GEMINI_API_KEY not set. Set it in your environment before asking.")
     if not os.getenv("DATABASE_URL"):
         st.info("DATABASE_URL not set. SQL/Hybrid modes will be disabled.")
 
@@ -139,8 +139,10 @@ def main() -> None:
         show_map = st.checkbox("Show map if latitude/longitude present", value=True)
         
         if st.button("🗑️ Clear Chat History", type="secondary"):
-            st.session_state.messages = []
-            st.session_state.conversation_history = []
+            if "messages" in st.session_state:
+                del st.session_state.messages
+            if "conversation_history" in st.session_state:
+                del st.session_state.conversation_history
             st.rerun()
 
     # Display chat history

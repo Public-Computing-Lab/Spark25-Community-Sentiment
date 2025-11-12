@@ -17,15 +17,15 @@ if str(_RAG_DIR) not in sys.path:
 # Import RAG retrieval helpers; import SQL pipeline lazily only when needed
 import retrieval  # type: ignore  # noqa: E402
 
-# Local OpenAI client config (avoid importing app3 at module load)
+# Local Gemini client config (avoid importing app3 at module load)
 try:
-    from openai import OpenAI  # type: ignore
+    import google.generativeai as genai  # type: ignore
 except Exception:  # pragma: no cover
-    OpenAI = None  # type: ignore
+    genai = None  # type: ignore
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-OPENAI_SUMMARY_MODEL = os.getenv("OPENAI_SUMMARY_MODEL", OPENAI_MODEL)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+GEMINI_SUMMARY_MODEL = os.getenv("GEMINI_SUMMARY_MODEL", GEMINI_MODEL)
 
 
 def _bootstrap_env() -> None:
@@ -57,9 +57,12 @@ def _fix_retrieval_vectordb_path() -> None:
 
 
 def _get_llm_client():
-    if OpenAI is None:
-        raise RuntimeError("openai client not installed: pip install openai")
-    return OpenAI(api_key=os.getenv("OPENAI_API_KEY") or None, timeout=60)
+    if genai is None:
+        raise RuntimeError("gemini client not installed: pip install google-generativeai")
+    api_key = os.getenv("GEMINI_API_KEY")
+    if api_key:
+        genai.configure(api_key=api_key)
+    return genai
 
 
 def _safe_json_loads(text: str, default: Dict[str, Any]) -> Dict[str, Any]:
@@ -74,23 +77,11 @@ def _route_question(question: str) -> Dict[str, Any]:
     Decide whether to answer via SQL, RAG, or HYBRID.
     Returns a dict like: {"mode": "sql|rag|hybrid", "transcript_tags": [..]|null, "policy_sources": [..]|null, "k": int}
     """
-    # Lightweight heuristic: prefer SQL for most data questions
-    quantitative_phrases = [
-        "how many", "how much", "count", "counts", "number of", "avg", "average", "sum", "total",
-        "trend", "per year", "by year", "by month", "year", "month", "week", "day",
-        "top", "rank", "distribution", "breakdown", "group by", "by ", "compare", "comparison",
-        "percent", "percentage", "ratio", "rate", "list", "show",
-        "map", "where", "location", "locations", "near", "recent", "latest",
-    ]
-    q_lower = (question or "").lower()
-    if any(p in q_lower for p in quantitative_phrases):
-        return {"mode": "sql", "transcript_tags": None, "policy_sources": None, "k": 3}
-
     client = _get_llm_client()
 
     system_prompt = (
         "You are a routing classifier for a chatbot that combines SQL (structured data) and RAG (text documents).\n"
-        "Classify the user's question into one of three modes: 'sql', 'rag', or 'hybrid'. If uncertain, prefer 'hybrid'.\n\n"
+        "Classify the user's question into one of three modes: 'sql', 'rag', or 'hybrid'.\n\n"
         "Use the following logic with examples grounded in our data:\n"
         "- 'sql': for pure statistics, counts, trends, comparisons, numeric breakdowns from Postgres tables like\n"
         "  'service_requests' (311), 'arrests', 'offenses', 'homicides', 'shots_fired', or Dorchester-focused tables.\n"
@@ -128,15 +119,13 @@ def _route_question(question: str) -> Dict[str, Any]:
     }
 
     try:
-        resp = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0,
+        model = client.GenerativeModel(GEMINI_MODEL)
+        prompt = f"{system_prompt}\n\n{user_prompt}"
+        resp = model.generate_content(
+            prompt,
+            generation_config={"temperature": 0}
         )
-        content = (resp.choices[0].message.content or "").strip()
+        content = (resp.text or "").strip()
         # Remove code fences if present
         if content.startswith("```"):
             content = content.strip("`").strip()
@@ -150,17 +139,12 @@ def _route_question(question: str) -> Dict[str, Any]:
         plan = default_plan
 
     # Normalize values
-    mode = str(plan.get("mode", "sql")).lower()
+    mode = str(plan.get("mode", "hybrid")).lower()
     if mode not in {"sql", "rag", "hybrid"}:
-        mode = "sql"
+        mode = "hybrid"  # Default to hybrid for safety
     tags = plan.get("transcript_tags")
     sources = plan.get("policy_sources")
     k = plan.get("k", 5)
-    # Safety override: if classification returned 'rag' but the question clearly asks for data/locations, use SQL
-    if mode == "rag" and any(p in q_lower for p in quantitative_phrases):
-        mode = "sql"
-    if mode == "rag" and any(p in q_lower for p in ["map", "where", "location", "locations", "near", "show", "list"]):
-        mode = "sql"
 
     return {
         "mode": mode,
@@ -190,10 +174,19 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
 
     system_prompt = (
         "You are a factual assistant answering questions about Boston community data and policies.\n"
-        "Only use the provided SOURCES. Do not add information that is not supported by the text.\n"
-        "Prefer quoting short phrases from the sources rather than paraphrasing too freely.\n"
+        "Only use the provided SOURCES. Do not add information that is not supported by the text.\n\n"
+        "CITATION STYLE:\n"
+        "- When citing interview transcripts or community meetings, introduce quotes naturally with context:\n"
+        "  Example: 'According to participants in [meeting name], ...'\n"
+        "  Example: 'Community members from [source] expressed that...'\n"
+        "  Example: 'In interviews about [topic], people mentioned...'\n"
+        "- When citing policy documents, reference them clearly:\n"
+        "  Example: 'The [Policy Name] outlines...'\n"
+        "  Example: 'According to the [Document], ...'\n"
+        "- Always cite as [Source X] at the end of the sentence, but provide context before the quote.\n"
+        "- Avoid bare quotes - contextualize who said it and where it came from.\n\n"
         "If the question involves quantitative topics, note that RAG sources may be incomplete and avoid fabricating figures.\n"
-        "Write in 2 short paragraphs. Cite sources as [Source X]."
+        "Write in 2 short paragraphs."
         + ("\n\nYou are in a conversation. Use previous messages for context when the current question references earlier topics or asks for follow-ups." if conversation_history else "")
     )
     user_prompt = (
@@ -202,20 +195,24 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
         "ANSWER (2 short paragraphs):"
     )
 
-    messages = [{"role": "system", "content": system_prompt}]
-    if conversation_history:
-        # Add conversation history (last 10 exchanges to avoid token limits)
-        messages.extend(conversation_history[-10:])
-    messages.append({"role": "user", "content": user_prompt})
-
     client = _get_llm_client()
+    model = client.GenerativeModel(GEMINI_MODEL)
+    
+    # Build conversation context
+    full_prompt = system_prompt + "\n\n"
+    if conversation_history:
+        for msg in conversation_history[-10:]:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            full_prompt += f"{role.upper()}: {content}\n\n"
+    full_prompt += user_prompt
+    
     try:
-        resp = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=messages,
-            temperature=0.3,
+        resp = model.generate_content(
+            full_prompt,
+            generation_config={"temperature": 0.3}
         )
-        return (resp.choices[0].message.content or "").strip()
+        return (resp.text or "").strip()
     except Exception:
         return "\n\n".join(context_parts[:10])  # fallback: show a sample of context
 
@@ -295,7 +292,7 @@ def _run_sql(question: str, conversation_history: Optional[List[Dict[str, str]]]
             metadata = json.dumps(meta_obj, ensure_ascii=False)
         except Exception:
             pass
-    sql = app3._llm_generate_sql(question, schema, os.getenv("OPENAI_MODEL", getattr(app3, "OPENAI_MODEL", OPENAI_MODEL)), metadata, conversation_history)
+    sql = app3._llm_generate_sql(question, schema, os.getenv("GEMINI_MODEL", getattr(app3, "GEMINI_MODEL", GEMINI_MODEL)), metadata, conversation_history)
     exec_out = app3._execute_with_retries(
         initial_sql=sql,
         question=question,
@@ -308,7 +305,7 @@ def _run_sql(question: str, conversation_history: Optional[List[Dict[str, str]]]
         question,
         final_sql,
         result,
-        os.getenv("OPENAI_SUMMARY_MODEL", getattr(app3, "OPENAI_SUMMARY_MODEL", OPENAI_SUMMARY_MODEL)),
+        os.getenv("GEMINI_SUMMARY_MODEL", getattr(app3, "GEMINI_SUMMARY_MODEL", GEMINI_SUMMARY_MODEL)),
         conversation_history,
     )
     return {"answer": answer, "sql": final_sql, "result": result}
@@ -320,6 +317,7 @@ def _run_hybrid(question: str, plan: Dict[str, Any], conversation_history: Optio
 
     # Merge with a short LLM call
     client = _get_llm_client()
+    model = client.GenerativeModel(GEMINI_MODEL)
     merge_system = (
         "You are combining two summaries:\n"
         "1. SQL-derived structured data (accurate counts, averages, statistics)\n"
@@ -342,33 +340,36 @@ def _run_hybrid(question: str, plan: Dict[str, Any], conversation_history: Optio
         "Inputs (JSON):\n" + json.dumps(blob, ensure_ascii=False, default=str)
     )
     
-    messages = [{"role": "system", "content": merge_system}]
+    # Build full prompt with conversation history
+    full_prompt = merge_system + "\n\n"
     if conversation_history:
-        messages.extend(conversation_history[-10:])
-    messages.append({"role": "user", "content": merge_user})
+        for msg in conversation_history[-10:]:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            full_prompt += f"{role.upper()}: {content}\n\n"
+    full_prompt += merge_user
     
     try:
-        resp = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=messages,
-            temperature=0,
+        resp = model.generate_content(
+            full_prompt,
+            generation_config={"temperature": 0}
         )
-        answer = (resp.choices[0].message.content or "").strip()
+        answer = (resp.text or "").strip()
     except Exception:
         answer = (sql_part.get("answer") or "") + "\n\n" + (rag_part.get("answer") or "")
 
     return {"answer": answer, "sql": sql_part, "rag": rag_part}
 
 
-def _ensure_openai_ready() -> None:
-    if not os.getenv("OPENAI_API_KEY"):
-        raise SystemExit("OPENAI_API_KEY not configured")
+def _ensure_gemini_ready() -> None:
+    if not os.getenv("GEMINI_API_KEY"):
+        raise SystemExit("GEMINI_API_KEY not configured")
 
 
 def main() -> None:
     _bootstrap_env()
     _fix_retrieval_vectordb_path()
-    _ensure_openai_ready()
+    _ensure_gemini_ready()
 
     print("\nUnified SQL + RAG Chatbot (type 'exit' to quit)\n")
     while True:

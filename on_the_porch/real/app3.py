@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Callable
 
 import psycopg2
 from pocketflow import Flow, Node
-from openai import OpenAI  # type: ignore
+import google.generativeai as genai  # type: ignore
 try:
     from langsmith.wrappers import wrap_openai  # type: ignore
 except Exception:
@@ -36,9 +36,9 @@ def _load_local_env() -> None:
 _load_local_env()
 
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-OPENAI_SUMMARY_MODEL = os.getenv("OPENAI_SUMMARY_MODEL", OPENAI_MODEL)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+GEMINI_SUMMARY_MODEL = os.getenv("GEMINI_SUMMARY_MODEL", GEMINI_MODEL)
 SQL_MAX_RETRIES = int(os.getenv("SQL_MAX_RETRIES", "2"))  # Reduced default to 2 for faster execution
 
 # Optional LangSmith tracing
@@ -62,9 +62,11 @@ def _print_langsmith_banner() -> None:
         print(f"LangSmith tracing enabled (project={project})")
 
 
-def _get_openai_client() -> OpenAI:
-    client = OpenAI(api_key=OPENAI_API_KEY or None, timeout=60)
-    return wrap_openai(client)
+def _get_gemini_client():
+    api_key = GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
+    if api_key:
+        genai.configure(api_key=api_key)
+    return genai
 
 
 def _get_db_connection():
@@ -224,17 +226,15 @@ def _llm_select_tables(question: str, catalog: List[Dict[str, Any]], default_mod
         "Tables (JSON):\n" + json.dumps(brief_rows, ensure_ascii=False)
     )
 
-    client = _get_openai_client()
+    client = _get_gemini_client()
     try:
-        resp = client.chat.completions.create(
-            model=default_model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0,
+        model = client.GenerativeModel(default_model)
+        prompt = f"{system_prompt}\n\n{user_prompt}"
+        resp = model.generate_content(
+            prompt,
+            generation_config={"temperature": 0}
         )
-        content = (resp.choices[0].message.content or "").strip()
+        content = (resp.text or "").strip()
     except Exception:
         return []
 
@@ -290,7 +290,7 @@ def _build_question_metadata(question: str) -> str:
     catalog = _load_catalog_entries()
     if not catalog:
         return _read_metadata_text()
-    tables = _llm_select_tables(question, catalog, OPENAI_MODEL)
+    tables = _llm_select_tables(question, catalog, GEMINI_MODEL)
     meta = _read_selected_metadata_json(tables, catalog)
     return meta or _read_metadata_text()
 
@@ -338,23 +338,27 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
         # Add note about conversation context
         system_prompt += "\n\nNote: You are in a conversation. If the question references previous context, use it to better understand what the user is asking."
     
-    messages = [{"role": "system", "content": system_prompt}]
+    client = _get_gemini_client()
+    model = client.GenerativeModel(default_model)
+    
+    # Build full prompt with conversation history
+    full_prompt = system_prompt + "\n\n"
     if conversation_history:
-        # Add conversation history (last 8 exchanges to keep within token limits for SQL generation)
-        messages.extend(conversation_history[-8:])
-    messages.append({"role": "user", "content": user_prompt})
-
-    client = _get_openai_client()
+        for msg in conversation_history[-8:]:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            full_prompt += f"{role.upper()}: {content}\n\n"
+    full_prompt += user_prompt
+    
     try:
-        resp = client.chat.completions.create(
-            model=default_model,
-            messages=messages,
-            temperature=0,
+        resp = model.generate_content(
+            full_prompt,
+            generation_config={"temperature": 0}
         )
-        content = resp.choices[0].message.content or ""
+        content = resp.text or ""
         return _extract_sql_from_text(content)
     except Exception as exc:
-        raise RuntimeError(f"OpenAI error: {exc}")
+        raise RuntimeError(f"Gemini error: {exc}")
 
 
 @traceable(name="refine_sql_on_error")
@@ -411,16 +415,14 @@ def _llm_refine_sql(
         "Only use columns that exist in the schema snapshot. Always double-quote all identifiers (schema, table, column)."
     )
 
-    client = _get_openai_client()
-    resp = client.chat.completions.create(
-        model=default_model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0,
+    client = _get_gemini_client()
+    model = client.GenerativeModel(default_model)
+    prompt = f"{system_prompt}\n\n{user_prompt}"
+    resp = model.generate_content(
+        prompt,
+        generation_config={"temperature": 0}
     )
-    content = resp.choices[0].message.content or ""
+    content = resp.text or ""
     return _extract_sql_from_text(content)
 
 
@@ -574,13 +576,13 @@ def _execute_with_retries(
             current_metadata = metadata if metadata else _build_question_metadata(question)
             
             sql = _llm_refine_sql(
-                question=question,
-                schema=schema,
-                previous_sql=sql or "",
-                error_text="\n".join(error_parts),
-                default_model=OPENAI_MODEL,
-                metadata=current_metadata,
-            )
+                    question=question,
+                    schema=schema,
+                    previous_sql=sql or "",
+                    error_text="\n".join(error_parts),
+                    default_model=GEMINI_MODEL,
+                    metadata=current_metadata,
+                )
         except Exception as exc:  # noqa: BLE001
             last_err = exc
             if attempt_idx == max_attempts:
@@ -614,7 +616,7 @@ def _execute_with_retries(
                     schema=schema,
                     previous_sql=sql or "",
                     error_text=err_text,
-                    default_model=OPENAI_MODEL,
+                    default_model=GEMINI_MODEL,
                     metadata=current_metadata,
                 )
             except Exception as refine_exc:  # noqa: BLE001
@@ -671,19 +673,24 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
         "Result (JSON, possibly truncated):\n" + json.dumps(data_blob, ensure_ascii=False, default=str)
     )
 
-    messages = [{"role": "system", "content": system_prompt}]
+    client = _get_gemini_client()
+    model = client.GenerativeModel(default_model)
+    
+    # Build full prompt with conversation history
+    full_prompt = system_prompt + "\n\n"
     if conversation_history:
-        messages.extend(conversation_history[-10:])
-    messages.append({"role": "user", "content": user_prompt})
-
-    client = _get_openai_client()
+        for msg in conversation_history[-10:]:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            full_prompt += f"{role.upper()}: {content}\n\n"
+    full_prompt += user_prompt
+    
     try:
-        resp = client.chat.completions.create(
-            model=default_model,
-            messages=messages,
-            temperature=0,
+        resp = model.generate_content(
+            full_prompt,
+            generation_config={"temperature": 0}
         )
-        content = resp.choices[0].message.content or ""
+        content = resp.text or ""
         return content.strip()
     except Exception:
         header = ", ".join(cols)
@@ -744,7 +751,7 @@ class GenerateSQLNode(Node):
         }
 
     def exec(self, prep_res):
-        return _llm_generate_sql(prep_res["question"], prep_res["schema"], OPENAI_MODEL, prep_res["metadata"])
+        return _llm_generate_sql(prep_res["question"], prep_res["schema"], GEMINI_MODEL, prep_res["metadata"])
 
     def post(self, shared, prep_res, exec_res):
         shared["sql"] = exec_res
@@ -786,7 +793,7 @@ class SummarizeNode(Node):
         }
 
     def exec(self, prep_res):
-        return _llm_generate_answer(prep_res["question"], prep_res["sql"], prep_res["result"], OPENAI_SUMMARY_MODEL)
+        return _llm_generate_answer(prep_res["question"], prep_res["sql"], prep_res["result"], GEMINI_SUMMARY_MODEL)
 
     def post(self, shared, prep_res, exec_res):
         shared["answer"] = exec_res
@@ -802,7 +809,7 @@ def _run_pipeline_fallback(shared: Dict[str, Any]) -> None:
 
     schema = _fetch_schema_snapshot(database)
     shared["schema"] = schema
-    sql = _llm_generate_sql(question, schema, OPENAI_MODEL, metadata)
+    sql = _llm_generate_sql(question, schema, GEMINI_MODEL, metadata)
     shared["sql"] = sql
     exec_out = _execute_with_retries(
         initial_sql=sql,
@@ -813,14 +820,14 @@ def _run_pipeline_fallback(shared: Dict[str, Any]) -> None:
     shared["sql"] = exec_out["sql"]
     shared["result"] = exec_out["result"]
     _print_result(shared["result"])  # show SQL call return (fallback)
-    answer = _llm_generate_answer(question, shared["sql"], shared["result"], OPENAI_SUMMARY_MODEL)
+    answer = _llm_generate_answer(question, shared["sql"], shared["result"], GEMINI_SUMMARY_MODEL)
     shared["answer"] = answer
     print("[Answer]\n" + answer + "\n", flush=True)
 
 
 def _interactive_loop() -> None:
-    if not (OPENAI_API_KEY or os.getenv("OPENAI_API_KEY")):
-        print("OPENAI_API_KEY not configured", file=sys.stderr)
+    if not (GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")):
+        print("GEMINI_API_KEY not configured", file=sys.stderr)
         sys.exit(1)
 
     database = os.environ.get("PGSCHEMA", "public")
@@ -866,8 +873,8 @@ def _interactive_loop() -> None:
 def main() -> None:
     if len(sys.argv) > 1:
         question = " ".join(sys.argv[1:])
-        if not (OPENAI_API_KEY or os.getenv("OPENAI_API_KEY")):
-            print("OPENAI_API_KEY not configured", file=sys.stderr)
+        if not (GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")):
+            print("GEMINI_API_KEY not configured", file=sys.stderr)
             sys.exit(1)
 
         database = os.environ.get("PGSCHEMA", "public")
