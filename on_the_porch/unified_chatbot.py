@@ -9,7 +9,8 @@ from typing import Any, Dict, List, Optional, Tuple
 _THIS_FILE = Path(__file__).resolve()
 _REAL_DIR = _THIS_FILE.parent
 _ROOT_DIR = _REAL_DIR.parent.parent
-_RAG_DIR = _REAL_DIR.parent / "rag stuff"
+# RAG utilities live in `on_the_porch/rag stuff`
+_RAG_DIR = _REAL_DIR / "rag stuff"
 if str(_RAG_DIR) not in sys.path:
     sys.path.insert(0, str(_RAG_DIR))
 
@@ -50,7 +51,7 @@ def _bootstrap_env() -> None:
 def _fix_retrieval_vectordb_path() -> None:
     # retrieval.VECTORDB_DIR is relative; ensure it points to on_the_porch/vectordb_new
     try:
-        expected = _REAL_DIR.parent / "vectordb_new"
+        expected = _REAL_DIR / "vectordb_new"
         retrieval.VECTORDB_DIR = expected  # type: ignore[attr-defined]
     except Exception:
         pass
@@ -253,7 +254,7 @@ def _run_rag(question: str, plan: Dict[str, Any], conversation_history: Optional
 
 def _run_sql(question: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     # Import app3 only when SQL path is actually used, to avoid psycopg2 import errors otherwise
-    import app3  # noqa: WPS433
+    import sql_chat.app3 as app3  # noqa: WPS433
 
     database = os.environ.get("PGSCHEMA", "public")
     schema = app3._fetch_schema_snapshot(database)
