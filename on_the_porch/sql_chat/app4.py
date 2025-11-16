@@ -69,49 +69,54 @@ def _get_gemini_client():
     return genai
 
 
-def _call_gemini_with_logging(model_name: str, prompt: str, temperature: float = 0) -> str:
+@traceable(name="gemini_chat")
+def _chat_with_model(user_message: str, model_name: str = GEMINI_MODEL, temperature: float = 0) -> str:
     """
-    Call Gemini and log to LangSmith if tracing is enabled.
-    Returns the response text.
+    Single Gemini call wrapped with LangSmith's @traceable.
+    This follows the pattern you provided and also logs token usage when available.
     """
     client = _get_gemini_client()
     model = client.GenerativeModel(model_name)
-    
-    # Track tokens if LangSmith is enabled
-    if _langsmith_enabled():
-        try:
-            from langsmith import Client as LangSmithClient
-            ls_client = LangSmithClient()
-            
-            # Create a run for this LLM call
-            run_id = ls_client.create_run(
-                name=f"gemini_{model_name}",
-                run_type="llm",
-                inputs={"prompt": prompt},
-                extra={"model": model_name, "temperature": temperature},
-            ).id
-            
-            try:
-                resp = model.generate_content(prompt, generation_config={"temperature": temperature})
-                output = (resp.text or "").strip()
-                
-                # Log completion
-                ls_client.update_run(
-                    run_id,
-                    outputs={"response": output},
-                    end_time=None,  # Will auto-set
-                )
-                return output
-            except Exception as exc:
-                ls_client.update_run(run_id, error=str(exc), end_time=None)
-                raise
-        except Exception:
-            # If LangSmith logging fails, fall back to direct call
-            pass
-    
-    # Direct call (no LangSmith or logging failed)
-    resp = model.generate_content(prompt, generation_config={"temperature": temperature})
-    return (resp.text or "").strip()
+    response = model.generate_content(
+        user_message,
+        generation_config={"temperature": temperature},
+    )
+
+    # Extract token usage and attach to current trace (if any)
+    try:
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            usage = response.usage_metadata
+            usage_info = {
+                "prompt_tokens": getattr(usage, "prompt_token_count", None),
+                "completion_tokens": getattr(usage, "candidates_token_count", None),
+                "total_tokens": getattr(usage, "total_token_count", None),
+            }
+            if any(v is not None for v in usage_info.values()):
+                try:
+                    from langsmith import Client as LangSmithClient  # type: ignore
+                    from langsmith.run_helpers import get_current_run_tree  # type: ignore
+
+                    current_run = get_current_run_tree()
+                    if current_run:
+                        ls_client = LangSmithClient()
+                        ls_client.update_run(
+                            current_run.id,
+                            extra={"gemini_usage": usage_info},
+                        )
+                except Exception:
+                    # Never break the app if logging fails
+                    pass
+    except Exception:
+        pass
+
+    return (getattr(response, "text", "") or "").strip()
+
+
+def _call_gemini_with_logging(model_name: str, prompt: str, temperature: float = 0) -> str:
+    """
+    Thin adapter that uses the traceable Gemini chat helper.
+    """
+    return _chat_with_model(prompt, model_name=model_name, temperature=temperature)
 
 
 def _get_db_connection():
@@ -370,6 +375,8 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
         "- If metadata.hints.need_location is true and the selected table includes latitude/longitude columns (e.g., 'latitude', 'longitude'), INCLUDE them in the SELECT. If returning many rows, LIMIT to a reasonable sample (e.g., 500).\n"
         "- If metadata.hints.prefer_location is true, strongly consider including latitude/longitude columns in the SELECT when available, especially for questions about locations, places, neighborhoods, or showing/visualizing data.\n"
         "- For queries involving 'where', 'location', 'show', 'find', 'map', or spatial concepts, ALWAYS include latitude and longitude columns when available in the table schema.\n"
+        "- CRITICAL: The user cares only about Dorchester. When data covers multiple neighborhoods or areas, ALWAYS restrict results and aggregations to Dorchester (e.g., WHERE neighborhood ILIKE 'dorchester%'). "
+        "If the question mentions another place, interpret it as \"in Dorchester\" unless explicitly told otherwise.\n"
         "- ALWAYS wrap table and column identifiers in backticks (`like_this`).\n"
         "- When using table aliases, always write them as separate backticked identifiers (for example, `T1`.`longitude`), never as a single backticked 'T1.longitude'."
     )
@@ -449,6 +456,8 @@ def _llm_refine_sql(
         "- For filtering by year/month in MySQL, prefer DATE_FORMAT(date_column, '%Y-%m') = 'YYYY-MM' instead of PostgreSQL functions like TO_CHAR.\n"
         "- If metadata.hints.need_location is true and coordinates exist, INCLUDE latitude/longitude in the SELECT and consider applying a LIMIT (e.g., 500).\n"
         "- IMPORTANT: Do NOT use a generic LIKE '%violation%' filter. Choose specific, valid category/value filters instead.\n"
+        "- CRITICAL: The user cares only about Dorchester. When data covers multiple neighborhoods or areas, ALWAYS restrict results and aggregations to Dorchester (e.g., WHERE neighborhood ILIKE 'dorchester%'). "
+        "If the question mentions another place, interpret it as \"in Dorchester\" unless explicitly told otherwise.\n"
         "- ALWAYS wrap table and column identifiers in backticks.\n"
         "- When using table aliases, always write them as separate backticked identifiers (for example, `T1`.`longitude`), never as a single backticked 'T1.longitude'."
     )
@@ -755,10 +764,13 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
     }
 
     system_prompt = (
-        "You are a data assistant. Provide a concise, human-readable answer based on the "
-        "SQL result. If it is an aggregation, report key figures clearly. If it is tabular, "
-        "briefly summarize notable rows or totals. Do not include SQL in the answer."
-        + ("\n\nYou are in a conversation. Reference previous context naturally when the question relates to earlier topics." if conversation_history else "")
+        "You are a friendly, non-technical assistant explaining results about Dorchester to a general audience.\n"
+        "Use clear, everyday language and speak as if you are talking directly to the user.\n"
+        "Focus on what the numbers mean for people in Dorchester (trends over time, comparisons within Dorchester, biggest/smallest values there), "
+        "not on how the data was queried or any technical details.\n"
+        "If the underlying data includes other neighborhoods or areas, ignore them and talk only about Dorchester.\n"
+        "Do NOT mention SQL, queries, databases, or internal tools in your answer."
+        + ("\n\nYou are in a conversation. Reference previous questions naturally when it helps the user." if conversation_history else "")
     )
 
     user_prompt = (
