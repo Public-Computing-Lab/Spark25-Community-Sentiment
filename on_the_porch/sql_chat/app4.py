@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Callable
 
-import psycopg2
+import pymysql
 from pocketflow import Flow, Node
 import google.generativeai as genai  # type: ignore
 try:
@@ -70,23 +70,44 @@ def _get_gemini_client():
 
 
 def _get_db_connection():
-    # Require DATABASE_URL from environment/.env
-    db_url = os.environ.get("DATABASE_URL")
-    if not db_url:
-        print("DATABASE_URL not set in environment (.env)", file=sys.stderr)
-        sys.exit(1)
+    """
+    Get a MySQL connection.
+
+    Defaults are chosen to work out of the box with the Docker command we set up:
+      host=localhost, port=3306, user=root, password="", database=sl_data
+    You can override with MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB.
+    """
+    host = os.environ.get("MYSQL_HOST", "127.0.0.1")
+    port = int(os.environ.get("MYSQL_PORT", "3306"))
+    user = os.environ.get("MYSQL_USER", "root")
+    password = os.environ.get("MYSQL_PASSWORD", "")
+    db_name = os.environ.get("MYSQL_DB", "rethink_ai_boston")
 
     try:
-        conn = psycopg2.connect(db_url)
-        conn.autocommit = True
+        conn = pymysql.connect(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            database=db_name,
+            charset="utf8mb4",
+            cursorclass=pymysql.cursors.Cursor,
+            autocommit=True,
+        )
     except Exception as exc:
-        print(f"DB connection failed: {exc}", file=sys.stderr)
+        print(f"MySQL connection failed: {exc}", file=sys.stderr)
         sys.exit(1)
 
     return conn
 
 
 def _fetch_schema_snapshot(database: str) -> str:
+    """
+    Fetch a simple schema snapshot from MySQL: table_name (col1, col2, ...).
+
+    The `database` argument is kept for API compatibility but the active
+    database comes from the MySQL connection itself.
+    """
     conn = _get_db_connection()
     try:
         with conn.cursor() as cur:
@@ -94,10 +115,9 @@ def _fetch_schema_snapshot(database: str) -> str:
                 """
                 SELECT table_name, column_name
                 FROM information_schema.columns
-                WHERE table_schema = %s
+                WHERE table_schema = DATABASE()
                 ORDER BY table_name, ordinal_position
-                """,
-                (database,),
+                """
             )
             rows = cur.fetchall()
     finally:
@@ -117,17 +137,15 @@ def _get_unique_values(table_name: str, column_name: str, schema: str = "public"
     """Get unique values from a column to help users see available options."""
     conn = _get_db_connection()
     try:
-        # Set a statement timeout to prevent hanging (5 seconds)
         with conn.cursor() as cur:
-            cur.execute("SET statement_timeout = '5s'")
             cur.execute(
-                f'''
-                SELECT DISTINCT "{column_name}"
-                FROM "{schema}"."{table_name}"
-                WHERE "{column_name}" IS NOT NULL
-                ORDER BY "{column_name}"
+                f"""
+                SELECT DISTINCT `{column_name}`
+                FROM `{table_name}`
+                WHERE `{column_name}` IS NOT NULL
+                ORDER BY `{column_name}`
                 LIMIT %s
-                ''',
+                """,
                 (limit,),
             )
             rows = cur.fetchall()
@@ -298,7 +316,7 @@ def _build_question_metadata(question: str) -> str:
 @traceable(name="generate_sql")
 def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: str = "", conversation_history: List[Dict[str, str]] | None = None) -> str:
     system_prompt = (
-        "You are a helpful data analyst. Generate a single, syntactically correct PostgreSQL "
+        "You are a helpful data analyst. Generate a single, syntactically correct MySQL "
         "SELECT statement based strictly on the provided schema snapshot and optional metadata JSON. "
         "Do not include explanations. Only output SQL.\n\n"
         "Rules:\n"
@@ -309,27 +327,27 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
         "- For 311 tables (\"service_requests\" or \"dorchester_311\"): use \"type\" or \"reason\" for category/topic filtering; avoid using \"subject\" (department) for problem categories.\n"
         "- For police offenses (\"offenses\"): map \"violation\" terms to the \"Crime\" field (e.g., 'LICENSE VIOLATION', 'VIOLATIONS') using ILIKE when appropriate.\n"
         "- IMPORTANT: Do NOT search generically for the literal word 'violation' (e.g., avoid WHERE col ILIKE '%violation%'). Instead, select concrete categories/values from the appropriate columns (e.g., specific 311 'type'/'reason' values, or explicit 'Crime' values such as 'LICENSE VIOLATION').\n"
-        "- Type correctness: NEVER compare text to timestamps. If a date/time column is text per metadata (e.g., 'open_dt' in 'dorchester_311'), CAST it to timestamp (e.g., \"open_dt\"::timestamp) before comparing to NOW() or intervals.\n"
+        "- Type correctness: NEVER compare text to timestamps incorrectly. If a date/time column is stored as text per metadata (e.g., 'open_dt' in 'dorchester_311'), CAST/convert it to a datetime type before comparing to NOW() or intervals.\n"
         "- If metadata.hints.need_location is true and the selected table includes latitude/longitude columns (e.g., 'latitude', 'longitude'), INCLUDE them in the SELECT. If returning many rows, LIMIT to a reasonable sample (e.g., 500).\n"
         "- If metadata.hints.prefer_location is true, strongly consider including latitude/longitude columns in the SELECT when available, especially for questions about locations, places, neighborhoods, or showing/visualizing data.\n"
         "- For queries involving 'where', 'location', 'show', 'find', 'map', or spatial concepts, ALWAYS include latitude and longitude columns when available in the table schema.\n"
-        "- ALWAYS wrap schema, table, and column identifiers in double quotes."
+        "- ALWAYS wrap table and column identifiers in backticks (`like_this`)."
     )
 
     if metadata:
         user_prompt = (
             "Schema:\n" + schema + "\n\n"
             "Additional metadata (JSON):\n" + metadata + "\n\n"
-            "Instruction: Write a single PostgreSQL SELECT to answer the question. "
-            "Always double-quote all identifiers (schema, table, column). "
+            "Instruction: Write a single MySQL SELECT to answer the question. "
+            "Always wrap table and column identifiers in backticks. "
             "If the question is ambiguous, choose a reasonable interpretation.\n\n"
             f"Question: {question}"
         )
     else:
         user_prompt = (
             "Schema:\n" + schema + "\n\n"
-            "Instruction: Write a single PostgreSQL SELECT to answer the question. "
-            "Always double-quote all identifiers (schema, table, column). "
+            "Instruction: Write a single MySQL SELECT to answer the question. "
+            "Always wrap table and column identifiers in backticks. "
             "If the question is ambiguous, choose a reasonable interpretation.\n\n"
             f"Question: {question}"
         )
@@ -384,8 +402,8 @@ def _llm_refine_sql(
             missing_column = col_match.group(1) or col_match.group(2)
     
     system_prompt = (
-        "You are a helpful data analyst. Given a PostgreSQL error, the schema snapshot, and metadata JSON, "
-        "correct the SQL so it runs successfully. Output only a single PostgreSQL SELECT statement with no explanations.\n\n"
+        "You are a helpful data analyst. Given a MySQL error, the schema snapshot, and metadata JSON, "
+        "correct the SQL so it runs successfully. Output only a single MySQL SELECT statement with no explanations.\n\n"
         "CRITICAL RULES:\n"
         "- USE ONLY tables/columns present in the schema snapshot; DO NOT invent names.\n"
         "- If the error mentions a column that 'does not exist', REMOVE that column from the SELECT statement immediately.\n"
@@ -394,10 +412,11 @@ def _llm_refine_sql(
         "- Prefer text/category columns identified in metadata for filtering ambiguous phrases (use ILIKE).\n"
         "- For 311 tables (\"service_requests\" or \"dorchester_311\"): prefer filtering on \"type\" or \"reason\" for categories; avoid \"subject\" when searching for problem types.\n"
         "- For police offenses (\"offenses\"): consider \"Crime\" values like 'LICENSE VIOLATION' or 'VIOLATIONS' when the user mentions violations.\n"
-        "- Type correctness: If the error indicates comparing text to timestamp (e.g., 'operator does not exist: text >= timestamp with time zone'), CAST text date columns to timestamp (\"col\"::timestamp) before date math.\n"
+        "- Type correctness: If the error indicates comparing text to datetime, CONVERT or CAST text date columns to datetime/timestamp before date math.\n"
+        "- For filtering by year/month in MySQL, prefer DATE_FORMAT(date_column, '%Y-%m') = 'YYYY-MM' instead of PostgreSQL functions like TO_CHAR.\n"
         "- If metadata.hints.need_location is true and coordinates exist, INCLUDE latitude/longitude in the SELECT and consider applying a LIMIT (e.g., 500).\n"
         "- IMPORTANT: Do NOT use a generic ILIKE '%violation%' filter. Choose specific, valid category/value filters instead.\n"
-        "- ALWAYS wrap identifiers (schema, table, column) in double quotes."
+        "- ALWAYS wrap table and column identifiers in backticks."
     )
     
     # Build enhanced error analysis
@@ -410,9 +429,9 @@ def _llm_refine_sql(
         "Metadata (JSON) for tables:\n" + (metadata if metadata else "{}") + "\n\n"
         "Question:\n" + question + "\n\n"
         "Previous SQL (has errors):\n```sql\n" + previous_sql + "\n```\n\n"
-        "PostgreSQL Error:\n" + error_analysis + "\n\n"
+        "MySQL Error:\n" + error_analysis + "\n\n"
         "Instruction: Provide a corrected single PostgreSQL SELECT statement that resolves the error. "
-        "Only use columns that exist in the schema snapshot. Always double-quote all identifiers (schema, table, column)."
+        "Only use columns that exist in the schema snapshot. Always wrap table and column identifiers in backticks."
     )
 
     client = _get_gemini_client()
@@ -431,8 +450,6 @@ def _execute_sql(sql: str) -> Dict[str, Any]:
     conn = _get_db_connection()
     try:
         with conn.cursor() as cur:
-            # Set statement timeout to prevent hanging (30 seconds)
-            cur.execute("SET statement_timeout = '30s'")
             cur.execute(sql)
             rows = cur.fetchall()
             cols = [d[0] for d in cur.description] if cur.description else []
@@ -694,7 +711,7 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
         return content.strip()
     except Exception:
         header = ", ".join(cols)
-        lines = [header] + [", ".join(str(r.get(c, "")) for r in sample_rows)]
+        lines = [header] + [", ".join(str(r.get(col, "")) for col in cols) for r in sample_rows]
         if len(rows) > max_rows:
             lines.append(f"... ({len(rows) - max_rows} more rows)")
         return "\n".join(lines)
