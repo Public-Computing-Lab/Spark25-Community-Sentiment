@@ -69,6 +69,51 @@ def _get_gemini_client():
     return genai
 
 
+def _call_gemini_with_logging(model_name: str, prompt: str, temperature: float = 0) -> str:
+    """
+    Call Gemini and log to LangSmith if tracing is enabled.
+    Returns the response text.
+    """
+    client = _get_gemini_client()
+    model = client.GenerativeModel(model_name)
+    
+    # Track tokens if LangSmith is enabled
+    if _langsmith_enabled():
+        try:
+            from langsmith import Client as LangSmithClient
+            ls_client = LangSmithClient()
+            
+            # Create a run for this LLM call
+            run_id = ls_client.create_run(
+                name=f"gemini_{model_name}",
+                run_type="llm",
+                inputs={"prompt": prompt},
+                extra={"model": model_name, "temperature": temperature},
+            ).id
+            
+            try:
+                resp = model.generate_content(prompt, generation_config={"temperature": temperature})
+                output = (resp.text or "").strip()
+                
+                # Log completion
+                ls_client.update_run(
+                    run_id,
+                    outputs={"response": output},
+                    end_time=None,  # Will auto-set
+                )
+                return output
+            except Exception as exc:
+                ls_client.update_run(run_id, error=str(exc), end_time=None)
+                raise
+        except Exception:
+            # If LangSmith logging fails, fall back to direct call
+            pass
+    
+    # Direct call (no LangSmith or logging failed)
+    resp = model.generate_content(prompt, generation_config={"temperature": temperature})
+    return (resp.text or "").strip()
+
+
 def _get_db_connection():
     """
     Get a MySQL connection.
@@ -244,15 +289,9 @@ def _llm_select_tables(question: str, catalog: List[Dict[str, Any]], default_mod
         "Tables (JSON):\n" + json.dumps(brief_rows, ensure_ascii=False)
     )
 
-    client = _get_gemini_client()
     try:
-        model = client.GenerativeModel(default_model)
         prompt = f"{system_prompt}\n\n{user_prompt}"
-        resp = model.generate_content(
-            prompt,
-            generation_config={"temperature": 0}
-        )
-        content = (resp.text or "").strip()
+        content = _call_gemini_with_logging(default_model, prompt, temperature=0)
     except Exception:
         return []
 
@@ -323,15 +362,16 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
         "- USE ONLY tables and columns present in the schema snapshot; DO NOT invent new names (e.g., never create \"street_violations\").\n"
         "- If metadata indicates certain columns are UNIQUE/identifiers (e.g., primary keys or constrained categories), prefer those columns for exact filtering, grouping, or joining.\n"
         "- Prefer columns indicated in metadata (JSON) when filtering (e.g., request_type, category, subject, description).\n"
-        "- When the question uses non-schema phrases (e.g., \"street violations\"), map them to appropriate text/category columns and use case-insensitive matches (ILIKE) rather than fabricating table names.\n"
-        "- For 311 tables (\"service_requests\" or \"dorchester_311\"): use \"type\" or \"reason\" for category/topic filtering; avoid using \"subject\" (department) for problem categories.\n"
-        "- For police offenses (\"offenses\"): map \"violation\" terms to the \"Crime\" field (e.g., 'LICENSE VIOLATION', 'VIOLATIONS') using ILIKE when appropriate.\n"
-        "- IMPORTANT: Do NOT search generically for the literal word 'violation' (e.g., avoid WHERE col ILIKE '%violation%'). Instead, select concrete categories/values from the appropriate columns (e.g., specific 311 'type'/'reason' values, or explicit 'Crime' values such as 'LICENSE VIOLATION').\n"
+        "- When the question uses non-schema phrases (e.g., \"street violations\"), map them to appropriate text/category columns and use case-insensitive matches (for example, using LOWER(column) LIKE '%term%') rather than fabricating table names.\n"
+        "- For 311 tables (\"service_requests\", \"dorchester_311\", or \"bos311_data\"): use \"type\" or \"reason\" for category/topic filtering; avoid using \"subject\" (department) for problem categories.\n"
+        "- For police offenses (\"offenses\" or similar tables): map \"violation\" terms to the appropriate offense/Crime field (e.g., 'LICENSE VIOLATION', 'VIOLATIONS') using appropriate LIKE filters when helpful.\n"
+        "- IMPORTANT: Do NOT search generically for the literal word 'violation' (e.g., avoid WHERE col LIKE '%violation%'). Instead, select concrete categories/values from the appropriate columns (e.g., specific 311 'type'/'reason' values, or explicit 'Crime' values such as 'LICENSE VIOLATION').\n"
         "- Type correctness: NEVER compare text to timestamps incorrectly. If a date/time column is stored as text per metadata (e.g., 'open_dt' in 'dorchester_311'), CAST/convert it to a datetime type before comparing to NOW() or intervals.\n"
         "- If metadata.hints.need_location is true and the selected table includes latitude/longitude columns (e.g., 'latitude', 'longitude'), INCLUDE them in the SELECT. If returning many rows, LIMIT to a reasonable sample (e.g., 500).\n"
         "- If metadata.hints.prefer_location is true, strongly consider including latitude/longitude columns in the SELECT when available, especially for questions about locations, places, neighborhoods, or showing/visualizing data.\n"
         "- For queries involving 'where', 'location', 'show', 'find', 'map', or spatial concepts, ALWAYS include latitude and longitude columns when available in the table schema.\n"
-        "- ALWAYS wrap table and column identifiers in backticks (`like_this`)."
+        "- ALWAYS wrap table and column identifiers in backticks (`like_this`).\n"
+        "- When using table aliases, always write them as separate backticked identifiers (for example, `T1`.`longitude`), never as a single backticked 'T1.longitude'."
     )
 
     if metadata:
@@ -356,9 +396,6 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
         # Add note about conversation context
         system_prompt += "\n\nNote: You are in a conversation. If the question references previous context, use it to better understand what the user is asking."
     
-    client = _get_gemini_client()
-    model = client.GenerativeModel(default_model)
-    
     # Build full prompt with conversation history
     full_prompt = system_prompt + "\n\n"
     if conversation_history:
@@ -369,11 +406,7 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
     full_prompt += user_prompt
     
     try:
-        resp = model.generate_content(
-            full_prompt,
-            generation_config={"temperature": 0}
-        )
-        content = resp.text or ""
+        content = _call_gemini_with_logging(default_model, full_prompt, temperature=0)
         return _extract_sql_from_text(content)
     except Exception as exc:
         raise RuntimeError(f"Gemini error: {exc}")
@@ -409,14 +442,15 @@ def _llm_refine_sql(
         "- If the error mentions a column that 'does not exist', REMOVE that column from the SELECT statement immediately.\n"
         "- ALWAYS check the schema snapshot to verify which columns actually exist before using them.\n"
         "- If metadata marks certain columns as UNIQUE/identifiers, prefer those for exact filters/joins instead of free-text conditions.\n"
-        "- Prefer text/category columns identified in metadata for filtering ambiguous phrases (use ILIKE).\n"
-        "- For 311 tables (\"service_requests\" or \"dorchester_311\"): prefer filtering on \"type\" or \"reason\" for categories; avoid \"subject\" when searching for problem types.\n"
-        "- For police offenses (\"offenses\"): consider \"Crime\" values like 'LICENSE VIOLATION' or 'VIOLATIONS' when the user mentions violations.\n"
+        "- Prefer text/category columns identified in metadata for filtering ambiguous phrases (use case-insensitive LIKE patterns, e.g., LOWER(column) LIKE '%term%').\n"
+        "- For 311 tables (\"service_requests\", \"dorchester_311\", or \"bos311_data\"): prefer filtering on \"type\" or \"reason\" for categories; avoid \"subject\" when searching for problem types.\n"
+        "- For police offenses (\"offenses\" or similar tables): consider offense/Crime values like 'LICENSE VIOLATION' or 'VIOLATIONS' when the user mentions violations.\n"
         "- Type correctness: If the error indicates comparing text to datetime, CONVERT or CAST text date columns to datetime/timestamp before date math.\n"
         "- For filtering by year/month in MySQL, prefer DATE_FORMAT(date_column, '%Y-%m') = 'YYYY-MM' instead of PostgreSQL functions like TO_CHAR.\n"
         "- If metadata.hints.need_location is true and coordinates exist, INCLUDE latitude/longitude in the SELECT and consider applying a LIMIT (e.g., 500).\n"
-        "- IMPORTANT: Do NOT use a generic ILIKE '%violation%' filter. Choose specific, valid category/value filters instead.\n"
-        "- ALWAYS wrap table and column identifiers in backticks."
+        "- IMPORTANT: Do NOT use a generic LIKE '%violation%' filter. Choose specific, valid category/value filters instead.\n"
+        "- ALWAYS wrap table and column identifiers in backticks.\n"
+        "- When using table aliases, always write them as separate backticked identifiers (for example, `T1`.`longitude`), never as a single backticked 'T1.longitude'."
     )
     
     # Build enhanced error analysis
@@ -430,18 +464,12 @@ def _llm_refine_sql(
         "Question:\n" + question + "\n\n"
         "Previous SQL (has errors):\n```sql\n" + previous_sql + "\n```\n\n"
         "MySQL Error:\n" + error_analysis + "\n\n"
-        "Instruction: Provide a corrected single PostgreSQL SELECT statement that resolves the error. "
+        "Instruction: Provide a corrected single MySQL SELECT statement that resolves the error. "
         "Only use columns that exist in the schema snapshot. Always wrap table and column identifiers in backticks."
     )
 
-    client = _get_gemini_client()
-    model = client.GenerativeModel(default_model)
     prompt = f"{system_prompt}\n\n{user_prompt}"
-    resp = model.generate_content(
-        prompt,
-        generation_config={"temperature": 0}
-    )
-    content = resp.text or ""
+    content = _call_gemini_with_logging(default_model, prompt, temperature=0)
     return _extract_sql_from_text(content)
 
 
@@ -580,17 +608,46 @@ def _execute_with_retries(
             error_parts = [
                 "No rows returned. Broaden or correct filters based on metadata: "
                 "For 311 tables use \"type\"/\"reason\" categories (avoid \"subject\"), "
-                "and use ILIKE for ambiguous phrases. For \"offenses\", consider \"Crime\" values "
+                "and use case-insensitive LIKE patterns. For \"offenses\", consider \"Crime\" values "
                 "like 'LICENSE VIOLATION'/'VIOLATIONS'."
             ]
             if unique_values_info:
-                error_parts.append("\n\nAvailable values in key columns:")
+                error_parts.append("\n\nAvailable values in key columns (from database):")
                 for col, vals in unique_values_info.items():
                     error_parts.append(f"  - {col}: {', '.join(str(v)[:50] for v in vals[:10])}{'...' if len(vals) > 10 else ''}")
                 error_parts.append("\nConsider using these actual values from the database in your filters.")
             
             # Always ensure metadata is available
             current_metadata = metadata if metadata else _build_question_metadata(question)
+            
+            # ALSO inject unique_values from metadata JSON (if present) to help LLM see all real terms
+            try:
+                import json as json_lib
+                meta_obj = json_lib.loads(current_metadata) if current_metadata else {}
+                tables_meta = meta_obj.get("tables", [])
+                if tables_meta:
+                    # Extract table name from SQL to find matching metadata
+                    table_from_sql = None
+                    from_match = re.search(r'FROM\s+`?(\w+)`?', sql, re.IGNORECASE)
+                    if from_match:
+                        table_from_sql = from_match.group(1).lower()
+                    
+                    for tbl_entry in tables_meta:
+                        tbl_meta_inner = tbl_entry.get("metadata", {})
+                        tbl_name = tbl_meta_inner.get("table", "").lower()
+                        if table_from_sql and tbl_name == table_from_sql:
+                            cols_meta = tbl_meta_inner.get("columns", {})
+                            # Find category/type columns with unique_values
+                            for col_name, col_info in cols_meta.items():
+                                col_lower = col_name.lower()
+                                if any(kw in col_lower for kw in ['type', 'reason', 'category']) and not col_info.get("is_numeric"):
+                                    uvals = col_info.get("unique_values", [])
+                                    if uvals and len(uvals) <= 150:
+                                        error_parts.append(f"\n\nMetadata unique_values for `{col_name}` (first 20): {', '.join(str(v)[:50] for v in uvals[:20])}")
+                                        print(f"[Debug] Injected {len(uvals)} unique_values for column `{col_name}`", file=sys.stderr)
+                            break
+            except Exception as e:
+                print(f"[Debug] Exception extracting metadata unique_values: {e}", file=sys.stderr)
             
             sql = _llm_refine_sql(
                     question=question,
@@ -602,10 +659,12 @@ def _execute_with_retries(
                 )
         except Exception as exc:  # noqa: BLE001
             last_err = exc
-            if attempt_idx == max_attempts:
-                raise
-            
             err_text = str(exc)
+            if attempt_idx == max_attempts:
+                # On final failure, return a structured error result instead of raising
+                print(f"\n[Error] SQL failed after {attempt_idx} attempts: {err_text}\n", file=sys.stderr)
+                error_result = {"columns": [], "rows": [], "error": err_text}
+                return {"result": error_result, "sql": sql}
             
             # Track error patterns to detect loops
             error_key = err_text[:200]  # Use first 200 chars as key
@@ -638,18 +697,36 @@ def _execute_with_retries(
                 )
             except Exception as refine_exc:  # noqa: BLE001
                 last_err = refine_exc
-                # If refinement itself fails, stop after 2 attempts
-                if attempt_idx >= 2:
-                    raise
+                # If refinement itself fails, stop after 2 attempts and return error
+                if attempt_idx >= 2 and last_err is not None:
+                    err_text = str(last_err)
+                    print(f"\n[Error] SQL refinement failed after {attempt_idx} attempts: {err_text}\n", file=sys.stderr)
+                    error_result = {"columns": [], "rows": [], "error": err_text}
+                    return {"result": error_result, "sql": sql}
                 continue
-    # Should not reach here; re-raise last error if loop exits unexpectedly
+
+    # If we somehow exit the loop without returning, surface the last error as a result
     if last_err:
-        raise last_err
-    raise RuntimeError("Unknown error during SQL execution with retries")
+        err_text = str(last_err)
+        error_result = {"columns": [], "rows": [], "error": err_text}
+        return {"result": error_result, "sql": sql}
+
+    # Fallback: unknown state, return empty result
+    empty_result = {"columns": [], "rows": [], "error": "Unknown SQL execution error"}
+    return {"result": empty_result, "sql": sql}
 
 
 @traceable(name="summarize_answer")
 def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], default_model: str, conversation_history: List[Dict[str, str]] | None = None) -> str:
+    # If SQL failed, provide a graceful explanation instead of crashing
+    error_text = result.get("error")
+    if error_text:
+        # For the user, present this as "no relevant data found" rather than a technical failure.
+        return (
+            "I couldn't find any data that clearly matches that query. "
+            "Try rephrasing it or broadening the time range or categories you're asking about."
+        )
+
     cols = result.get("columns", [])
     rows = result.get("rows", [])
     if not rows:
@@ -690,9 +767,6 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
         "Result (JSON, possibly truncated):\n" + json.dumps(data_blob, ensure_ascii=False, default=str)
     )
 
-    client = _get_gemini_client()
-    model = client.GenerativeModel(default_model)
-    
     # Build full prompt with conversation history
     full_prompt = system_prompt + "\n\n"
     if conversation_history:
@@ -703,11 +777,7 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
     full_prompt += user_prompt
     
     try:
-        resp = model.generate_content(
-            full_prompt,
-            generation_config={"temperature": 0}
-        )
-        content = resp.text or ""
+        content = _call_gemini_with_logging(default_model, full_prompt, temperature=0)
         return content.strip()
     except Exception:
         header = ", ".join(cols)

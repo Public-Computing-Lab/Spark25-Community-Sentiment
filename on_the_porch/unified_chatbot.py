@@ -253,13 +253,13 @@ def _run_rag(question: str, plan: Dict[str, Any], conversation_history: Optional
 
 
 def _run_sql(question: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
-    # Import app3 only when SQL path is actually used, to avoid psycopg2 import errors otherwise
-    import sql_chat.app3 as app3  # noqa: WPS433
+    # Import app4 (MySQL) only when SQL path is actually used
+    import sql_chat.app4 as app4  # noqa: WPS433
 
     database = os.environ.get("PGSCHEMA", "public")
-    schema = app3._fetch_schema_snapshot(database)
+    schema = app4._fetch_schema_snapshot(database)
     # Base metadata from catalog selection
-    metadata = app3._build_question_metadata(question)
+    metadata = app4._build_question_metadata(question)
     # Strongly encourage maps for location-related queries and many data queries
     location_keywords = ["map", "maps", "where", "location", "locations", "hotspot", "cluster", "show on a map", "geo", "geography", "near", "place", "places", "area", "neighborhood", "neighborhoods"]
     data_visualization_keywords = ["show", "display", "visualize", "see", "find", "list"]
@@ -293,8 +293,8 @@ def _run_sql(question: str, conversation_history: Optional[List[Dict[str, str]]]
             metadata = json.dumps(meta_obj, ensure_ascii=False)
         except Exception:
             pass
-    sql = app3._llm_generate_sql(question, schema, os.getenv("GEMINI_MODEL", getattr(app3, "GEMINI_MODEL", GEMINI_MODEL)), metadata, conversation_history)
-    exec_out = app3._execute_with_retries(
+    sql = app4._llm_generate_sql(question, schema, os.getenv("GEMINI_MODEL", getattr(app4, "GEMINI_MODEL", GEMINI_MODEL)), metadata, conversation_history)
+    exec_out = app4._execute_with_retries(
         initial_sql=sql,
         question=question,
         schema=schema,
@@ -302,11 +302,11 @@ def _run_sql(question: str, conversation_history: Optional[List[Dict[str, str]]]
     )
     final_sql = exec_out.get("sql", sql)
     result = exec_out.get("result", {})
-    answer = app3._llm_generate_answer(
+    answer = app4._llm_generate_answer(
         question,
         final_sql,
         result,
-        os.getenv("GEMINI_SUMMARY_MODEL", getattr(app3, "GEMINI_SUMMARY_MODEL", GEMINI_SUMMARY_MODEL)),
+        os.getenv("GEMINI_SUMMARY_MODEL", getattr(app4, "GEMINI_SUMMARY_MODEL", GEMINI_SUMMARY_MODEL)),
         conversation_history,
     )
     return {"answer": answer, "sql": final_sql, "result": result}
