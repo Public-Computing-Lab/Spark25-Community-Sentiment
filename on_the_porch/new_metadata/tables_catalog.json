@@ -13,5 +13,10 @@
     "table": "shots_fired_data",
     "description": "Shots-fired incidents/calls from the SL MySQL database; one row per event with date and location, suitable for trend and hotspot analysis.",
     "metadata_file": "shots_fired_data.json"
+  },
+  {
+    "table": "weekly_events",
+    "description": "Events schedule extracted from PDF calendars; one row per event with event name, date label, source PDF, and raw text.",
+    "metadata_file": "weekly_events.json"
   }
 ]
