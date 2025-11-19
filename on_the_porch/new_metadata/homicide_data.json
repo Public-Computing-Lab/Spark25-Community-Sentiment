@@ -1,0 +1,132 @@
+{
+  "schema": "mysql",
+  "table": "homicide_data",
+  "columns": {
+    "id": {
+      "data_type": "int",
+      "is_numeric": true
+    },
+    "object_id": {
+      "data_type": "int",
+      "is_numeric": true
+    },
+    "reporting_event_number": {
+      "data_type": "varchar(20)",
+      "is_numeric": false
+    },
+    "ruled_date": {
+      "data_type": "datetime",
+      "is_numeric": false
+    },
+    "homicide_date": {
+      "data_type": "datetime",
+      "is_numeric": false
+    },
+    "district": {
+      "data_type": "varchar(10)",
+      "is_numeric": false,
+      "unique_values": [
+        "A1",
+        "A15",
+        "A7",
+        "B2",
+        "B3",
+        "C11",
+        "C6",
+        "D14",
+        "D4",
+        "E13",
+        "E18",
+        "E5"
+      ]
+    },
+    "victim_age": {
+      "data_type": "int",
+      "is_numeric": true
+    },
+    "race": {
+      "data_type": "varchar(50)",
+      "is_numeric": false,
+      "unique_values": [
+        "Asian",
+        "Black or African American",
+        "Unknown",
+        "White"
+      ]
+    },
+    "gender": {
+      "data_type": "varchar(10)",
+      "is_numeric": false,
+      "unique_values": [
+        "Female",
+        "Male"
+      ]
+    },
+    "weapon": {
+      "data_type": "varchar(20)",
+      "is_numeric": false,
+      "unique_values": [
+        "GSW",
+        "Other",
+        "STAB",
+        "Suffocation-Stab",
+        "Trauma"
+      ]
+    },
+    "hour_of_day": {
+      "data_type": "int",
+      "is_numeric": true
+    },
+    "day_of_week": {
+      "data_type": "int",
+      "is_numeric": true
+    },
+    "year": {
+      "data_type": "int",
+      "is_numeric": true
+    },
+    "quarter": {
+      "data_type": "int",
+      "is_numeric": true
+    },
+    "month": {
+      "data_type": "int",
+      "is_numeric": true
+    },
+    "neighborhood": {
+      "data_type": "varchar(50)",
+      "is_numeric": false,
+      "unique_values": [
+        "Allston",
+        "Back Bay",
+        "Brighton",
+        "Charlestown",
+        "Chinatown",
+        "Dorchester",
+        "Downtown",
+        "East Boston",
+        "Fenway",
+        "Hyde Park",
+        "Jamaica Plain",
+        "Longwood",
+        "Mattapan",
+        "Mission Hill",
+        "Roslindale",
+        "Roxbury",
+        "South Boston",
+        "South End",
+        "West End",
+        "West Roxbury"
+      ]
+    },
+    "ethnicity_nibrs": {
+      "data_type": "varchar(50)",
+      "is_numeric": false,
+      "unique_values": [
+        "Hispanic or Latinx",
+        "Not Hispanic or Latinx",
+        "Unknown"
+      ]
+    }
+  }
+}

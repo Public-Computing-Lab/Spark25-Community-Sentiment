@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 POLICY_DIR = Path("Data/VectorDB_text")
 TRANSCRIPT_DIR = Path("Data/AI meeting transcripts")
-VECTORDB_DIR = Path("Data/vectordb_new")
+VECTORDB_DIR = Path("../vectordb_new")
 
 
 def parse_transcript_chunks(file_path):
