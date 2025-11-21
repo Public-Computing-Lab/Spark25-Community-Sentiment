@@ -101,3 +101,4 @@ on_the_porch/rag_stuff/data/*
 !api/*.sql
 !setup/*.sql
 
+/on_the_porch/vectordb_new
