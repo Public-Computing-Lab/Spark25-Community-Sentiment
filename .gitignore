@@ -27,7 +27,6 @@ llm_query_log.csv
 logs/
 *.sqlite
 *.db
-*.sqlite3
 *.sql
 
 
