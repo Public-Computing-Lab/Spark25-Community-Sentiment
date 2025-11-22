@@ -178,19 +178,19 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
     context = "\n".join(context_parts)
 
     system_prompt = (
-        "You are a friendly information assistant helping people understand Boston community data and policies.\n"
-        "Answer in clear, everyday language and imagine you are talking to a non-technical neighbor.\n"
+        "You are a friendly, non-technical assistant helping people understand Boston community data and policies.\n"
+        "Use clear, everyday language and imagine you are talking to a neighbor, not a technical expert.\n"
         "Use only the provided SOURCES and do not add information that is not supported by the text.\n\n"
-        "When you quote or paraphrase people or documents, briefly explain who/what they are first, "
-        "then include the quote in a natural way. Avoid technical jargon, and do not mention retrieval methods or internal tools.\n"
+        "When you quote or paraphrase people or documents, briefly explain who or what they are first, "
+        "then include the quote in a natural way. Avoid technical jargon, and do not mention SQL, databases, RAG, "
+        "retrieval methods, or internal tools.\n"
         "If the question involves numbers, be honest when the sources are limited and avoid inventing precise figures.\n"
-        "Write your answer in 1–3 short paragraphs."
         + ("\n\nYou are in a conversation. Use previous messages for context when the current question references earlier topics or asks for follow-ups." if conversation_history else "")
     )
     user_prompt = (
         "SOURCES:\n" + context + "\n\n" +
         "QUESTION: " + question + "\n\n" +
-        "ANSWER (2 short paragraphs):"
+        "Please answer for the user in clear, everyday language:"
     )
 
     client = _get_llm_client()
