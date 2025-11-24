@@ -6,22 +6,35 @@ Step 2: Execute retrieval based on LLM's decision
 Step 3: LLM generates final answer from context
 """
 
-from retrieval import retrieve, retrieve_transcripts, retrieve_policies, format_results
-from langchain_openai import ChatOpenAI
+from retrieval import retrieve, retrieve_transcripts, retrieve_policies, retrieve_calendar_events, format_results
 from dotenv import load_dotenv
 import json
+import os
+
+import google.generativeai as genai  # type: ignore
 
 load_dotenv()
+
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+
+
+def _get_gemini_client():
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY not configured")
+    genai.configure(api_key=api_key)
+    return genai, GEMINI_MODEL
 
 
 def plan_retrieval(query):
     """
     Step 1: LLM analyzes query and decides what to retrieve.
-    
+
     Returns a retrieval plan with doc_type, tags, sources, etc.
     """
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-    
+    client, model_name = _get_gemini_client()
+    model = client.GenerativeModel(model_name)
+
     planning_prompt = f"""You are a retrieval planner for a RAG system about Boston community sentiment and policy.
 
 Available data sources:
@@ -49,30 +62,30 @@ Respond in JSON format:
 Be strategic:
 - Use 1-2 most relevant tags maximum (not all possible tags)
 - Only specify policy sources if question is about a specific plan
-"""
-    
-    response = llm.invoke(planning_prompt)
-    
+    """
+
+    response = model.generate_content(planning_prompt, generation_config={"temperature": 0})
+
     # Parse JSON response
     try:
         # Extract JSON from response (might be wrapped in markdown)
-        content = response.content.strip()
+        content = (getattr(response, "text", "") or "").strip()
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
             content = content.split("```")[1].split("```")[0].strip()
-        
+
         plan = json.loads(content)
         return plan
     except Exception as e:
         print(f"Error parsing plan: {e}")
-        print(f"Raw response: {response.content}")
+        print(f"Raw response: {getattr(response, 'text', '')}")
         # Fallback plan
         return {
             "doc_types": ["both"],
             "transcript_tags": None,
             "policy_sources": None,
-            "k_results": 5
+            "k_results": 5,
         }
 
 
@@ -126,20 +139,20 @@ def generate_answer(query, retrieval_result, plan):
     """
     if not retrieval_result['chunks']:
         return "No relevant information found.", None
-    
+
     # Build context from retrieved chunks
     context_parts = []
     for i, (chunk, meta) in enumerate(zip(retrieval_result['chunks'], retrieval_result['metadata']), 1):
         source = meta.get('source', 'Unknown')
         doc_type = meta.get('doc_type', 'unknown')
         tags = meta.get('tags', [])
-        
+
         context_parts.append(f"[Source {i}: {source} ({doc_type}){' - Tags: ' + ', '.join(tags) if tags else ''}]")
         context_parts.append(chunk)
         context_parts.append("")
-    
+
     context = "\n".join(context_parts)
-    
+
     # Create answer prompt
     answer_prompt = f"""You are a helpful assistant analyzing Boston community data.
 
@@ -154,11 +167,12 @@ SOURCES:
 QUESTION: {query}
 
 ANSWER (2-3 paragraphs max):"""
-    
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
-    response = llm.invoke(answer_prompt)
-    
-    return response.content, context_parts
+
+    client, model_name = _get_gemini_client()
+    model = client.GenerativeModel(model_name)
+    response = model.generate_content(answer_prompt, generation_config={"temperature": 0.3})
+
+    return (getattr(response, "text", "") or "").strip(), context_parts
 
 
 def two_step_rag(query, verbose=True):
@@ -219,6 +233,126 @@ def two_step_rag(query, verbose=True):
     }
 
 
+def plan_calendar_retrieval(query):
+    """
+    Calendar-specific planner: LLM analyzes query and proposes
+    a semantic search query plus simple filters.
+
+    This is kept separate from the main policy/transcript planner.
+    """
+    client, model_name = _get_gemini_client()
+    model = client.GenerativeModel(model_name)
+
+    planning_prompt = f"""You are a retrieval planner for a calendar events vector database.
+
+The documents represent individual events with metadata like:
+- event_name: short human-readable name
+- event_date: human-friendly label as written (e.g. "Monday", "June 3–5, 2025", "All week")
+- start_date: ISO date YYYY-MM-DD when the event starts (or null)
+- end_date: ISO date YYYY-MM-DD when the event ends (or null)
+- start_time: 24h time HH:MM when the event starts (or null)
+- end_time: 24h time HH:MM when the event ends (or null)
+- source: PDF filename where the event came from
+
+Your task: Analyze the user's question and:
+- produce a concise semantic_query that should be used for similarity search over event descriptions
+- optionally propose simple filters that describe what subset of events they care about
+
+USER QUESTION: {query}
+
+Respond in JSON format:
+{{
+  "semantic_query": "short query for semantic search",
+  "filters": {{
+    "date_keywords": ["Monday", "June 3", "this week"] or null,
+    "time_keywords": ["morning", "evening"] or null,
+    "source_pdfs": ["REP 47_25web.pdf"] or null
+  }},
+  "k_results": 5
+}}
+
+Rules:
+- semantic_query should be short and focused, and should already reflect any important date/time constraints
+- filters are just hints for the human; keep them small and relevant
+- If you are unsure about filters, set them to null.
+    """
+
+    response = model.generate_content(planning_prompt, generation_config={"temperature": 0})
+
+    try:
+        content = (getattr(response, "text", "") or "").strip()
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+
+        plan = json.loads(content)
+        return plan
+    except Exception as e:
+        print(f"Error parsing calendar plan: {e}")
+        print(f"Raw response: {getattr(response, 'text', '')}")
+        return {
+            "semantic_query": query,
+            "filters": None,
+            "k_results": 5,
+        }
+
+
+def calendar_two_step_rag(query, verbose=True):
+    """
+    Simple two-step pipeline for calendar events:
+      1) LLM plans semantic_query + filters
+      2) Run similarity search on the calendar DB using semantic_query
+    """
+    if verbose:
+        print(f"\n{'='*80}")
+        print(f"CALENDAR QUESTION: {query}")
+        print(f"{'='*80}\n")
+        print("🧠 STEP 1 (Calendar): Planning retrieval strategy...")
+
+    plan = plan_calendar_retrieval(query)
+
+    if verbose:
+        print("\nCalendar Retrieval Plan:")
+        print(f"  Semantic query: {plan.get('semantic_query')}")
+        filters = plan.get("filters") or {}
+        print(f"  Date keywords: {filters.get('date_keywords')}")
+        print(f"  Time keywords: {filters.get('time_keywords')}")
+        print(f"  Source PDFs: {filters.get('source_pdfs')}")
+        print(f"  Results to retrieve: {plan.get('k_results')}")
+
+    if verbose:
+        print(f"\n🔍 STEP 2 (Calendar): Retrieving events from calendar vectordb...")
+
+    semantic_query = plan.get("semantic_query") or query
+    k = plan.get("k_results", 5)
+
+    if verbose:
+        print(f"\nUsing semantic query for vectordb search:\n  {semantic_query}")
+
+    results = retrieve_calendar_events(semantic_query, k=k)
+
+    if verbose:
+        print(f"\nRetrieved {len(results['chunks'])} calendar chunks.")
+        print("\nRaw calendar documents (full metadata + content):")
+        for i, (chunk, meta) in enumerate(zip(results.get("chunks", []), results.get("metadata", [])), start=1):
+            print(f"\n--- Calendar Result {i} ---")
+            print("Metadata:")
+            print(json.dumps(meta, indent=2, ensure_ascii=False))
+            print("\nContent:")
+            print(chunk)
+            print("\n---------------------------")
+
+    print("\nCalendar retrieval results (summary):\n")
+    print(format_results(results))
+
+    return {
+        "query": query,
+        "plan": plan,
+        "retrieval": results,
+    }
+
+
 def demo_1():
     """Demo: Media representation question"""
     print("\n🎯 DEMO 1: Community Perspectives on Media")
@@ -255,6 +389,19 @@ def demo_4():
     two_step_rag(query, verbose=True)
 
 
+def demo_calendar():
+    """Demo: Calendar events from PDF vectordb."""
+    print("\n🎯 DEMO 5: Calendar events from PDF")
+    print("-" * 80)
+
+    query = input("\nEnter your calendar question: ").strip()
+    if not query:
+        query = "What events are happening this week?"
+        print(f"Using default: {query}")
+
+    calendar_two_step_rag(query, verbose=True)
+
+
 def demo_interactive():
     """Interactive demo"""
     print("\n🎯 INTERACTIVE DEMO")
@@ -284,6 +431,7 @@ def main():
     print("  4. Complex multi-faceted query")
     print("  5. Interactive - your own question")
     print("  6. Run all demos")
+    print("  7. Calendar events (PDF vectordb test)")
     
     choice = input("\nSelect demo (1-6, default=1): ").strip() or "1"
     
@@ -309,6 +457,8 @@ def main():
         interactive = input("\nTry interactive demo? (y/n): ").strip().lower()
         if interactive == 'y':
             demo_interactive()
+    elif choice == "7":
+        demo_calendar()
     
     print("\n" + "="*80)
     print("Demo complete! ✨")

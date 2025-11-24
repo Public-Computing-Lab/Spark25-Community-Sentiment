@@ -1,11 +1,14 @@
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from pathlib import Path
+from datetime import date
 
 VECTORDB_DIR = Path("../vectordb_new")
+CALENDAR_VECTORDB_DIR = Path("../vectordb_calendar")
+
 
 def load_vectordb():
-    """Load the existing vector database."""
+    """Load the main (policy + transcripts) vector database."""
     embeddings = OpenAIEmbeddings()
     vectordb = Chroma(
         persist_directory=str(VECTORDB_DIR),
@@ -14,14 +17,32 @@ def load_vectordb():
     return vectordb
 
 
-def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None):
+def load_calendar_vectordb():
+    """Load the separate calendar events vector database."""
+    embeddings = OpenAIEmbeddings()
+    vectordb = Chroma(
+        persist_directory=str(CALENDAR_VECTORDB_DIR),
+        embedding_function=embeddings,
+    )
+    return vectordb
+
+
+def _parse_iso_date(value: str):
+    """Parse ISO date (YYYY-MM-DD) safely, return None on failure."""
+    try:
+        return date.fromisoformat(value)
+    except Exception:
+        return None
+
+
+def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None, vectordb=None):
     """
     Universal retrieval with flexible metadata filtering.
     
     Args:
         query: Search query string
         k: Number of results to return
-        doc_type: Filter by document type ('transcript' or 'policy')
+        doc_type: Filter by document type ('transcript', 'policy', or 'calendar_event')
         tags: Filter by tags (list of tags, e.g., ['media', 'community'])
                For transcripts only - uses OR logic (chunk must have ANY tag)
         source: Filter by specific source filename
@@ -46,7 +67,8 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None):
         # Everything
         retrieve(query)
     """
-    vectordb = load_vectordb()
+    if vectordb is None:
+        vectordb = load_vectordb()
     
     # Build filter dictionary (Chroma requires $and for multiple conditions)
     filter_dict = None
@@ -76,7 +98,7 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None):
             filter=filter_dict if filter_dict else None
         )
         
-        # Post-process tag filtering if needed
+        # Post-process tag filtering if needed (soft filter: fall back to unfiltered if no matches)
         if tags:
             filtered_results = []
             for doc, score in results_with_scores:
@@ -88,7 +110,9 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None):
                         filtered_results.append((doc, score))
                         if len(filtered_results) >= k:
                             break
-            results_with_scores = filtered_results
+            # Only apply tag filter if it yields at least one result
+            if filtered_results:
+                results_with_scores = filtered_results
         
         # Apply score threshold
         filtered_results = [(doc, score) for doc, score in results_with_scores if score <= min_score]
@@ -106,7 +130,7 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None):
             filter=filter_dict if filter_dict else None
         )
         
-        # Post-process tag filtering if needed
+        # Post-process tag filtering if needed (soft filter: fall back to unfiltered if no matches)
         if tags:
             filtered_results = []
             for doc in results:
@@ -118,7 +142,9 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None):
                         filtered_results.append(doc)
                         if len(filtered_results) >= k:
                             break
-            results = filtered_results
+            # Only apply tag filter if it yields at least one result
+            if filtered_results:
+                results = filtered_results
         
         return {
             'chunks': [doc.page_content for doc in results[:k]],
@@ -156,6 +182,73 @@ def retrieve_policies(query, k=5, source=None):
         retrieve_policies("anti-displacement strategies")
     """
     return retrieve(query, k=k, doc_type='policy', source=source)
+
+
+def retrieve_calendar_events(query, k=5, start_date: str | None = None, end_date: str | None = None):
+    """
+    Convenience function for calendar-event-only search.
+
+    Args:
+        query: Search query
+        k: Number of results
+
+    Example:
+        retrieve_calendar_events("What events are happening this week?", k=5)
+        retrieve_calendar_events("events", start_date="2025-03-01", end_date="2025-03-07")
+    """
+    calendar_db = load_calendar_vectordb()
+
+    # If no date filters, just delegate to generic retrieval.
+    if not start_date and not end_date:
+        return retrieve(query, k=k, doc_type='calendar_event', vectordb=calendar_db)
+
+    # With date filters, get a few extra candidates then filter by overlap.
+    base = retrieve(query, k=k * 3, doc_type='calendar_event', vectordb=calendar_db)
+
+    q_start = _parse_iso_date(start_date) if start_date else None
+    q_end = _parse_iso_date(end_date) if end_date else None
+
+    filtered_chunks = []
+    filtered_meta = []
+
+    for chunk, meta in zip(base["chunks"], base["metadata"]):
+        ev_start = _parse_iso_date(str(meta.get("start_date") or "")) if meta.get("start_date") else None
+        ev_end = _parse_iso_date(str(meta.get("end_date") or "")) if meta.get("end_date") else None
+
+        # Treat missing end_date as same-day event.
+        if ev_start and not ev_end:
+            ev_end = ev_start
+        if ev_end and not ev_start:
+            ev_start = ev_end
+
+        if not ev_start and not ev_end:
+            continue
+
+        include = False
+        # Overlap logic between [ev_start, ev_end] and [q_start, q_end]
+        if q_start and q_end:
+            include = ev_end >= q_start and ev_start <= q_end
+        elif q_start:
+            include = ev_start <= q_start <= ev_end
+        elif q_end:
+            include = ev_start <= q_end <= ev_end
+
+        if include:
+            filtered_chunks.append(chunk)
+            filtered_meta.append(meta)
+            if len(filtered_chunks) >= k:
+                break
+
+    # If nothing matched filters, fall back to unfiltered base results (top-k).
+    if not filtered_chunks:
+        return base
+
+    return {
+        "chunks": filtered_chunks,
+        "metadata": filtered_meta,
+        "scores": base.get("scores"),
+        "query": query,
+    }
 
 
 def format_results(result_dict):

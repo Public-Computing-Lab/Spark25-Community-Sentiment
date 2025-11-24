@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
@@ -129,17 +130,17 @@ def load_transcript_documents():
 
 def build_vectordb():
     """Build the vector database from policy and transcript documents."""
-    # Load both types of documents
+    # Load documents
     policy_docs = load_policy_documents()
     transcript_docs = load_transcript_documents()
-    
+
     all_documents = policy_docs + transcript_docs
-    
+
     print(f"\n{'='*80}")
     print(f"Total documents: {len(all_documents)}")
     print(f"  - Policy chunks: {len(policy_docs)}")
     print(f"  - Transcript chunks: {len(transcript_docs)}")
-    
+
     # Show tag stats for transcripts
     tagged_count = sum(1 for doc in transcript_docs if 'tags' in doc.metadata)
     print(f"  - Transcript chunks with tags: {tagged_count}")
