@@ -2,10 +2,10 @@ from pathlib import Path
 import re
 
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 from dotenv import load_dotenv
+from retrieval import GeminiEmbeddings
 
 load_dotenv()
 POLICY_DIR = Path("Data/VectorDB_text")
@@ -147,7 +147,7 @@ def build_vectordb():
     print(f"  - Transcript chunks without tags: {len(transcript_docs) - tagged_count}")
     print(f"{'='*80}\n")
     
-    embeddings = OpenAIEmbeddings()
+    embeddings = GeminiEmbeddings()
     
     if VECTORDB_DIR.exists():
         print(f"Removing existing vector database at {VECTORDB_DIR}")

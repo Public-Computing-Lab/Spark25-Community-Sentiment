@@ -1,15 +1,44 @@
-from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from pathlib import Path
 from datetime import date
+import os
+import google.generativeai as genai  # type: ignore
 
 VECTORDB_DIR = Path("../vectordb_new")
 CALENDAR_VECTORDB_DIR = Path("../vectordb_calendar")
+GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "models/text-embedding-004")
+
+
+def _configure_gemini() -> None:
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY not configured")
+    genai.configure(api_key=api_key)
+
+
+class GeminiEmbeddings:
+    """
+    Minimal embeddings wrapper using Gemini's embedding API, compatible with LangChain's interface.
+    """
+
+    def __init__(self, model: str | None = None) -> None:
+        _configure_gemini()
+        self.model = model or GEMINI_EMBED_MODEL
+
+    def _embed(self, text: str):
+        res = genai.embed_content(model=self.model, content=text)
+        return res["embedding"]
+
+    def embed_documents(self, texts):
+        return [self._embed(t) for t in texts]
+
+    def embed_query(self, text):
+        return self._embed(text)
 
 
 def load_vectordb():
     """Load the main (policy + transcripts) vector database."""
-    embeddings = OpenAIEmbeddings()
+    embeddings = GeminiEmbeddings()
     vectordb = Chroma(
         persist_directory=str(VECTORDB_DIR),
         embedding_function=embeddings,
@@ -19,7 +48,7 @@ def load_vectordb():
 
 def load_calendar_vectordb():
     """Load the separate calendar events vector database."""
-    embeddings = OpenAIEmbeddings()
+    embeddings = GeminiEmbeddings()
     vectordb = Chroma(
         persist_directory=str(CALENDAR_VECTORDB_DIR),
         embedding_function=embeddings,

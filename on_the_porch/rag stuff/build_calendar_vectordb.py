@@ -4,10 +4,10 @@ import json
 
 from pypdf import PdfReader
 import google.generativeai as genai  # type: ignore
-from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 from dotenv import load_dotenv
+from retrieval import GeminiEmbeddings
 
 
 load_dotenv()
@@ -185,7 +185,7 @@ def build_calendar_vectordb():
     print(f"Calendar documents: {len(calendar_docs)}")
     print(f"{'='*80}\n")
 
-    embeddings = OpenAIEmbeddings()
+    embeddings = GeminiEmbeddings()
 
     if CALENDAR_VECTORDB_DIR.exists():
         print(f"Removing existing calendar vector database at {CALENDAR_VECTORDB_DIR}")
