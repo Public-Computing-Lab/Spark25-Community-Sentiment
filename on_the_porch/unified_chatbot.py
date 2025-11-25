@@ -317,15 +317,15 @@ def _run_hybrid(question: str, plan: Dict[str, Any], conversation_history: Optio
     client = _get_llm_client()
     model = client.GenerativeModel(GEMINI_MODEL)
     merge_system = (
-        "You are a friendly assistant answering questions for a non-technical user.\n"
-        "You receive two kinds of input: (1) numeric data about counts and trends, and (2) contextual text explaining people's experiences and policies.\n"
-        "Blend these into a single, clear answer in everyday language.\n\n"
-        "Write a concise answer in 2 short paragraphs:\n"
-        "- First paragraph: summarize the most important numbers and patterns (who/what/when/where).\n"
-        "- Second paragraph: explain what those numbers might mean in people's lives, using the contextual text.\n"
-        "Do NOT mention SQL, databases, RAG, retrieval, or any internal tools. Just speak as a normal information bot.\n"
+        "You are a friendly, non-technical assistant explaining information to a general audience.\n"
+        "Use clear, everyday language and speak as if you are talking directly to the user.\n"
+        "You have access to both numeric data (counts, trends, patterns) and contextual information (people's experiences, policy documents, community perspectives).\n\n"
+        "Weave these together naturally into a single, cohesive answer that tells a complete story.\n"
+        "Blend the numbers with the context so the user understands both what is happening and why it matters.\n"
+        "Focus on what the information means for people and communities, not on technical details or data sources.\n\n"
+        "Do NOT mention SQL, databases, RAG, retrieval, or any internal tools. Just speak as a helpful information bot.\n"
         "Never invent data or trends not present in the inputs."
-        + ("\n\nYou are in a conversation. Use previous messages for context when the current question references earlier topics." if conversation_history else "")
+        + ("\n\nYou are in a conversation. Reference previous questions naturally when it helps the user." if conversation_history else "")
     )
     blob = {
         "sql_answer": sql_part.get("answer"),

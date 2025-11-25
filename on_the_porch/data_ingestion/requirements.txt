@@ -1,0 +1,33 @@
+# Core dependencies for automated data ingestion
+
+# Google Drive API
+google-api-python-client>=2.100.0
+google-auth-httplib2>=0.1.1
+google-auth-oauthlib>=1.1.0
+
+# Document processing
+pypdf>=3.17.0
+python-docx>=1.0.1
+
+# LangChain for vector DB and text splitting
+langchain>=0.1.0
+langchain-community>=0.0.20
+langchain-text-splitters>=0.0.1
+
+# Vector database (Chroma)
+chromadb>=0.4.22
+
+# LLM (Gemini)
+google-generativeai>=0.3.0
+
+# Database (MySQL/PostgreSQL)
+pymysql>=1.1.0
+psycopg2-binary>=2.9.9
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# HTML parsing (for email)
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
