@@ -156,8 +156,8 @@ def load_transcript_documents():
 
 def _extract_events_from_pdf_for_vectordb(pdf_path: str, page_index: int = 0):
     """
-    Extract structured events from a single PDF page using Gemini,
-    matching the logic from build_calendar_vectordb.py.
+    Extract structured events from a single PDF page using Gemini.
+    NOTE: Events are now primarily stored in SQL (weekly_events table).
     """
     reader = PdfReader(pdf_path)
     page_text = reader.pages[page_index].extract_text() or ""
@@ -283,8 +283,9 @@ def _newsletter_events_to_documents(events, pdf_path: str):
 
 def load_newsletter_documents():
     """
-    Load newsletter PDFs and convert extracted events into Documents,
-    mirroring the chunking logic from build_calendar_vectordb.py.
+    Load newsletter PDFs and convert extracted events into Documents.
+    Events are stored in the main vectordb for context, but calendar queries
+    should use SQL (weekly_events table) for structured event filtering.
     """
     documents = []
 

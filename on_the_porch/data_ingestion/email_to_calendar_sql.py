@@ -31,7 +31,6 @@ from utils.email_parser import (
     get_email_subject,
     get_email_date
 )
-from utils.document_processor import events_to_documents
 
 # Gmail OAuth scopes - using Gmail API (readonly)
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
@@ -161,8 +160,15 @@ def get_recent_newsletters(service, processed_ids: List[str], days_back: int = 7
         raise RuntimeError(f"Failed to fetch emails from Gmail API: {e}")
 
 
-def extract_events_with_llm(text: str, source: str) -> List[Dict]:
-    """Use LLM to extract structured events from newsletter text."""
+def extract_events_with_llm(text: str, source: str, publication_date: str = None) -> List[Dict]:
+    """
+    Use LLM to extract structured events from newsletter text.
+    
+    Args:
+        text: Newsletter text content
+        source: Source identifier
+        publication_date: Newsletter publication date in YYYY-MM-DD format (used to infer exact dates from day names)
+    """
     if not config.GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY is not configured")
     
@@ -174,10 +180,33 @@ def extract_events_with_llm(text: str, source: str) -> List[Dict]:
     if len(text) > max_chars:
         text = text[:max_chars] + "\n\n[... text truncated ...]"
     
+    # Build date context for the prompt
+    date_context = ""
+    if publication_date:
+        try:
+            from datetime import datetime
+            pub_dt = datetime.strptime(publication_date, '%Y-%m-%d')
+            date_context = f"""
+IMPORTANT DATE CONTEXT:
+- Newsletter publication date: {publication_date} ({pub_dt.strftime('%A, %B %d, %Y')})
+- Use this date to convert day-of-week references (Monday, Tuesday, etc.) to exact dates
+- For example, if the newsletter is dated {publication_date} and an event says "Monday", calculate which Monday that refers to
+- Events typically occur in the week following the newsletter publication date
+- Always prefer exact dates (YYYY-MM-DD) over day names when possible
+"""
+        except Exception:
+            pass
+    
     prompt = f"""
 You are reading a community newsletter or calendar listing events.
-
+{date_context}
 Extract ALL events with their dates and times from the text below.
+
+CRITICAL: Convert day-of-week references (Monday, Tuesday, Wednesday, etc.) to EXACT dates (YYYY-MM-DD) using the newsletter publication date as reference.
+- If an event says "Monday" and the newsletter is dated {publication_date or 'unknown'}, calculate the exact Monday date
+- Events in newsletters typically refer to the upcoming week
+- Always provide start_date and end_date in ISO format (YYYY-MM-DD) when possible
+- Only use null if the date truly cannot be determined
 
 Return ONLY valid JSON (no explanations, no markdown, no code fences), in this exact format:
 [
@@ -196,15 +225,15 @@ Return ONLY valid JSON (no explanations, no markdown, no code fences), in this e
 
 Field rules:
 - "event_name": Short descriptive name
-- "event_date": Date label as written (e.g., "Monday", "June 3-5", "All week")
-- "start_date": ISO date YYYY-MM-DD when event starts (or null)
-- "end_date": ISO date YYYY-MM-DD when event ends (or null if same day)
+- "event_date": Date label as written (e.g., "Monday", "June 3-5", "All week") - keep original text
+- "start_date": ISO date YYYY-MM-DD when event starts - CONVERT day names to exact dates using publication date
+- "end_date": ISO date YYYY-MM-DD when event ends (or null if same day) - CONVERT day names to exact dates
 - "start_time": 24-hour time HH:MM (or null)
 - "end_time": 24-hour time HH:MM (or null)
 - "raw_text": Original text describing the event
 - "location": Where the event takes place (or null)
 
-Be conservative: only extract clear events with dates. Never invent information.
+Be conservative: only extract clear events with dates. Never invent information, but DO convert day names to exact dates when the publication date is provided.
 
 Text:
 \"\"\"
@@ -405,58 +434,6 @@ def add_articles_to_vectordb(articles: List[Dict]) -> int:
         return 0
 
 
-def add_events_to_calendar_vectordb(events: List[Dict]) -> int:
-    """
-    Add calendar events to the calendar vector database for semantic search.
-    
-    This mirrors the approach from build_calendar_vectordb.py in rag stuff,
-    enabling semantic search over calendar events with rich metadata.
-    
-    Args:
-        events: List of event dictionaries from LLM extraction
-        
-    Returns:
-        Number of events successfully added to vector DB
-    """
-    if not events:
-        return 0
-    
-    from langchain_community.vectorstores import Chroma
-    sys.path.insert(0, str(Path(__file__).parent.parent / "rag stuff"))
-    from retrieval import GeminiEmbeddings
-    
-    # Convert events to Documents using the same format as build_calendar_vectordb.py
-    documents = events_to_documents(events, source="email_newsletter")
-    
-    if not documents:
-        return 0
-    
-    embeddings = GeminiEmbeddings()
-    
-    try:
-        if config.CALENDAR_VECTORDB_DIR.exists():
-            # Add to existing calendar vector DB
-            vectordb = Chroma(
-                persist_directory=str(config.CALENDAR_VECTORDB_DIR),
-                embedding_function=embeddings
-            )
-            vectordb.add_documents(documents)
-            print(f"  ✓ Added {len(documents)} events to calendar vector DB")
-        else:
-            # Create new calendar vector DB
-            vectordb = Chroma.from_documents(
-                documents=documents,
-                embedding=embeddings,
-                persist_directory=str(config.CALENDAR_VECTORDB_DIR)
-            )
-            print(f"  ✓ Created calendar vector DB with {len(documents)} events")
-        
-        return len(documents)
-    except Exception as e:
-        print(f"  ✗ Error adding events to calendar vector DB: {e}")
-        return 0
-
-
 def insert_events_to_db(events: List[Dict]) -> int:
     """Insert events into the weekly_events table."""
     if not events:
@@ -524,7 +501,6 @@ def sync_email_newsletters_to_sql() -> dict:
         'emails_processed': 0,
         'events_extracted': 0,
         'events_inserted': 0,
-        'events_vectordb_added': 0,
         'articles_extracted': 0,
         'articles_added': 0,
         'errors': []
@@ -594,8 +570,8 @@ def sync_email_newsletters_to_sql() -> dict:
                     print("  ⚠ No text content found")
                     continue
                 
-                # Extract events using LLM
-                events = extract_events_with_llm(full_text, source=f"Email: {subject}")
+                # Extract events using LLM (pass publication date for date inference)
+                events = extract_events_with_llm(full_text, source=f"Email: {subject}", publication_date=pub_date)
                 
                 if events:
                     print(f"  ✓ Extracted {len(events)} events")
@@ -629,18 +605,12 @@ def sync_email_newsletters_to_sql() -> dict:
                 print(f"  ✗ {error_msg}")
                 stats['errors'].append(error_msg)
         
-        # Insert all events to database
+        # Insert all events to database (SQL only - no vector DB for events)
         if all_events:
             print(f"\nInserting {len(all_events)} events into database...")
             inserted = insert_events_to_db(all_events)
             stats['events_inserted'] = inserted
             print(f"✓ Inserted {inserted} events successfully")
-            
-            # Also add events to calendar vector DB for semantic search
-            print(f"\nAdding {len(all_events)} events to calendar vector database...")
-            vectordb_added = add_events_to_calendar_vectordb(all_events)
-            stats['events_vectordb_added'] = vectordb_added
-            print(f"✓ Added {vectordb_added} events to calendar vector DB")
         
         # Add all articles to vector database (if enabled)
         if config.EXTRACT_ARTICLES and all_articles:
@@ -665,7 +635,6 @@ def sync_email_newsletters_to_sql() -> dict:
     print(f"Emails processed: {stats['emails_processed']}")
     print(f"Events extracted: {stats['events_extracted']}")
     print(f"Events inserted (SQL): {stats['events_inserted']}")
-    print(f"Events added to calendar vector DB: {stats['events_vectordb_added']}")
     if config.EXTRACT_ARTICLES:
         print(f"Articles extracted: {stats['articles_extracted']}")
         print(f"Articles added to vector DB: {stats['articles_added']}")

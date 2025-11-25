@@ -60,12 +60,6 @@ def _fix_retrieval_vectordb_path() -> None:
         retrieval.VECTORDB_DIR = expected  # type: ignore[attr-defined]
     except Exception:
         pass
-    # Also fix the calendar vector DB path
-    try:
-        expected_calendar = _REAL_DIR / "vectordb_calendar"
-        retrieval.CALENDAR_VECTORDB_DIR = expected_calendar  # type: ignore[attr-defined]
-    except Exception:
-        pass
 
 
 def _get_llm_client():
@@ -123,8 +117,8 @@ def _route_question(question: str) -> Dict[str, Any]:
         "Available document types in the vector database:\n"
         "- 'transcript': community meeting transcripts with tags like 'safety', 'youth', 'media', 'community', 'displacement', 'government', 'structural racism'\n"
         "- 'policy': city policy documents like 'Boston Anti-Displacement Plan Analysis.txt', 'Boston Slow Streets Plan Analysis.txt', 'Imagine Boston 2030 Analysis.txt'\n"
-        "- 'calendar_event': community events and activities extracted from newsletters\n"
         "- 'client_upload': documents uploaded from Google Drive, organized in folders: 'newsletters', 'policy', 'transcripts'\n\n"
+        "NOTE: Calendar events and schedules are stored in SQL (weekly_events table), NOT in the vector database. Use 'sql' or 'hybrid' mode for event queries.\n\n"
         "If you choose 'rag' or 'hybrid', you may suggest:\n"
         "- up to 2 transcript_tags when relevant. NOTE: For podcast-related queries, usually use the 'media' tag.\n"
         "- policy_sources when asking about specific policy documents\n"
@@ -270,16 +264,8 @@ def _run_rag(question: str, plan: Dict[str, Any], conversation_history: Optional
     combined_chunks: List[str] = []
     combined_meta: List[Dict[str, Any]] = []
 
-    # Always try to retrieve calendar events - they're useful for many queries
-    # and will just return empty if none match
-    try:
-        cal_res = retrieval.retrieve_calendar_events(question, k=k)
-        cal_chunks = cal_res.get("chunks", [])
-        print(f"  📅 Calendar events: {len(cal_chunks)} chunks found")
-        combined_chunks.extend(cal_chunks)
-        combined_meta.extend(cal_res.get("metadata", []))
-    except Exception as e:
-        print(f"  ⚠️ Calendar retrieval error: {e}")
+    # NOTE: Calendar events are now SQL-only (weekly_events table), not in vector DB.
+    # Event queries should use 'sql' or 'hybrid' mode which handles them via SQL.
 
     # transcripts
     try:

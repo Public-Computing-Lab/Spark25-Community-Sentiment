@@ -1,7 +1,7 @@
 """
 Google Drive to Vector DB Ingestion
 Downloads new files from a shared Google Drive folder and adds them to the vector database.
-For newsletters: extracts events page-by-page using LLM and stores in both SQL and vector DB.
+For newsletters: extracts events page-by-page using LLM and stores in SQL.
 """
 import json
 import sys
@@ -32,8 +32,7 @@ import sql_chat.app4 as app4
 import config
 from utils.document_processor import (
     process_file_to_documents,
-    extract_pages_from_pdf,
-    events_to_documents
+    extract_pages_from_pdf
 )
 
 
@@ -179,9 +178,67 @@ def download_file(service, file_id: str, file_name: str) -> Path:
     return local_path
 
 
-def extract_events_from_page(page_text: str, page_num: int, source: str) -> List[Dict]:
+def _extract_date_from_filename(filename: str) -> str | None:
+    """
+    Try to extract a publication date from newsletter filename.
+    Common patterns: "REP 47_25web.pdf", "Newsletter_2025-01-15.pdf", "Jan15_2025.pdf"
+    Returns date in YYYY-MM-DD format or None if not found.
+    """
+    import re
+    from datetime import datetime
+    
+    # Try various date patterns
+    patterns = [
+        r'(\d{4})-(\d{2})-(\d{2})',  # YYYY-MM-DD
+        r'(\d{2})/(\d{2})/(\d{4})',  # MM/DD/YYYY
+        r'(\d{4})(\d{2})(\d{2})',     # YYYYMMDD
+        r'(\d{2})_(\d{2})_(\d{4})',  # MM_DD_YYYY
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, filename)
+        if match:
+            try:
+                if len(match.groups()) == 3:
+                    if pattern == r'(\d{4})-(\d{2})-(\d{2})':
+                        year, month, day = match.groups()
+                    elif pattern == r'(\d{2})/(\d{2})/(\d{4})':
+                        month, day, year = match.groups()
+                    elif pattern == r'(\d{4})(\d{2})(\d{2})':
+                        year, month, day = match.groups()
+                    elif pattern == r'(\d{2})_(\d{2})_(\d{4})':
+                        month, day, year = match.groups()
+                    
+                    date_str = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                    # Validate the date
+                    datetime.strptime(date_str, '%Y-%m-%d')
+                    return date_str
+            except (ValueError, IndexError):
+                continue
+    
+    # Try to extract year from patterns like "REP 47_25web.pdf" (year 2025)
+    year_match = re.search(r'[_\s](\d{2})(?:web|\.pdf|$)', filename)
+    if year_match:
+        year_suffix = year_match.group(1)
+        # Assume 20XX for years 00-99
+        current_year = datetime.now().year
+        century = (current_year // 100) * 100
+        year = century + int(year_suffix)
+        # Use first day of year as fallback (better than nothing)
+        return f"{year}-01-01"
+    
+    return None
+
+
+def extract_events_from_page(page_text: str, page_num: int, source: str, publication_date: str = None) -> List[Dict]:
     """
     Use LLM to extract structured events from a single newsletter page.
+    
+    Args:
+        page_text: Text content from the page
+        page_num: Page number
+        source: Source identifier (filename)
+        publication_date: Newsletter publication date in YYYY-MM-DD format (used to infer exact dates from day names)
     """
     if not config.GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY is not configured")
@@ -197,10 +254,33 @@ def extract_events_from_page(page_text: str, page_num: int, source: str) -> List
     if len(page_text) > max_chars:
         page_text = page_text[:max_chars] + "\n\n[... text truncated ...]"
     
+    # Build date context for the prompt
+    date_context = ""
+    if publication_date:
+        try:
+            from datetime import datetime
+            pub_dt = datetime.strptime(publication_date, '%Y-%m-%d')
+            date_context = f"""
+IMPORTANT DATE CONTEXT:
+- Newsletter publication date: {publication_date} ({pub_dt.strftime('%A, %B %d, %Y')})
+- Use this date to convert day-of-week references (Monday, Tuesday, etc.) to exact dates
+- For example, if the newsletter is dated {publication_date} and an event says "Monday", calculate which Monday that refers to
+- Events typically occur in the week following the newsletter publication date
+- Always prefer exact dates (YYYY-MM-DD) over day names when possible
+"""
+        except Exception:
+            pass
+    
     prompt = f"""
 You are reading PAGE {page_num} of a community newsletter.
-
+{date_context}
 Extract ALL events with their dates and times from this page.
+
+CRITICAL: Convert day-of-week references (Monday, Tuesday, Wednesday, etc.) to EXACT dates (YYYY-MM-DD) using the newsletter publication date as reference.
+- If an event says "Monday" and the newsletter is dated {publication_date or 'unknown'}, calculate the exact Monday date
+- Events in newsletters typically refer to the upcoming week
+- Always provide start_date and end_date in ISO format (YYYY-MM-DD) when possible
+- Only use null if the date truly cannot be determined
 
 Return ONLY valid JSON (no explanations, no markdown, no code fences), in this exact format:
 [
@@ -220,9 +300,9 @@ Return ONLY valid JSON (no explanations, no markdown, no code fences), in this e
 
 Field rules:
 - "event_name": Short descriptive name
-- "event_date": Date label as written (e.g., "Monday", "June 3-5", "All week")
-- "start_date": ISO date YYYY-MM-DD when event starts (or null if unclear)
-- "end_date": ISO date YYYY-MM-DD when event ends (or null if same day)
+- "event_date": Date label as written (e.g., "Monday", "June 3-5", "All week") - keep original text
+- "start_date": ISO date YYYY-MM-DD when event starts - CONVERT day names to exact dates using publication date
+- "end_date": ISO date YYYY-MM-DD when event ends (or null if same day) - CONVERT day names to exact dates
 - "start_time": 24-hour time HH:MM (or null)
 - "end_time": 24-hour time HH:MM (or null)
 - "raw_text": Original text describing the event (include full details)
@@ -231,7 +311,7 @@ Field rules:
 
 If there are NO events on this page, return an empty array: []
 
-Be thorough but conservative: extract all clear events but never invent information.
+Be thorough but conservative: extract all clear events but never invent information, but DO convert day names to exact dates when the publication date is provided.
 
 Page {page_num} text:
 \"\"\"
@@ -336,51 +416,37 @@ def insert_events_to_db(events: List[Dict]) -> int:
     return inserted_count
 
 
-def add_events_to_calendar_vectordb(events: List[Dict]) -> int:
-    """Add calendar events to the calendar vector database for semantic search."""
-    if not events:
-        return 0
-    
-    # Convert events to Documents
-    documents = events_to_documents(events, source="google_drive_newsletter")
-    
-    if not documents:
-        return 0
-    
-    embeddings = GeminiEmbeddings()
-    
-    try:
-        if config.CALENDAR_VECTORDB_DIR.exists():
-            vectordb = Chroma(
-                persist_directory=str(config.CALENDAR_VECTORDB_DIR),
-                embedding_function=embeddings
-            )
-            vectordb.add_documents(documents)
-        else:
-            vectordb = Chroma.from_documents(
-                documents=documents,
-                embedding=embeddings,
-                persist_directory=str(config.CALENDAR_VECTORDB_DIR)
-            )
-        
-        return len(documents)
-    except Exception as e:
-        print(f"  ⚠ Error adding events to calendar vector DB: {e}")
-        return 0
-
-
 def process_newsletter_pdf(file_path: Path, file_metadata: Dict) -> Dict:
     """
     Process a newsletter PDF page by page:
     1. Extract text from each page
     2. Use LLM to extract events from each page
-    3. Store events in SQL and calendar vector DB
+    3. Store events in SQL
     4. Also create document chunks for the main vector DB
     
     Returns dict with 'documents' (for vector DB) and 'events' (extracted events)
     """
     source_name = file_metadata.get('name', 'unknown')
     print(f"  📰 Processing newsletter page-by-page: {source_name}")
+    
+    # Try to determine publication date from filename or file metadata
+    publication_date = _extract_date_from_filename(source_name)
+    if not publication_date:
+        # Fallback to file modification date
+        try:
+            modified_time = file_metadata.get('modifiedTime', '')
+            if modified_time:
+                from datetime import datetime
+                # Parse ISO format datetime and extract date
+                pub_dt = datetime.fromisoformat(modified_time.replace('Z', '+00:00'))
+                publication_date = pub_dt.strftime('%Y-%m-%d')
+        except Exception:
+            pass
+    
+    if publication_date:
+        print(f"    📅 Using publication date: {publication_date}")
+    else:
+        print(f"    ⚠ Could not determine publication date - day names may not be converted to exact dates")
     
     # Extract pages
     try:
@@ -409,8 +475,8 @@ def process_newsletter_pdf(file_path: Path, file_metadata: Dict) -> Dict:
         
         print(f"    📄 Page {page_num}/{total_pages}: ", end="")
         
-        # Extract events from this page using LLM
-        events = extract_events_from_page(page_text, page_num, source_name)
+        # Extract events from this page using LLM (pass publication date for date inference)
+        events = extract_events_from_page(page_text, page_num, source_name, publication_date=publication_date)
         
         if events:
             print(f"found {len(events)} events")
@@ -496,7 +562,7 @@ def cleanup_temp_files() -> None:
 def sync_google_drive_to_vectordb() -> dict:
     """
     Main function to sync Google Drive files to vector database.
-    For newsletters: extracts events and stores in SQL + calendar vector DB.
+    For newsletters: extracts events and stores in SQL.
     Returns summary statistics.
     """
     print("=" * 80)
@@ -508,7 +574,6 @@ def sync_google_drive_to_vectordb() -> dict:
         'chunks_added': 0,
         'events_extracted': 0,
         'events_sql_inserted': 0,
-        'events_vectordb_added': 0,
         'errors': []
     }
     
@@ -609,18 +674,12 @@ def sync_google_drive_to_vectordb() -> dict:
             add_documents_to_vectordb(all_documents)
             stats['chunks_added'] = len(all_documents)
         
-        # Insert events to SQL database
+        # Insert events to SQL database (events are SQL-only, no vector DB)
         if all_events:
             print(f"\nInserting {len(all_events)} events into SQL database...")
             inserted = insert_events_to_db(all_events)
             stats['events_sql_inserted'] = inserted
             print(f"✓ Inserted {inserted} events to SQL")
-            
-            # Add events to calendar vector DB
-            print(f"Adding {len(all_events)} events to calendar vector database...")
-            vectordb_added = add_events_to_calendar_vectordb(all_events)
-            stats['events_vectordb_added'] = vectordb_added
-            print(f"✓ Added {vectordb_added} events to calendar vector DB")
         
         # Save updated sync state
         state['processed_files'] = processed_files
@@ -642,7 +701,6 @@ def sync_google_drive_to_vectordb() -> dict:
     print(f"Document chunks added: {stats['chunks_added']}")
     print(f"Events extracted: {stats['events_extracted']}")
     print(f"Events inserted (SQL): {stats['events_sql_inserted']}")
-    print(f"Events added (Calendar Vector DB): {stats['events_vectordb_added']}")
     print(f"Errors: {len(stats['errors'])}")
     print("=" * 80)
     

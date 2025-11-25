@@ -6,7 +6,7 @@ Step 2: Execute retrieval based on LLM's decision
 Step 3: LLM generates final answer from context
 """
 
-from retrieval import retrieve, retrieve_transcripts, retrieve_policies, retrieve_calendar_events, format_results
+from retrieval import retrieve, retrieve_transcripts, retrieve_policies, format_results
 from dotenv import load_dotenv
 import json
 import os
@@ -41,7 +41,9 @@ Available doc types in the vector database:
                 "community", "displacement", "government", "structural racism".
 - "policy": city policy documents like "Boston Anti-Displacement Plan Analysis.txt",
            "Boston Slow Streets Plan Analysis.txt", "Imagine Boston 2030 Analysis.txt".
-- "calendar_event": community events and activities extracted from newsletters.
+- "client_upload": documents uploaded from Google Drive (newsletters, policy, transcripts).
+
+NOTE: Calendar events are stored in SQL (weekly_events table), NOT in vector DB.
 
 User question:
 {query}
@@ -51,7 +53,7 @@ Decide what to retrieve for ONE similarity search.
 Respond ONLY with valid JSON (no markdown, no code fences):
 
 {{
-  "doc_types": ["transcript", "policy", "calendar_event"],
+  "doc_types": ["transcript", "policy", "client_upload"],
   "tags": ["safety", "youth"] or null,
   "source": "Boston Anti-Displacement Plan Analysis.txt" or null,
   "k": 5
@@ -320,126 +322,6 @@ def two_step_rag(query, verbose=True):
     }
 
 
-def plan_calendar_retrieval(query):
-    """
-    Calendar-specific planner: LLM analyzes query and proposes
-    a semantic search query plus simple filters.
-
-    This is kept separate from the main policy/transcript planner.
-    """
-    client, model_name = _get_gemini_client()
-    model = client.GenerativeModel(model_name)
-
-    planning_prompt = f"""You are a retrieval planner for a calendar events vector database.
-
-The documents represent individual events with metadata like:
-- event_name: short human-readable name
-- event_date: human-friendly label as written (e.g. "Monday", "June 3–5, 2025", "All week")
-- start_date: ISO date YYYY-MM-DD when the event starts (or null)
-- end_date: ISO date YYYY-MM-DD when the event ends (or null)
-- start_time: 24h time HH:MM when the event starts (or null)
-- end_time: 24h time HH:MM when the event ends (or null)
-- source: PDF filename where the event came from
-
-Your task: Analyze the user's question and:
-- produce a concise semantic_query that should be used for similarity search over event descriptions
-- optionally propose simple filters that describe what subset of events they care about
-
-USER QUESTION: {query}
-
-Respond in JSON format:
-{{
-  "semantic_query": "short query for semantic search",
-  "filters": {{
-    "date_keywords": ["Monday", "June 3", "this week"] or null,
-    "time_keywords": ["morning", "evening"] or null,
-    "source_pdfs": ["REP 47_25web.pdf"] or null
-  }},
-  "k_results": 5
-}}
-
-Rules:
-- semantic_query should be short and focused, and should already reflect any important date/time constraints
-- filters are just hints for the human; keep them small and relevant
-- If you are unsure about filters, set them to null.
-    """
-
-    response = model.generate_content(planning_prompt, generation_config={"temperature": 0})
-
-    try:
-        content = (getattr(response, "text", "") or "").strip()
-        if "```json" in content:
-            content = content.split("```json")[1].split("```")[0].strip()
-        elif "```" in content:
-            content = content.split("```")[1].split("```")[0].strip()
-
-        plan = json.loads(content)
-        return plan
-    except Exception as e:
-        print(f"Error parsing calendar plan: {e}")
-        print(f"Raw response: {getattr(response, 'text', '')}")
-        return {
-            "semantic_query": query,
-            "filters": None,
-            "k_results": 5,
-        }
-
-
-def calendar_two_step_rag(query, verbose=True):
-    """
-    Simple two-step pipeline for calendar events:
-      1) LLM plans semantic_query + filters
-      2) Run similarity search on the calendar DB using semantic_query
-    """
-    if verbose:
-        print(f"\n{'='*80}")
-        print(f"CALENDAR QUESTION: {query}")
-        print(f"{'='*80}\n")
-        print("🧠 STEP 1 (Calendar): Planning retrieval strategy...")
-
-    plan = plan_calendar_retrieval(query)
-
-    if verbose:
-        print("\nCalendar Retrieval Plan:")
-        print(f"  Semantic query: {plan.get('semantic_query')}")
-        filters = plan.get("filters") or {}
-        print(f"  Date keywords: {filters.get('date_keywords')}")
-        print(f"  Time keywords: {filters.get('time_keywords')}")
-        print(f"  Source PDFs: {filters.get('source_pdfs')}")
-        print(f"  Results to retrieve: {plan.get('k_results')}")
-
-    if verbose:
-        print(f"\n🔍 STEP 2 (Calendar): Retrieving events from calendar vectordb...")
-
-    semantic_query = plan.get("semantic_query") or query
-    k = plan.get("k_results", 5)
-
-    if verbose:
-        print(f"\nUsing semantic query for vectordb search:\n  {semantic_query}")
-
-    results = retrieve_calendar_events(semantic_query, k=k)
-
-    if verbose:
-        print(f"\nRetrieved {len(results['chunks'])} calendar chunks.")
-        print("\nRaw calendar documents (full metadata + content):")
-        for i, (chunk, meta) in enumerate(zip(results.get("chunks", []), results.get("metadata", [])), start=1):
-            print(f"\n--- Calendar Result {i} ---")
-            print("Metadata:")
-            print(json.dumps(meta, indent=2, ensure_ascii=False))
-            print("\nContent:")
-            print(chunk)
-            print("\n---------------------------")
-
-    print("\nCalendar retrieval results (summary):\n")
-    print(format_results(results))
-
-    return {
-        "query": query,
-        "plan": plan,
-        "retrieval": results,
-    }
-
-
 def demo_1():
     """Demo: Media representation question"""
     print("\n🎯 DEMO 1: Community Perspectives on Media")
@@ -474,19 +356,6 @@ def demo_4():
     
     query = "What are the perspectives on youth involvement in violence, and what solutions do people suggest?"
     two_step_rag(query, verbose=True)
-
-
-def demo_calendar():
-    """Demo: Calendar events from PDF vectordb."""
-    print("\n🎯 DEMO 5: Calendar events from PDF")
-    print("-" * 80)
-
-    query = input("\nEnter your calendar question: ").strip()
-    if not query:
-        query = "What events are happening this week?"
-        print(f"Using default: {query}")
-
-    calendar_two_step_rag(query, verbose=True)
 
 
 def demo_interactive():
@@ -545,10 +414,10 @@ def main():
     print("  4. Complex multi-faceted query")
     print("  5. Interactive - your own question")
     print("  6. Run all demos")
-    print("  7. Calendar events (PDF vectordb test)")
-    print("  8. Mixed vectordb (Gemini-planned retrieve)")
+    print("  7. Mixed vectordb (Gemini-planned retrieve)")
+    print("\nNOTE: Calendar events are now SQL-only. Use unified_chatbot.py for event queries.")
     
-    choice = input("\nSelect demo (1-8, default=1): ").strip() or "1"
+    choice = input("\nSelect demo (1-7, default=1): ").strip() or "1"
     
     if choice == "1":
         demo_1()
@@ -573,8 +442,6 @@ def main():
         if interactive == 'y':
             demo_interactive()
     elif choice == "7":
-        demo_calendar()
-    elif choice == "8":
         demo_vectordb_mixed()
     
     print("\n" + "="*80)
