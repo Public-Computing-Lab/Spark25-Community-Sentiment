@@ -31,6 +31,7 @@ from utils.email_parser import (
     get_email_subject,
     get_email_date
 )
+from utils.document_processor import events_to_documents
 
 # Gmail OAuth scopes - using Gmail API (readonly)
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
@@ -404,6 +405,58 @@ def add_articles_to_vectordb(articles: List[Dict]) -> int:
         return 0
 
 
+def add_events_to_calendar_vectordb(events: List[Dict]) -> int:
+    """
+    Add calendar events to the calendar vector database for semantic search.
+    
+    This mirrors the approach from build_calendar_vectordb.py in rag stuff,
+    enabling semantic search over calendar events with rich metadata.
+    
+    Args:
+        events: List of event dictionaries from LLM extraction
+        
+    Returns:
+        Number of events successfully added to vector DB
+    """
+    if not events:
+        return 0
+    
+    from langchain_community.vectorstores import Chroma
+    sys.path.insert(0, str(Path(__file__).parent.parent / "rag stuff"))
+    from retrieval import GeminiEmbeddings
+    
+    # Convert events to Documents using the same format as build_calendar_vectordb.py
+    documents = events_to_documents(events, source="email_newsletter")
+    
+    if not documents:
+        return 0
+    
+    embeddings = GeminiEmbeddings()
+    
+    try:
+        if config.CALENDAR_VECTORDB_DIR.exists():
+            # Add to existing calendar vector DB
+            vectordb = Chroma(
+                persist_directory=str(config.CALENDAR_VECTORDB_DIR),
+                embedding_function=embeddings
+            )
+            vectordb.add_documents(documents)
+            print(f"  ✓ Added {len(documents)} events to calendar vector DB")
+        else:
+            # Create new calendar vector DB
+            vectordb = Chroma.from_documents(
+                documents=documents,
+                embedding=embeddings,
+                persist_directory=str(config.CALENDAR_VECTORDB_DIR)
+            )
+            print(f"  ✓ Created calendar vector DB with {len(documents)} events")
+        
+        return len(documents)
+    except Exception as e:
+        print(f"  ✗ Error adding events to calendar vector DB: {e}")
+        return 0
+
+
 def insert_events_to_db(events: List[Dict]) -> int:
     """Insert events into the weekly_events table."""
     if not events:
@@ -471,6 +524,7 @@ def sync_email_newsletters_to_sql() -> dict:
         'emails_processed': 0,
         'events_extracted': 0,
         'events_inserted': 0,
+        'events_vectordb_added': 0,
         'articles_extracted': 0,
         'articles_added': 0,
         'errors': []
@@ -581,6 +635,12 @@ def sync_email_newsletters_to_sql() -> dict:
             inserted = insert_events_to_db(all_events)
             stats['events_inserted'] = inserted
             print(f"✓ Inserted {inserted} events successfully")
+            
+            # Also add events to calendar vector DB for semantic search
+            print(f"\nAdding {len(all_events)} events to calendar vector database...")
+            vectordb_added = add_events_to_calendar_vectordb(all_events)
+            stats['events_vectordb_added'] = vectordb_added
+            print(f"✓ Added {vectordb_added} events to calendar vector DB")
         
         # Add all articles to vector database (if enabled)
         if config.EXTRACT_ARTICLES and all_articles:
@@ -604,7 +664,8 @@ def sync_email_newsletters_to_sql() -> dict:
     print("Email Newsletter Sync Complete")
     print(f"Emails processed: {stats['emails_processed']}")
     print(f"Events extracted: {stats['events_extracted']}")
-    print(f"Events inserted: {stats['events_inserted']}")
+    print(f"Events inserted (SQL): {stats['events_inserted']}")
+    print(f"Events added to calendar vector DB: {stats['events_vectordb_added']}")
     if config.EXTRACT_ARTICLES:
         print(f"Articles extracted: {stats['articles_extracted']}")
         print(f"Articles added to vector DB: {stats['articles_added']}")

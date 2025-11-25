@@ -164,3 +164,50 @@ def get_file_info(file_path: Path) -> Dict[str, Any]:
         'extension': file_path.suffix.lower()
     }
 
+
+def events_to_documents(events: List[Dict[str, Any]], source: str = "unknown") -> List[Document]:
+    """
+    Convert event dictionaries into LangChain Documents for the calendar vector DB.
+    
+    This follows the same approach as build_calendar_vectordb.py in the rag stuff folder,
+    creating documents optimized for semantic search of calendar events.
+    
+    Args:
+        events: List of event dictionaries with keys:
+            - event_name: Short descriptive name
+            - event_date: Date label as written (e.g., "Monday", "June 3-5")
+            - start_date: ISO date YYYY-MM-DD (or None)
+            - end_date: ISO date YYYY-MM-DD (or None)
+            - start_time: 24-hour time HH:MM (or None)
+            - end_time: 24-hour time HH:MM (or None)
+            - raw_text: Original text describing the event
+            - location: Where the event takes place (optional)
+        source: Source identifier (e.g., "Email: Newsletter Subject")
+        
+    Returns:
+        List of Document objects ready for calendar vector DB ingestion
+    """
+    documents = []
+    
+    for event in events:
+        raw_text = (event.get("raw_text") or "").strip()
+        if not raw_text:
+            continue
+        
+        # Build metadata matching the build_calendar_vectordb.py format
+        metadata = {
+            "source": source,
+            "doc_type": "calendar_event",
+            "ingestion_date": datetime.now().isoformat(),
+        }
+        
+        # Add all event fields to metadata (except raw_text which becomes page_content)
+        for key, value in event.items():
+            if key == "raw_text":
+                continue
+            if value is not None and value != "":
+                metadata[key] = value
+        
+        documents.append(Document(page_content=raw_text, metadata=metadata))
+    
+    return documents

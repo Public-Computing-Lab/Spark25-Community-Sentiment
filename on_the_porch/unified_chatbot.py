@@ -55,6 +55,12 @@ def _fix_retrieval_vectordb_path() -> None:
         retrieval.VECTORDB_DIR = expected  # type: ignore[attr-defined]
     except Exception:
         pass
+    # Also fix the calendar vector DB path
+    try:
+        expected_calendar = _REAL_DIR / "vectordb_calendar"
+        retrieval.CALENDAR_VECTORDB_DIR = expected_calendar  # type: ignore[attr-defined]
+    except Exception:
+        pass
 
 
 def _get_llm_client():
@@ -215,6 +221,18 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
         return "\n\n".join(context_parts[:10])  # fallback: show a sample of context
 
 
+def _is_calendar_question(question: str) -> bool:
+    """Check if the question is about events, calendar, or schedules."""
+    calendar_keywords = [
+        "event", "events", "happening", "schedule", "calendar", "activity", "activities",
+        "this week", "next week", "today", "tomorrow", "weekend", "saturday", "sunday",
+        "monday", "tuesday", "wednesday", "thursday", "friday", "what's on", "what is on",
+        "going on", "things to do", "community event", "meeting", "workshop"
+    ]
+    question_lower = question.lower()
+    return any(kw in question_lower for kw in calendar_keywords)
+
+
 def _run_rag(question: str, plan: Dict[str, Any], conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     k = int(plan.get("k", 5))
     tags = plan.get("transcript_tags")
@@ -222,6 +240,18 @@ def _run_rag(question: str, plan: Dict[str, Any], conversation_history: Optional
 
     combined_chunks: List[str] = []
     combined_meta: List[Dict[str, Any]] = []
+
+    # Check if this is a calendar/events question
+    is_calendar_q = _is_calendar_question(question)
+
+    # calendar events (if question is about events/calendar)
+    if is_calendar_q:
+        try:
+            cal_res = retrieval.retrieve_calendar_events(question, k=k)
+            combined_chunks.extend(cal_res.get("chunks", []))
+            combined_meta.extend(cal_res.get("metadata", []))
+        except Exception:
+            pass
 
     # transcripts
     try:

@@ -59,10 +59,12 @@ def print_final_summary(drive_stats: dict, email_stats: dict) -> None:
     
     # Email stats
     emails = email_stats.get('emails_processed', 0)
-    events = email_stats.get('events_inserted', 0)
+    events_sql = email_stats.get('events_inserted', 0)
+    events_vectordb = email_stats.get('events_vectordb_added', 0)
     articles = email_stats.get('articles_added', 0)
     print(f"║ Emails Processed:             {emails:>5}                                      ║")
-    print(f"║ Calendar Events Inserted:     {events:>5}                                      ║")
+    print(f"║ Calendar Events (SQL):        {events_sql:>5}                                      ║")
+    print(f"║ Calendar Events (Vector DB):  {events_vectordb:>5}                                      ║")
     if config.EXTRACT_ARTICLES:
         print(f"║ Newsletter Articles Added:    {articles:>5}                                      ║")
     

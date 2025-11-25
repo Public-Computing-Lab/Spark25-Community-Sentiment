@@ -50,12 +50,19 @@ IMAP_PORT = int(os.getenv("IMAP_PORT", "993"))
 # ============================================================================
 # File Paths Configuration
 # ============================================================================
-# Vector DB directory
+# Vector DB directory (main documents)
 _VECTORDB_DIR_RAW = os.getenv("VECTORDB_DIR", "../vectordb_new")
 if Path(_VECTORDB_DIR_RAW).is_absolute():
     VECTORDB_DIR = Path(_VECTORDB_DIR_RAW)
 else:
     VECTORDB_DIR = (_THIS_DIR / _VECTORDB_DIR_RAW).resolve()
+
+# Calendar Vector DB directory (for event semantic search)
+_CALENDAR_VECTORDB_DIR_RAW = os.getenv("CALENDAR_VECTORDB_DIR", "../vectordb_calendar")
+if Path(_CALENDAR_VECTORDB_DIR_RAW).is_absolute():
+    CALENDAR_VECTORDB_DIR = Path(_CALENDAR_VECTORDB_DIR_RAW)
+else:
+    CALENDAR_VECTORDB_DIR = (_THIS_DIR / _CALENDAR_VECTORDB_DIR_RAW).resolve()
 
 # Temporary download directory
 _TEMP_DIR_RAW = os.getenv("TEMP_DOWNLOAD_DIR", "./temp_downloads")
@@ -150,6 +157,7 @@ def print_config_summary():
     print(f"Gmail Token File: {GMAIL_TOKEN_PATH}")
     print(f"IMAP Server: {IMAP_SERVER}:{IMAP_PORT}")
     print(f"Vector DB Directory: {VECTORDB_DIR}")
+    print(f"Calendar Vector DB Directory: {CALENDAR_VECTORDB_DIR}")
     print(f"Temp Download Directory: {TEMP_DOWNLOAD_DIR}")
     print(f"Database: {'Configured' if DATABASE_URL else 'Not configured'}")
     print(f"Gemini Model: {GEMINI_MODEL}")
