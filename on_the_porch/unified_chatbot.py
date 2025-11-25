@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -91,6 +92,7 @@ def _route_question(question: str) -> Dict[str, Any]:
     client = _get_llm_client()
 
     system_prompt = (
+        f"Today's date is {date.today().strftime('%A, %B %d, %Y')}.\n\n"
         "You are a routing classifier for a chatbot that combines SQL (structured data) and RAG (text documents).\n"
         "Classify the user's question into one of three modes: 'sql', 'rag', or 'hybrid'.\n\n"
         "Use the following logic with examples grounded in our data:\n"
@@ -100,11 +102,12 @@ def _route_question(question: str) -> Dict[str, Any]:
         "  'What is the trend in shots fired by year in Boston?',\n"
         "  'Which neighborhoods have the highest arrests in 2023?'\n"
         "- 'rag': ONLY for purely qualitative, descriptive, or policy questions answered by documents/transcripts, such as\n"
-        "  'Boston Anti-Displacement Plan Analysis.txt', 'Boston Slow Streets Plan Analysis.txt', 'Imagine Boston 2030 Analysis.txt',\n"
-        "  or interview transcripts tagged with 'safety', 'violence', 'youth', 'media', 'community', 'displacement', 'government', 'structural racism'.\n"
+        "  policy documents, interview transcripts, newsletters, or client-uploaded files.\n"
         "  Examples: 'What does the Slow Streets program aim to achieve?',\n"
         "  'How do community members describe media representation of Dorchester?',\n"
-        "  'What strategies does the Anti-Displacement Plan propose?'\n"
+        "  'What strategies does the Anti-Displacement Plan propose?',\n"
+        "  'What was in the latest newsletter?',\n"
+        "  'Summarize the recent meeting transcripts'\n"
         "- 'hybrid': PREFERRED when both numbers and context are needed, OR when questions involve location/data visualization, "
         "  OR when questions are about events, calendars, schedules, or \"what is happening\" on a given day or week so you can use both weekly events SQL data and RAG documents.\n"
         "  Examples: 'How many homicides were recorded in Dorchester last year, and what concerns about safety come up in interviews?',\n"
@@ -112,17 +115,28 @@ def _route_question(question: str) -> Dict[str, Any]:
         "  'Show me where crime incidents occurred in Dorchester',\n"
         "  'What locations have the most service requests?',\n"
         "  'What events are happening this week?',\n"
-        "  'What activities are available for kids on Saturday?'\n\n"
+        "  'What activities are available for kids on Saturday?',\n"
+        "  'Show me only public meetings happening next week'\n\n"
         "IMPORTANT: When questions involve 'where', 'location', 'map', 'show', 'visualize', 'geography', spatial data, "
-        "or events/calendars/schedules, prefer 'hybrid' mode to combine SQL (including weekly events tables) with RAG context.\n"
-        "If you choose 'rag' or 'hybrid', you may suggest up to 2 transcript_tags and policy_sources when clearly relevant.\n"
-        "Respond ONLY as compact JSON with keys: mode, transcript_tags, policy_sources, k."
+        "or events/calendars/schedules, prefer 'hybrid' mode to combine SQL (including weekly events tables) with RAG context.\n\n"
+        "For event/calendar questions, set 'k' to at least 5 to ensure multiple events are retrieved. The SQL 'weekly_events' table now includes a 'category' column (e.g., 'Youth/Family', 'Public Meeting') which can be used for filtering.\n\n"
+        "Available document types in the vector database:\n"
+        "- 'transcript': community meeting transcripts with tags like 'safety', 'youth', 'media', 'community', 'displacement', 'government', 'structural racism'\n"
+        "- 'policy': city policy documents like 'Boston Anti-Displacement Plan Analysis.txt', 'Boston Slow Streets Plan Analysis.txt', 'Imagine Boston 2030 Analysis.txt'\n"
+        "- 'calendar_event': community events and activities extracted from newsletters\n"
+        "- 'client_upload': documents uploaded from Google Drive, organized in folders: 'newsletters', 'policy', 'transcripts'\n\n"
+        "If you choose 'rag' or 'hybrid', you may suggest:\n"
+        "- up to 2 transcript_tags when relevant. NOTE: For podcast-related queries, usually use the 'media' tag.\n"
+        "- policy_sources when asking about specific policy documents\n"
+        "- folder_categories when asking about client-uploaded documents (newsletters, policy, transcripts)\n"
+        "Respond ONLY as compact JSON with keys: mode, transcript_tags, policy_sources, folder_categories, k."
     )
 
     user_prompt = (
         "Question:\n" + question + "\n\n"
         "Policy sources include: 'Boston Anti-Displacement Plan Analysis.txt', 'Boston Slow Streets Plan Analysis.txt', 'Imagine Boston 2030 Analysis.txt'.\n"
         "Transcript tags include: safety, violence, youth, media, community, displacement, government, structural racism.\n"
+        "Folder categories (for client uploads): newsletters, policy, transcripts.\n"
         "Output JSON only."
     )
 
@@ -130,6 +144,7 @@ def _route_question(question: str) -> Dict[str, Any]:
         "mode": "hybrid",
         "transcript_tags": None,
         "policy_sources": None,
+        "folder_categories": None,
         "k": 5,
     }
 
@@ -159,12 +174,22 @@ def _route_question(question: str) -> Dict[str, Any]:
         mode = "hybrid"  # Default to hybrid for safety
     tags = plan.get("transcript_tags")
     sources = plan.get("policy_sources")
+    folders = plan.get("folder_categories")
     k = plan.get("k", 5)
+    
+    # Force higher k for calendar questions to ensure good event coverage
+    if _is_calendar_question(question):
+        # Ensure at least 5 results for calendar queries
+        if isinstance(k, int) and k < 5:
+            k = 5
+        elif not isinstance(k, int):
+            k = 5
 
     return {
         "mode": mode,
         "transcript_tags": tags if isinstance(tags, list) or tags is None else None,
         "policy_sources": sources if isinstance(sources, list) or sources is None else None,
+        "folder_categories": folders if isinstance(folders, list) or folders is None else None,
         "k": int(k) if isinstance(k, int) else 5,
     }
 
@@ -245,25 +270,26 @@ def _run_rag(question: str, plan: Dict[str, Any], conversation_history: Optional
     combined_chunks: List[str] = []
     combined_meta: List[Dict[str, Any]] = []
 
-    # Check if this is a calendar/events question
-    is_calendar_q = _is_calendar_question(question)
-
-    # calendar events (if question is about events/calendar)
-    if is_calendar_q:
-        try:
-            cal_res = retrieval.retrieve_calendar_events(question, k=k)
-            combined_chunks.extend(cal_res.get("chunks", []))
-            combined_meta.extend(cal_res.get("metadata", []))
-        except Exception:
-            pass
+    # Always try to retrieve calendar events - they're useful for many queries
+    # and will just return empty if none match
+    try:
+        cal_res = retrieval.retrieve_calendar_events(question, k=k)
+        cal_chunks = cal_res.get("chunks", [])
+        print(f"  📅 Calendar events: {len(cal_chunks)} chunks found")
+        combined_chunks.extend(cal_chunks)
+        combined_meta.extend(cal_res.get("metadata", []))
+    except Exception as e:
+        print(f"  ⚠️ Calendar retrieval error: {e}")
 
     # transcripts
     try:
         t_res = retrieval.retrieve_transcripts(question, tags=tags, k=k)
-        combined_chunks.extend(t_res.get("chunks", []))
+        t_chunks = t_res.get("chunks", [])
+        print(f"  📝 Transcripts: {len(t_chunks)} chunks found")
+        combined_chunks.extend(t_chunks)
         combined_meta.extend(t_res.get("metadata", []))
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"  ⚠️ Transcript retrieval error: {e}")
 
     # policies
     try:
@@ -274,10 +300,12 @@ def _run_rag(question: str, plan: Dict[str, Any], conversation_history: Optional
                 combined_meta.extend(p_res.get("metadata", []))
         else:
             p_res = retrieval.retrieve_policies(question, k=k)
-            combined_chunks.extend(p_res.get("chunks", []))
+            p_chunks = p_res.get("chunks", [])
+            print(f"  📋 Policies: {len(p_chunks)} chunks found")
+            combined_chunks.extend(p_chunks)
             combined_meta.extend(p_res.get("metadata", []))
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"  ⚠️ Policy retrieval error: {e}")
 
     answer = _compose_rag_answer(question, combined_chunks, combined_meta, conversation_history)
     return {"answer": answer, "chunks": combined_chunks, "metadata": combined_meta}
@@ -417,6 +445,9 @@ def main() -> None:
 
         plan = _route_question(question)
         mode = plan.get("mode", "rag")
+        
+        # Print the routing plan
+        print(f"\n🧭 Routing Plan: {json.dumps(plan, indent=2)}\n")
 
         try:
             if mode == "sql":

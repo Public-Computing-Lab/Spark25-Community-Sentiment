@@ -195,6 +195,10 @@ def main() -> None:
 
                     mode = plan.get("mode", "rag")
                     
+                    # Display the routing plan
+                    with st.expander("🧭 Routing Plan", expanded=False):
+                        st.json(plan)
+                    
                     # Prepare conversation history (format: list of {"role": "user"/"assistant", "content": "..."})
                     conversation_history = st.session_state.conversation_history.copy()
 
@@ -229,6 +233,18 @@ def main() -> None:
                             out = uc._run_rag(prompt, plan, conversation_history)
                             response_text = out.get("answer", "")
                             metas: List[Dict[str, Any]] = out.get("metadata", [])
+                            
+                            # Show retrieval stats by doc type
+                            doc_type_counts: Dict[str, int] = {}
+                            for m in metas:
+                                dt = m.get("doc_type", "unknown")
+                                doc_type_counts[dt] = doc_type_counts.get(dt, 0) + 1
+                            
+                            with st.expander("📊 Retrieval Stats", expanded=False):
+                                for dt, count in doc_type_counts.items():
+                                    st.write(f"- **{dt}**: {count} chunks")
+                                if not doc_type_counts:
+                                    st.write("No chunks retrieved")
                             
                             assistant_msg = {
                                 "role": "assistant",
@@ -266,6 +282,19 @@ def main() -> None:
                             
                             ragp = out.get("rag", {})
                             metas: List[Dict[str, Any]] = ragp.get("metadata", [])
+                            
+                            # Show retrieval stats by doc type
+                            doc_type_counts: Dict[str, int] = {}
+                            for m in metas:
+                                dt = m.get("doc_type", "unknown")
+                                doc_type_counts[dt] = doc_type_counts.get(dt, 0) + 1
+                            
+                            with st.expander("📊 RAG Retrieval Stats", expanded=False):
+                                for dt, count in doc_type_counts.items():
+                                    st.write(f"- **{dt}**: {count} chunks")
+                                if not doc_type_counts:
+                                    st.write("No chunks retrieved")
+                            
                             if metas:
                                 assistant_msg["sources"] = [m.get("source", "Unknown") for m in metas[:20]]
                                 with st.expander("Sources"):
@@ -276,6 +305,18 @@ def main() -> None:
                         out = uc._run_rag(prompt, plan, conversation_history)
                         response_text = out.get("answer", "")
                         metas: List[Dict[str, Any]] = out.get("metadata", [])
+                        
+                        # Show retrieval stats by doc type
+                        doc_type_counts: Dict[str, int] = {}
+                        for m in metas:
+                            dt = m.get("doc_type", "unknown")
+                            doc_type_counts[dt] = doc_type_counts.get(dt, 0) + 1
+                        
+                        with st.expander("📊 Retrieval Stats", expanded=False):
+                            for dt, count in doc_type_counts.items():
+                                st.write(f"- **{dt}**: {count} chunks")
+                            if not doc_type_counts:
+                                st.write("No chunks retrieved")
                         
                         assistant_msg = {
                             "role": "assistant",

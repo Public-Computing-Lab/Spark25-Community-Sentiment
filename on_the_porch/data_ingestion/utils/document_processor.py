@@ -12,13 +12,36 @@ from langchain_core.documents import Document
 
 
 def extract_text_from_pdf(file_path: Path) -> str:
-    """Extract text from a PDF file."""
+    """Extract text from a PDF file (all pages combined)."""
     try:
         reader = PdfReader(file_path)
         text = "\n\n".join(page.extract_text() or "" for page in reader.pages)
         return text.strip()
     except Exception as e:
         raise ValueError(f"Failed to extract text from PDF: {e}")
+
+
+def extract_pages_from_pdf(file_path: Path) -> List[Dict[str, Any]]:
+    """
+    Extract text from a PDF file page by page.
+    
+    Returns:
+        List of dicts with 'page_num' and 'text' for each page
+    """
+    try:
+        reader = PdfReader(file_path)
+        pages = []
+        for i, page in enumerate(reader.pages, start=1):
+            text = (page.extract_text() or "").strip()
+            if text:
+                pages.append({
+                    'page_num': i,
+                    'text': text,
+                    'total_pages': len(reader.pages)
+                })
+        return pages
+    except Exception as e:
+        raise ValueError(f"Failed to extract pages from PDF: {e}")
 
 
 def extract_text_from_docx(file_path: Path) -> str:
@@ -67,11 +90,20 @@ def extract_text_from_file(file_path: Path) -> str:
         raise ValueError(f"Unsupported file type: {ext}")
 
 
+# Chunk size settings per folder category
+CHUNK_SETTINGS = {
+    'newsletters': {'chunk_size': 2500, 'chunk_overlap': 300, 'page_wise': True},
+    'policy': {'chunk_size': 1500, 'chunk_overlap': 200, 'page_wise': False},
+    'transcripts': {'chunk_size': 1500, 'chunk_overlap': 200, 'page_wise': False},
+    'default': {'chunk_size': 1000, 'chunk_overlap': 200, 'page_wise': False},
+}
+
+
 def process_file_to_documents(
     file_path: Path,
     file_metadata: Dict[str, Any],
-    chunk_size: int = 1000,
-    chunk_overlap: int = 200
+    chunk_size: int = None,
+    chunk_overlap: int = None
 ) -> List[Document]:
     """
     Process a file into LangChain documents for the vector DB.
@@ -79,13 +111,27 @@ def process_file_to_documents(
     Args:
         file_path: Path to the file
         file_metadata: Metadata about the file (id, name, modifiedTime, etc.)
-        chunk_size: Size of text chunks
-        chunk_overlap: Overlap between chunks
+        chunk_size: Size of text chunks (auto-determined by folder_category if None)
+        chunk_overlap: Overlap between chunks (auto-determined by folder_category if None)
         
     Returns:
         List of Document objects ready for vector DB ingestion
     """
-    # Extract text from file
+    folder_category = file_metadata.get('folder_category', 'root')
+    settings = CHUNK_SETTINGS.get(folder_category, CHUNK_SETTINGS['default'])
+    
+    # Use provided values or fall back to settings
+    chunk_size = chunk_size or settings['chunk_size']
+    chunk_overlap = chunk_overlap or settings['chunk_overlap']
+    use_page_wise = settings.get('page_wise', False)
+    
+    ext = file_path.suffix.lower()
+    
+    # For newsletters PDFs, process page by page
+    if use_page_wise and ext == '.pdf':
+        return _process_pdf_page_wise(file_path, file_metadata, chunk_size, chunk_overlap)
+    
+    # Standard processing for other files
     text = extract_text_from_file(file_path)
     
     if not text.strip():
@@ -107,14 +153,73 @@ def process_file_to_documents(
             metadata={
                 'source': file_metadata.get('name', 'unknown'),
                 'doc_type': 'client_upload',
+                'folder_category': folder_category,
                 'chunk_id': i,
                 'drive_file_id': file_metadata.get('id', ''),
                 'modified_time': file_metadata.get('modifiedTime', ''),
                 'ingestion_date': datetime.now().isoformat(),
-                'file_extension': file_path.suffix.lower()
+                'file_extension': ext
             }
         )
         documents.append(doc)
+    
+    return documents
+
+
+def _process_pdf_page_wise(
+    file_path: Path,
+    file_metadata: Dict[str, Any],
+    chunk_size: int,
+    chunk_overlap: int
+) -> List[Document]:
+    """
+    Process a PDF file page by page, creating chunks for each page separately.
+    This preserves page context and is better for newsletters.
+    """
+    folder_category = file_metadata.get('folder_category', 'root')
+    pages = extract_pages_from_pdf(file_path)
+    
+    if not pages:
+        return []
+    
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=["\n\n", "\n", ". ", " ", ""]
+    )
+    
+    documents = []
+    chunk_id = 0
+    
+    for page_info in pages:
+        page_num = page_info['page_num']
+        total_pages = page_info['total_pages']
+        page_text = page_info['text']
+        
+        if not page_text.strip():
+            continue
+        
+        # Split this page's text into chunks
+        page_chunks = text_splitter.split_text(page_text)
+        
+        for chunk in page_chunks:
+            doc = Document(
+                page_content=chunk,
+                metadata={
+                    'source': file_metadata.get('name', 'unknown'),
+                    'doc_type': 'client_upload',
+                    'folder_category': folder_category,
+                    'chunk_id': chunk_id,
+                    'page_num': page_num,
+                    'total_pages': total_pages,
+                    'drive_file_id': file_metadata.get('id', ''),
+                    'modified_time': file_metadata.get('modifiedTime', ''),
+                    'ingestion_date': datetime.now().isoformat(),
+                    'file_extension': '.pdf'
+                }
+            )
+            documents.append(doc)
+            chunk_id += 1
     
     return documents
 
@@ -182,6 +287,7 @@ def events_to_documents(events: List[Dict[str, Any]], source: str = "unknown") -
             - end_time: 24-hour time HH:MM (or None)
             - raw_text: Original text describing the event
             - location: Where the event takes place (optional)
+            - category: Event category (e.g. "Youth/Family", "Public Meeting")
         source: Source identifier (e.g., "Email: Newsletter Subject")
         
     Returns:
@@ -207,6 +313,10 @@ def events_to_documents(events: List[Dict[str, Any]], source: str = "unknown") -
                 continue
             if value is not None and value != "":
                 metadata[key] = value
+                
+        # If category exists, prepend it to content for better semantic search
+        if event.get("category"):
+            raw_text = f"[{event['category']}] {raw_text}"
         
         documents.append(Document(page_content=raw_text, metadata=metadata))
     
