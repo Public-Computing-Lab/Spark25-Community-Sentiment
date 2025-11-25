@@ -14,13 +14,13 @@ from retrieval import GeminiEmbeddings
 
 load_dotenv()
 
-# Default input directories (can be overridden by callers)
-DEFAULT_POLICY_DIR = Path("Data/VectorDB_text")
-DEFAULT_TRANSCRIPT_DIR = Path("Data/AI meeting transcripts")
-DEFAULT_NEWSLETTER_DIR = Path("Data/newsletters")
+# Input directories
+POLICY_DIR = Path("Data/VectorDB_text")
+TRANSCRIPT_DIR = Path("Data/AI meeting transcripts")
+NEWSLETTER_DIR = Path("Data/newsletters")
 
-# Shared vector DB used by the chatbot (must match retrieval.py)
-DEFAULT_VECTORDB_DIR = Path("../vectordb_new")
+# Shared vector DB used by the chatbot
+VECTORDB_DIR = Path("../vectordb_mixed")
 
 
 def _get_gemini_client():
@@ -95,14 +95,14 @@ def parse_transcript_chunks(file_path):
     return documents
 
 
-def load_policy_documents(policy_dir: Path):
+def load_policy_documents():
     """Load policy documents with markdown header metadata."""
     documents = []
 
-    if not policy_dir.exists() or not policy_dir.is_dir():
+    if not POLICY_DIR.exists() or not POLICY_DIR.is_dir():
         return documents
 
-    text_files = list(policy_dir.glob("*.txt"))
+    text_files = list(POLICY_DIR.glob("*.txt"))
     print(f"Found {len(text_files)} policy files")
     
     # Define headers to split on
@@ -135,14 +135,14 @@ def load_policy_documents(policy_dir: Path):
     return documents
 
 
-def load_transcript_documents(transcript_dir: Path):
+def load_transcript_documents():
     """Load and parse AI meeting transcripts with tags."""
     documents = []
 
-    if not transcript_dir.exists() or not transcript_dir.is_dir():
+    if not TRANSCRIPT_DIR.exists() or not TRANSCRIPT_DIR.is_dir():
         return documents
 
-    transcript_files = list(transcript_dir.glob("*.txt"))
+    transcript_files = list(TRANSCRIPT_DIR.glob("*.txt"))
     print(f"Found {len(transcript_files)} transcript files")
     
     for file_path in transcript_files:
@@ -281,17 +281,17 @@ def _newsletter_events_to_documents(events, pdf_path: str):
     return documents
 
 
-def load_newsletter_documents(newsletter_dir: Path):
+def load_newsletter_documents():
     """
     Load newsletter PDFs and convert extracted events into Documents,
     mirroring the chunking logic from build_calendar_vectordb.py.
     """
     documents = []
 
-    if not newsletter_dir.exists() or not newsletter_dir.is_dir():
+    if not NEWSLETTER_DIR.exists() or not NEWSLETTER_DIR.is_dir():
         return documents
 
-    pdf_files = list(newsletter_dir.glob("*.pdf"))
+    pdf_files = list(NEWSLETTER_DIR.glob("*.pdf"))
     print(f"Found {len(pdf_files)} newsletter PDFs")
 
     for pdf_path in pdf_files:
@@ -313,24 +313,14 @@ def load_newsletter_documents(newsletter_dir: Path):
     return documents
 
 
-def build_vectordb(
-    policy_dir: Path | None = None,
-    transcript_dir: Path | None = None,
-    newsletter_dir: Path | None = None,
-    vectordb_dir: Path | None = None,
-):
+def build_vectordb():
     """
     Build or update the vector database from
     policy docs, meeting transcripts, and newsletters.
     """
-    policy_dir = policy_dir or DEFAULT_POLICY_DIR
-    transcript_dir = transcript_dir or DEFAULT_TRANSCRIPT_DIR
-    newsletter_dir = newsletter_dir or DEFAULT_NEWSLETTER_DIR
-    vectordb_dir = vectordb_dir or DEFAULT_VECTORDB_DIR
-
-    policy_docs = load_policy_documents(policy_dir)
-    transcript_docs = load_transcript_documents(transcript_dir)
-    newsletter_docs = load_newsletter_documents(newsletter_dir)
+    policy_docs = load_policy_documents()
+    transcript_docs = load_transcript_documents()
+    newsletter_docs = load_newsletter_documents()
 
     all_documents = policy_docs + transcript_docs + newsletter_docs
 
@@ -347,19 +337,19 @@ def build_vectordb(
 
     embeddings = GeminiEmbeddings()
 
-    if vectordb_dir.exists():
-        print(f"Adding documents to existing vector database at {vectordb_dir}")
+    if VECTORDB_DIR.exists():
+        print(f"Adding documents to existing vector database at {VECTORDB_DIR}")
         vectordb = Chroma(
-            persist_directory=str(vectordb_dir),
+            persist_directory=str(VECTORDB_DIR),
             embedding_function=embeddings,
         )
         vectordb.add_documents(all_documents)
     else:
-        print(f"Creating new vector database at {vectordb_dir}")
+        print(f"Creating new vector database at {VECTORDB_DIR}")
         vectordb = Chroma.from_documents(
             documents=all_documents,
             embedding=embeddings,
-            persist_directory=str(vectordb_dir),
+            persist_directory=str(VECTORDB_DIR),
         )
 
     print("Vector database update complete.")

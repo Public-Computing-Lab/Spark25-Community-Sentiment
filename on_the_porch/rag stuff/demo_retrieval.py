@@ -26,6 +26,93 @@ def _get_gemini_client():
     return genai, GEMINI_MODEL
 
 
+def plan_vectordb_mixed(query: str) -> dict:
+    """
+    Use Gemini to decide arguments for a single call to retrieval.retrieve().
+    """
+    client, model_name = _get_gemini_client()
+    model = client.GenerativeModel(model_name)
+
+    planning_prompt = f"""
+You are a routing planner for a semantic search system about Boston community data.
+
+Available doc types in the vector database:
+- "transcript": community meeting transcripts with tags like "safety", "youth", "media",
+                "community", "displacement", "government", "structural racism".
+- "policy": city policy documents like "Boston Anti-Displacement Plan Analysis.txt",
+           "Boston Slow Streets Plan Analysis.txt", "Imagine Boston 2030 Analysis.txt".
+- "calendar_event": community events and activities extracted from newsletters.
+
+User question:
+{query}
+
+Decide what to retrieve for ONE similarity search.
+
+Respond ONLY with valid JSON (no markdown, no code fences):
+
+{{
+  "doc_types": ["transcript", "policy", "calendar_event"],
+  "tags": ["safety", "youth"] or null,
+  "source": "Boston Anti-Displacement Plan Analysis.txt" or null,
+  "k": 5
+}}
+
+Rules:
+- Choose the smallest set of doc_types that makes sense (often 1 or 2).
+- Use at most 2 tags when helpful; otherwise set "tags" to null.
+- Only set "source" when the question is clearly about a specific policy document.
+- Keep "k" between 3 and 10.
+"""
+
+    try:
+        resp = model.generate_content(
+            planning_prompt,
+            generation_config={"temperature": 0}
+        )
+        content = (getattr(resp, "text", "") or "").strip()
+        if content.startswith("```"):
+            content = content.strip("`").strip()
+            lines = content.splitlines()
+            if lines and lines[0].strip().lower() in ("json", "javascript", "js"):
+                content = "\n".join(lines[1:]).strip()
+        plan = json.loads(content)
+    except Exception:
+        plan = {
+            "doc_types": ["transcript", "policy"],
+            "tags": None,
+            "source": None,
+            "k": 5,
+        }
+
+    # Normalize doc_types
+    doc_types = plan.get("doc_types") or []
+    if isinstance(doc_types, str):
+        doc_types = [doc_types]
+    plan["doc_types"] = [dt for dt in doc_types if isinstance(dt, str) and dt]
+
+    # Normalize tags
+    tags = plan.get("tags")
+    if not isinstance(tags, list):
+        tags = None
+    plan["tags"] = tags
+
+    # Normalize source
+    source = plan.get("source")
+    if not isinstance(source, str) or not source.strip():
+        source = None
+    plan["source"] = source
+
+    # Normalize k
+    k = plan.get("k", 5)
+    try:
+        k = int(k)
+    except Exception:
+        k = 5
+    plan["k"] = max(1, min(k, 20))
+
+    return plan
+
+
 def plan_retrieval(query):
     """
     Step 1: LLM analyzes query and decides what to retrieve.
@@ -417,6 +504,33 @@ def demo_interactive():
     two_step_rag(query, verbose=verbose)
 
 
+def demo_vectordb_mixed():
+    """Single-step demo: Gemini plans → unified vectordb retrieve."""
+    print("\n🎯 MIXED VECTORDb DEMO")
+    print("-" * 80)
+
+    query = input("\nEnter your question: ").strip()
+    if not query:
+        query = "What do people say about safety, and what events are happening this week?"
+        print(f"Using default: {query}")
+
+    plan = plan_vectordb_mixed(query)
+
+    results = retrieve(
+        query,
+        k=plan.get("k", 5),
+        doc_type=plan.get("doc_types"),
+        tags=plan.get("tags"),
+        source=plan.get("source"),
+    )
+
+    print("\nRetrieval plan:")
+    print(json.dumps(plan, indent=2, ensure_ascii=False))
+
+    print("\nRetrieval results (summary):\n")
+    print(format_results(results))
+
+
 def main():
     """Run demos"""
     print("\n" + "="*80)
@@ -432,8 +546,9 @@ def main():
     print("  5. Interactive - your own question")
     print("  6. Run all demos")
     print("  7. Calendar events (PDF vectordb test)")
+    print("  8. Mixed vectordb (Gemini-planned retrieve)")
     
-    choice = input("\nSelect demo (1-6, default=1): ").strip() or "1"
+    choice = input("\nSelect demo (1-8, default=1): ").strip() or "1"
     
     if choice == "1":
         demo_1()
@@ -459,6 +574,8 @@ def main():
             demo_interactive()
     elif choice == "7":
         demo_calendar()
+    elif choice == "8":
+        demo_vectordb_mixed()
     
     print("\n" + "="*80)
     print("Demo complete! ✨")

@@ -4,8 +4,7 @@ from datetime import date
 import os
 import google.generativeai as genai  # type: ignore
 
-VECTORDB_DIR = Path("../vectordb_new")
-CALENDAR_VECTORDB_DIR = Path("../vectordb_calendar")
+VECTORDB_DIR = Path("../vectordb_mixed")
 GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "models/text-embedding-004")
 
 
@@ -37,20 +36,10 @@ class GeminiEmbeddings:
 
 
 def load_vectordb():
-    """Load the main (policy + transcripts) vector database."""
+    """Load the unified vector database (policies, transcripts, calendar events, etc.)."""
     embeddings = GeminiEmbeddings()
     vectordb = Chroma(
         persist_directory=str(VECTORDB_DIR),
-        embedding_function=embeddings,
-    )
-    return vectordb
-
-
-def load_calendar_vectordb():
-    """Load the separate calendar events vector database."""
-    embeddings = GeminiEmbeddings()
-    vectordb = Chroma(
-        persist_directory=str(CALENDAR_VECTORDB_DIR),
         embedding_function=embeddings,
     )
     return vectordb
@@ -99,21 +88,31 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None, 
     if vectordb is None:
         vectordb = load_vectordb()
     
-    # Build filter dictionary (Chroma requires $and for multiple conditions)
+    # Build filter dictionary (Chroma requires $and / $or for combinations)
     filter_dict = None
-    
-    if doc_type and source:
-        # Multiple filters - use $and
+
+    # Allow doc_type to be a single value or a list of values
+    doc_filter = None
+    if isinstance(doc_type, (list, tuple)):
+        doc_types = [dt for dt in doc_type if dt]
+        if len(doc_types) == 1:
+            doc_filter = {"doc_type": doc_types[0]}
+        elif len(doc_types) > 1:
+            doc_filter = {"$or": [{"doc_type": dt} for dt in doc_types]}
+    elif doc_type:
+        doc_filter = {"doc_type": doc_type}
+
+    if doc_filter and source:
         filter_dict = {
             "$and": [
-                {"doc_type": doc_type},
-                {"source": source}
+                doc_filter,
+                {"source": source},
             ]
         }
-    elif doc_type:
-        filter_dict = {'doc_type': doc_type}
+    elif doc_filter:
+        filter_dict = doc_filter
     elif source:
-        filter_dict = {'source': source}
+        filter_dict = {"source": source}
     
     # Note: Tag filtering is more complex in Chroma
     # For now, we'll filter tags in post-processing if specified
@@ -215,24 +214,22 @@ def retrieve_policies(query, k=5, source=None):
 
 def retrieve_calendar_events(query, k=5, start_date: str | None = None, end_date: str | None = None):
     """
-    Convenience function for calendar-event-only search.
-
+    Convenience function for calendar-event-only search on the unified vectordb.
+    
     Args:
         query: Search query
         k: Number of results
-
+    
     Example:
         retrieve_calendar_events("What events are happening this week?", k=5)
         retrieve_calendar_events("events", start_date="2025-03-01", end_date="2025-03-07")
     """
-    calendar_db = load_calendar_vectordb()
-
     # If no date filters, just delegate to generic retrieval.
     if not start_date and not end_date:
-        return retrieve(query, k=k, doc_type='calendar_event', vectordb=calendar_db)
-
+        return retrieve(query, k=k, doc_type='calendar_event')
+    
     # With date filters, get a few extra candidates then filter by overlap.
-    base = retrieve(query, k=k * 3, doc_type='calendar_event', vectordb=calendar_db)
+    base = retrieve(query, k=k * 3, doc_type='calendar_event')
 
     q_start = _parse_iso_date(start_date) if start_date else None
     q_end = _parse_iso_date(end_date) if end_date else None

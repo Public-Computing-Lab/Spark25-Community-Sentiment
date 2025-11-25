@@ -13,6 +13,20 @@ from google_drive_to_vectordb import sync_google_drive_to_vectordb
 from email_to_calendar_sql import sync_email_newsletters_to_sql
 import config
 
+# Temporary: import vectordb builder from rag stuff (will be moved into this package later)
+_RAG_STUFF_DIR = Path(__file__).parent.parent / "rag stuff"
+if str(_RAG_STUFF_DIR) not in sys.path:
+    sys.path.insert(0, str(_RAG_STUFF_DIR))
+from build_vectordb import build_vectordb  # type: ignore
+
+# Placeholder directories where future ingestion steps will drop files
+INGESTION_POLICY_DIR = config.TEMP_DOWNLOAD_DIR / "policy_docs"
+INGESTION_TRANSCRIPT_DIR = config.TEMP_DOWNLOAD_DIR / "transcripts"
+INGESTION_NEWSLETTER_DIR = config.TEMP_DOWNLOAD_DIR / "newsletters"
+
+for _d in (INGESTION_POLICY_DIR, INGESTION_TRANSCRIPT_DIR, INGESTION_NEWSLETTER_DIR):
+    _d.mkdir(parents=True, exist_ok=True)
+
 
 def log_run_summary(drive_stats: dict, email_stats: dict) -> None:
     """Log summary of the ingestion run to a JSONL file."""
@@ -129,6 +143,18 @@ def main():
             "articles_added": 0,
             "errors": [str(e)]
         }
+    
+    # After ingestion, update the unified vector DB from any files present
+    # in the placeholder directories. Future steps will copy the right files
+    # into these folders before this runs.
+    try:
+        build_vectordb(
+            policy_dir=INGESTION_POLICY_DIR,
+            transcript_dir=INGESTION_TRANSCRIPT_DIR,
+            newsletter_dir=INGESTION_NEWSLETTER_DIR,
+        )
+    except Exception as e:
+        print(f"\n⚠️  Vectordb build/update failed: {e}")
     
     # Log summary
     log_run_summary(drive_stats, email_stats)

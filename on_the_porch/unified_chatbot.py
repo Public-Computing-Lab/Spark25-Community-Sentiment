@@ -4,6 +4,10 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 # Ensure we can import RAG utilities from the directory with a space in its name
 _THIS_FILE = Path(__file__).resolve()
