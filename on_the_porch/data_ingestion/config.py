@@ -29,10 +29,21 @@ if GOOGLE_CREDENTIALS_PATH and not Path(GOOGLE_CREDENTIALS_PATH).is_absolute():
     GOOGLE_CREDENTIALS_PATH = str(_THIS_DIR / GOOGLE_CREDENTIALS_PATH)
 
 # ============================================================================
-# Email Configuration
+# Email Configuration (Gmail OAuth 2.0)
 # ============================================================================
 EMAIL_ADDRESS = os.getenv("NEWSLETTER_EMAIL_ADDRESS", "")
-EMAIL_PASSWORD = os.getenv("NEWSLETTER_EMAIL_PASSWORD", "")
+
+# OAuth 2.0 credentials (for Gmail)
+GMAIL_CREDENTIALS_PATH = os.getenv("GMAIL_CREDENTIALS_PATH", "gmail_credentials.json")
+GMAIL_TOKEN_PATH = os.getenv("GMAIL_TOKEN_PATH", "gmail_token.json")
+
+# Convert to absolute path if relative
+if GMAIL_CREDENTIALS_PATH and not Path(GMAIL_CREDENTIALS_PATH).is_absolute():
+    GMAIL_CREDENTIALS_PATH = str(_THIS_DIR / GMAIL_CREDENTIALS_PATH)
+if GMAIL_TOKEN_PATH and not Path(GMAIL_TOKEN_PATH).is_absolute():
+    GMAIL_TOKEN_PATH = str(_THIS_DIR / GMAIL_TOKEN_PATH)
+
+# IMAP settings (Gmail defaults)
 IMAP_SERVER = os.getenv("IMAP_SERVER", "imap.gmail.com")
 IMAP_PORT = int(os.getenv("IMAP_PORT", "993"))
 
@@ -76,6 +87,10 @@ EMAIL_LOOKBACK_DAYS = int(os.getenv("EMAIL_LOOKBACK_DAYS", "7"))
 MAX_FILES_PER_RUN = int(os.getenv("MAX_FILES_PER_RUN", "100"))
 VERBOSE_LOGGING = os.getenv("VERBOSE_LOGGING", "false").lower() in ("true", "1", "yes")
 
+# Article extraction settings
+EXTRACT_ARTICLES = os.getenv("EXTRACT_ARTICLES", "true").lower() in ("true", "1", "yes")
+ARTICLE_MIN_LENGTH = int(os.getenv("ARTICLE_MIN_LENGTH", "50"))
+
 # ============================================================================
 # Sync State Files
 # ============================================================================
@@ -105,12 +120,12 @@ def validate_config() -> list:
     if not Path(GOOGLE_CREDENTIALS_PATH).exists():
         errors.append(f"Google credentials file not found: {GOOGLE_CREDENTIALS_PATH}")
     
-    # Check Email config
+    # Check Email config (Gmail OAuth)
     if not EMAIL_ADDRESS:
         errors.append("NEWSLETTER_EMAIL_ADDRESS is not set")
     
-    if not EMAIL_PASSWORD:
-        errors.append("NEWSLETTER_EMAIL_PASSWORD is not set")
+    if not Path(GMAIL_CREDENTIALS_PATH).exists():
+        errors.append(f"Gmail OAuth credentials file not found: {GMAIL_CREDENTIALS_PATH}")
     
     # Check Gemini config
     if not GEMINI_API_KEY:
@@ -131,6 +146,8 @@ def print_config_summary():
     print(f"Google Drive Folder ID: {GOOGLE_DRIVE_FOLDER_ID[:20]}..." if len(GOOGLE_DRIVE_FOLDER_ID) > 20 else f"Google Drive Folder ID: {GOOGLE_DRIVE_FOLDER_ID}")
     print(f"Google Credentials: {GOOGLE_CREDENTIALS_PATH}")
     print(f"Email Address: {EMAIL_ADDRESS}")
+    print(f"Gmail OAuth Credentials: {GMAIL_CREDENTIALS_PATH}")
+    print(f"Gmail Token File: {GMAIL_TOKEN_PATH}")
     print(f"IMAP Server: {IMAP_SERVER}:{IMAP_PORT}")
     print(f"Vector DB Directory: {VECTORDB_DIR}")
     print(f"Temp Download Directory: {TEMP_DOWNLOAD_DIR}")

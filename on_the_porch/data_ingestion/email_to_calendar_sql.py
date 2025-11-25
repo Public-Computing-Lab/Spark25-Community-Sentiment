@@ -1,13 +1,21 @@
 """
 Email Newsletter to Calendar SQL Ingestion
 Reads newsletters from a dedicated email inbox and extracts events to SQL database.
+Uses Gmail API with OAuth 2.0 authentication (more reliable than IMAP).
 """
-import imaplib
 import json
 import sys
+import base64
 from pathlib import Path
 from typing import List, Dict
 from datetime import datetime, timedelta
+import email
+
+# Gmail API
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
 
 # LLM for extraction
 import google.generativeai as genai
@@ -20,8 +28,12 @@ import config
 from utils.email_parser import (
     extract_text_from_email,
     extract_pdf_attachments,
-    get_email_subject
+    get_email_subject,
+    get_email_date
 )
+
+# Gmail OAuth scopes - using Gmail API (readonly)
+SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
 
 def load_email_sync_state() -> dict:
@@ -40,64 +52,112 @@ def save_email_sync_state(state: dict) -> None:
     config.EMAIL_SYNC_STATE_FILE.write_text(json.dumps(state, indent=2))
 
 
-def connect_to_email() -> imaplib.IMAP4_SSL:
-    """Connect to email server via IMAP."""
-    if not config.EMAIL_ADDRESS or not config.EMAIL_PASSWORD:
-        raise ValueError("Email credentials not configured")
+def get_gmail_credentials() -> Credentials:
+    """Get or refresh Gmail OAuth 2.0 credentials."""
+    creds = None
+    token_path = Path(config.GMAIL_TOKEN_PATH)
+    
+    # Load existing token if available
+    if token_path.exists():
+        try:
+            creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+        except Exception:
+            pass
+    
+    # If no valid credentials, go through OAuth flow
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            # Refresh the token
+            try:
+                creds.refresh(Request())
+            except Exception:
+                # If refresh fails, re-authenticate
+                creds = None
+        
+        if not creds:
+            # Run OAuth flow (opens browser for user to authorize)
+            credentials_path = Path(config.GMAIL_CREDENTIALS_PATH)
+            if not credentials_path.exists():
+                raise FileNotFoundError(
+                    f"Gmail OAuth credentials not found: {config.GMAIL_CREDENTIALS_PATH}\n"
+                    "Please download credentials from Google Cloud Console."
+                )
+            
+            flow = InstalledAppFlow.from_client_secrets_file(
+                str(credentials_path), SCOPES
+            )
+            # Use fixed port 8080 so redirect URI is predictable
+            creds = flow.run_local_server(port=8080)
+        
+        # Save the credentials for next run
+        token_path.write_text(creds.to_json())
+    
+    return creds
+
+
+def get_gmail_service():
+    """Get authenticated Gmail API service."""
+    if not config.EMAIL_ADDRESS:
+        raise ValueError("NEWSLETTER_EMAIL_ADDRESS not configured")
     
     try:
-        mail = imaplib.IMAP4_SSL(config.IMAP_SERVER, config.IMAP_PORT)
-        mail.login(config.EMAIL_ADDRESS, config.EMAIL_PASSWORD)
-        return mail
+        # Get OAuth credentials
+        creds = get_gmail_credentials()
+        
+        # Build Gmail API service
+        service = build('gmail', 'v1', credentials=creds)
+        return service
     except Exception as e:
-        raise RuntimeError(f"Failed to connect to email server: {e}")
+        raise RuntimeError(f"Failed to connect to Gmail API: {e}")
 
 
-def get_recent_newsletters(mail: imaplib.IMAP4_SSL, processed_ids: List[str], days_back: int = 7) -> List[tuple]:
+def get_recent_newsletters(service, processed_ids: List[str], days_back: int = 7) -> List[tuple]:
     """
-    Fetch recent newsletters that haven't been processed.
+    Fetch recent newsletters using Gmail API.
     Returns list of (email_id, email_message) tuples.
     """
-    # Select inbox
-    mail.select("inbox")
-    
-    # Search for emails from the last N days
-    since_date = (datetime.now() - timedelta(days=days_back)).strftime("%d-%b-%Y")
-    
     try:
-        status, messages = mail.search(None, f'(SINCE {since_date})')
-    except Exception as e:
-        raise RuntimeError(f"Failed to search emails: {e}")
-    
-    if status != "OK":
-        return []
-    
-    email_ids = messages[0].split()
-    
-    newsletters = []
-    for email_id in email_ids:
-        email_id_str = email_id.decode()
+        # Calculate date for query
+        since_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y/%m/%d')
         
-        # Skip if already processed
-        if email_id_str in processed_ids:
-            continue
+        # Search for recent emails
+        query = f'after:{since_date}'
+        results = service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=100
+        ).execute()
         
-        # Fetch email
-        try:
-            status, msg_data = mail.fetch(email_id, "(RFC822)")
-            if status != "OK":
+        messages = results.get('messages', [])
+        
+        newsletters = []
+        for msg_ref in messages:
+            msg_id = msg_ref['id']
+            
+            # Skip if already processed
+            if msg_id in processed_ids:
                 continue
             
-            # Parse email
-            import email
-            raw_email = msg_data[0][1]
-            msg = email.message_from_bytes(raw_email)
-            
-            newsletters.append((email_id_str, msg))
-        except Exception:
-            continue
-    
-    return newsletters
+            # Get full message
+            try:
+                message = service.users().messages().get(
+                    userId='me',
+                    id=msg_id,
+                    format='raw'
+                ).execute()
+                
+                # Decode the raw message
+                raw_email = base64.urlsafe_b64decode(message['raw'])
+                msg = email.message_from_bytes(raw_email)
+                
+                newsletters.append((msg_id, msg))
+            except Exception:
+                continue
+        
+        return newsletters
+        
+    except Exception as e:
+        raise RuntimeError(f"Failed to fetch emails from Gmail API: {e}")
 
 
 def extract_events_with_llm(text: str, source: str) -> List[Dict]:
@@ -181,6 +241,169 @@ Text:
         return []
 
 
+def extract_articles_with_llm(text: str, source: str, publication_date: str = None) -> List[Dict]:
+    """Use LLM to extract news articles/stories from newsletter text (excluding events)."""
+    if not config.GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY is not configured")
+    
+    genai.configure(api_key=config.GEMINI_API_KEY)
+    model = genai.GenerativeModel(config.GEMINI_MODEL)
+    
+    # Truncate very long text to avoid token limits
+    max_chars = 15000
+    if len(text) > max_chars:
+        text = text[:max_chars] + "\n\n[... text truncated ...]"
+    
+    prompt = f"""
+You are reading a community newsletter that contains news articles, stories, and announcements.
+
+Extract ALL distinct news articles, stories, opinion pieces, and announcements from the text below.
+EXCLUDE event listings, calendars, and schedules (those are handled separately).
+
+Return ONLY valid JSON (no explanations, no markdown, no code fences), in this exact format:
+[
+  {{
+    "title": "...",
+    "content": "...",
+    "section": "...",
+    "topics": ["...", "..."],
+    "summary": "..."
+  }},
+  ...
+]
+
+Field rules:
+- "title": Article headline or title (brief)
+- "content": Full article text
+- "section": Type of content - one of: "news", "opinion", "announcement", "feature_story", "community_update", "other"
+- "topics": List of 2-5 main topics/themes (e.g., ["housing", "community", "safety"])
+- "summary": 1-2 sentence summary of the article
+
+Only extract substantial content (at least 50 words). Skip:
+- Event listings and calendars
+- Advertisements
+- Boilerplate text (headers, footers, contact info)
+- Navigation elements
+
+Be conservative: only extract clear, distinct articles. Never invent content.
+
+Text:
+\"\"\"
+{text}
+\"\"\"
+"""
+    
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config={"temperature": 0}
+        )
+        text_response = (response.text or "").strip()
+        
+        # Clean up potential code fences
+        if text_response.startswith("```"):
+            text_response = text_response.strip("`").strip()
+            lines = text_response.splitlines()
+            if lines and lines[0].strip().lower() in ("json", "javascript"):
+                text_response = "\n".join(lines[1:]).strip()
+        
+        articles = json.loads(text_response)
+        
+        if not isinstance(articles, list):
+            return []
+        
+        # Add source and publication date to each article
+        for article in articles:
+            article['source'] = source
+            if publication_date:
+                article['publication_date'] = publication_date
+        
+        return articles
+        
+    except Exception as e:
+        print(f"  ✗ Error extracting articles with LLM: {e}")
+        return []
+
+
+def add_articles_to_vectordb(articles: List[Dict]) -> int:
+    """Add newsletter articles to the vector database."""
+    if not articles:
+        return 0
+    
+    # Import here to avoid circular dependencies
+    from langchain_core.documents import Document
+    from langchain_community.vectorstores import Chroma
+    sys.path.insert(0, str(Path(__file__).parent.parent / "rag stuff"))
+    from retrieval import GeminiEmbeddings
+    
+    documents = []
+    for article in articles:
+        # Skip articles that are too short
+        content = article.get('content', '')
+        if len(content.split()) < config.ARTICLE_MIN_LENGTH:
+            continue
+        
+        # Create metadata
+        metadata = {
+            'source': article.get('source', 'newsletter'),
+            'doc_type': 'newsletter_article',
+            'title': article.get('title', 'Untitled'),
+            'section': article.get('section', 'other'),
+            'publication_date': article.get('publication_date', datetime.now().isoformat()[:10]),
+            'ingestion_date': datetime.now().isoformat(),
+        }
+        
+        # Add topics as comma-separated string for filtering
+        topics = article.get('topics', [])
+        if topics and isinstance(topics, list):
+            metadata['topics'] = ', '.join(topics)
+        
+        # Add summary if available
+        summary = article.get('summary', '')
+        if summary:
+            metadata['summary'] = summary
+        
+        # Create document with title + summary + content
+        doc_content = f"# {article.get('title', 'Article')}\n\n"
+        if summary:
+            doc_content += f"**Summary:** {summary}\n\n"
+        doc_content += content
+        
+        doc = Document(
+            page_content=doc_content,
+            metadata=metadata
+        )
+        documents.append(doc)
+    
+    if not documents:
+        return 0
+    
+    # Add to vector database
+    embeddings = GeminiEmbeddings()
+    
+    try:
+        if config.VECTORDB_DIR.exists():
+            vectordb = Chroma(
+                persist_directory=str(config.VECTORDB_DIR),
+                embedding_function=embeddings
+            )
+            vectordb.add_documents(documents)
+            print(f"  ✓ Added {len(documents)} articles to vector DB")
+        else:
+            # Create new vector DB if it doesn't exist
+            vectordb = Chroma.from_documents(
+                documents=documents,
+                embedding=embeddings,
+                persist_directory=str(config.VECTORDB_DIR)
+            )
+            print(f"  ✓ Created vector DB with {len(documents)} articles")
+        
+        return len(documents)
+    except Exception as e:
+        print(f"  ✗ Error adding articles to vector DB: {e}")
+        return 0
+
+
 def insert_events_to_db(events: List[Dict]) -> int:
     """Insert events into the weekly_events table."""
     if not events:
@@ -248,6 +471,8 @@ def sync_email_newsletters_to_sql() -> dict:
         'emails_processed': 0,
         'events_extracted': 0,
         'events_inserted': 0,
+        'articles_extracted': 0,
+        'articles_added': 0,
         'errors': []
     }
     
@@ -265,29 +490,37 @@ def sync_email_newsletters_to_sql() -> dict:
         state = load_email_sync_state()
         processed_ids = state.get('processed_email_ids', [])
         
-        # Connect to email
-        print("Connecting to email server...")
-        mail = connect_to_email()
+        # Connect to Gmail API
+        print("Connecting to Gmail API...")
+        service = get_gmail_service()
         print("✓ Connected successfully")
         
         # Get recent newsletters
         print(f"Scanning inbox for newsletters from last {config.EMAIL_LOOKBACK_DAYS} days...")
-        newsletters = get_recent_newsletters(mail, processed_ids, days_back=config.EMAIL_LOOKBACK_DAYS)
+        newsletters = get_recent_newsletters(service, processed_ids, days_back=config.EMAIL_LOOKBACK_DAYS)
         
         print(f"Found {len(newsletters)} new newsletters to process.")
         
         if not newsletters:
             print("No new newsletters. Exiting.")
-            mail.logout()
             return stats
         
         all_events = []
+        all_articles = []
         
         # Process each newsletter
         for i, (email_id, msg) in enumerate(newsletters, 1):
             try:
-                # Get subject
+                # Get subject and date
                 subject = get_email_subject(msg)
+                email_date = get_email_date(msg)
+                
+                # Try to parse publication date
+                from email.utils import parsedate_to_datetime
+                try:
+                    pub_date = parsedate_to_datetime(email_date).strftime('%Y-%m-%d')
+                except Exception:
+                    pub_date = datetime.now().strftime('%Y-%m-%d')
                 
                 print(f"\n[{i}/{len(newsletters)}] Processing: {subject[:60]}...")
                 
@@ -316,6 +549,22 @@ def sync_email_newsletters_to_sql() -> dict:
                 else:
                     print("  ⚠ No events found")
                 
+                # Extract articles using LLM (if enabled)
+                if config.EXTRACT_ARTICLES:
+                    articles = extract_articles_with_llm(
+                        full_text, 
+                        source=f"Newsletter: {subject}",
+                        publication_date=pub_date
+                    )
+                    
+                    if articles:
+                        print(f"  ✓ Extracted {len(articles)} articles")
+                        all_articles.extend(articles)
+                    else:
+                        print("  ⚠ No articles found")
+                    
+                    stats['articles_extracted'] += len(articles)
+                
                 # Mark as processed
                 processed_ids.append(email_id)
                 stats['emails_processed'] += 1
@@ -333,14 +582,18 @@ def sync_email_newsletters_to_sql() -> dict:
             stats['events_inserted'] = inserted
             print(f"✓ Inserted {inserted} events successfully")
         
+        # Add all articles to vector database (if enabled)
+        if config.EXTRACT_ARTICLES and all_articles:
+            print(f"\nAdding {len(all_articles)} articles to vector database...")
+            added = add_articles_to_vectordb(all_articles)
+            stats['articles_added'] = added
+            print(f"✓ Added {added} articles successfully")
+        
         # Save updated sync state (keep last 1000 IDs to prevent file from growing too large)
         state['processed_email_ids'] = processed_ids[-1000:]
         save_email_sync_state(state)
         print("✓ Sync state saved")
-        
-        # Logout
-        mail.logout()
-        print("✓ Disconnected from email server")
+        print("✓ Gmail API session completed")
         
     except Exception as e:
         error_msg = f"Fatal error during sync: {str(e)}"
@@ -352,6 +605,9 @@ def sync_email_newsletters_to_sql() -> dict:
     print(f"Emails processed: {stats['emails_processed']}")
     print(f"Events extracted: {stats['events_extracted']}")
     print(f"Events inserted: {stats['events_inserted']}")
+    if config.EXTRACT_ARTICLES:
+        print(f"Articles extracted: {stats['articles_extracted']}")
+        print(f"Articles added to vector DB: {stats['articles_added']}")
     print(f"Errors: {len(stats['errors'])}")
     print("=" * 80)
     

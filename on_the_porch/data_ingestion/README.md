@@ -1,8 +1,10 @@
 # Automated Data Ingestion System
 
-This system automatically syncs data from two sources:
+This system automatically syncs data from multiple sources using a hybrid approach:
 1. **Google Drive → Vector Database**: Client-uploaded documents (PDF, DOCX, TXT, MD)
-2. **Email Newsletters → Calendar SQL**: Community event listings from email
+2. **Email Newsletters → Hybrid Storage**:
+   - **Events → MySQL Database**: Calendar events with dates/times for temporal queries
+   - **Articles → Vector Database**: News stories and community updates for semantic search
 
 Designed to run daily with minimal compute requirements (~$0.02-0.30/month in API costs).
 
@@ -13,6 +15,49 @@ Designed to run daily with minimal compute requirements (~$0.02-0.30/month in AP
 ✅ **Error resilient** - Continues despite individual failures  
 ✅ **Low compute** - Uses efficient models and batch operations  
 ✅ **Comprehensive logging** - Tracks all runs for monitoring  
+✅ **Hybrid storage** - Best of both SQL and vector DB for different query types  
+
+## Hybrid Storage Architecture
+
+### Why Hybrid?
+
+Different types of data work better with different storage systems:
+
+**Events → MySQL (Structured)**
+- Perfect for: "What events are happening this weekend?" "Show me all workshops in December"
+- Efficient date range queries, filtering by time/location
+- Fast aggregations and temporal analysis
+
+**Articles/News → Vector DB (Unstructured)**
+- Perfect for: "What's the latest news about affordable housing?" "Tell me about community safety initiatives"
+- Semantic search finds relevant content by meaning, not just keywords
+- Works with natural language queries
+
+**Combined Queries**
+- Your chatbot automatically uses both: "What events are this weekend and what's been happening in the community?"
+- SQL for structured event data + Vector DB for contextual information
+
+### What Goes Where?
+
+| Content Type | Storage | Example Query |
+|--------------|---------|---------------|
+| Event listings with dates/times | MySQL | "Events on Saturday" |
+| Community news articles | Vector DB | "Housing developments news" |
+| Opinion pieces | Vector DB | "What do residents say about..." |
+| Workshop schedules | MySQL | "Yoga classes this month" |
+| Policy announcements | Vector DB | "New community programs" |
+| Client-uploaded docs | Vector DB | "Find documents about X topic" |
+
+### Configuration
+
+Control article extraction in `.env`:
+```bash
+# Enable/disable article extraction (events always extracted)
+EXTRACT_ARTICLES=true
+
+# Minimum word count for articles (skip very short snippets)
+ARTICLE_MIN_LENGTH=50
+```
 
 ## Prerequisites
 
@@ -54,25 +99,58 @@ pip install -r requirements.txt
 5. Copy the folder ID from the URL:
    - URL format: `https://drive.google.com/drive/folders/[FOLDER_ID]`
 
-### 3. Email Setup (Gmail)
+### 3. Gmail OAuth 2.0 Setup
 
-#### Enable IMAP:
+**Important:** Gmail now requires OAuth 2.0 authentication (app-specific passwords were discontinued in November 2025).
 
-1. Go to Gmail Settings > "See all settings"
-2. Click "Forwarding and POP/IMAP" tab
-3. Enable IMAP
-4. Save changes
+#### Step 1: Enable Gmail API in Google Cloud Console
 
-#### Create App-Specific Password:
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Select your project (or create a new one)
+3. Navigate to **APIs & Services** > **Library**
+4. Search for "Gmail API"
+5. Click **Enable**
 
-1. Go to [Google Account Security](https://myaccount.google.com/security)
-2. Enable 2-Step Verification (if not already enabled)
-3. Go to [App Passwords](https://myaccount.google.com/apppasswords)
-4. Select "Mail" and "Other (custom name)"
-5. Enter name like "Newsletter Ingestion"
-6. Copy the generated 16-character password
+#### Step 2: Create OAuth 2.0 Credentials
 
-**Note:** For non-Gmail providers, check their documentation for IMAP settings.
+1. In Google Cloud Console, go to **APIs & Services** > **Credentials**
+2. Click **Create Credentials** > **OAuth client ID**
+3. If prompted, configure the OAuth consent screen:
+   - User Type: Select "External"
+   - App name: "Newsletter Ingestion" (or any name)
+   - User support email: Your email
+   - Developer contact: Your email
+   - Click **Save and Continue** through the steps
+   - Add your email to "Test users"
+4. Back in **Create OAuth client ID**:
+   - Application type: **Desktop app**
+   - Name: "Newsletter Ingestion Client"
+   - Click **Create**
+5. **IMPORTANT: Add Authorized Redirect URI**:
+   - Click the pencil/edit icon next to your newly created OAuth client
+   - Scroll down to **"Authorized redirect URIs"**
+   - Click **"+ ADD URI"**
+   - Add this exact URI: `http://localhost:8080/`
+   - Click **Save**
+   - **Wait 5 minutes** for Google to propagate the changes
+6. **Download the JSON file**
+   - Click the download icon next to your OAuth 2.0 Client ID
+   - Save as `gmail_credentials.json` in the `data_ingestion/` folder
+
+#### Step 3: No Additional Gmail Settings Needed
+
+The Gmail API handles email access automatically - no need to enable IMAP or POP!
+
+#### Step 4: First-Time Authentication
+
+When you first run the ingestion script, it will:
+1. Open your browser automatically
+2. Ask you to sign in to your Gmail account
+3. Show a warning "Google hasn't verified this app" - Click **Continue**
+4. Grant permission to access Gmail
+5. The script will save the token for future runs (no browser needed next time)
+
+**Note:** The `gmail_token.json` file will be created automatically after first authentication.
 
 ## Configuration
 
@@ -92,9 +170,10 @@ Fill in all required values:
 GOOGLE_DRIVE_FOLDER_ID=your_folder_id_here
 GOOGLE_CREDENTIALS_PATH=service_account_credentials.json
 
-# Email
-NEWSLETTER_EMAIL_ADDRESS=newsletters@yourdomain.com
-NEWSLETTER_EMAIL_PASSWORD=your_16_char_app_password
+# Email (Gmail OAuth 2.0)
+NEWSLETTER_EMAIL_ADDRESS=your-email@gmail.com
+GMAIL_CREDENTIALS_PATH=gmail_credentials.json
+GMAIL_TOKEN_PATH=gmail_token.json
 
 # Paths (defaults are usually fine)
 VECTORDB_DIR=../vectordb_new
@@ -178,6 +257,46 @@ C:\path\to\python.exe main_daily_ingestion.py >> logs\cron.log 2>&1
    - Action: Start a program
    - Program: `C:\path\to\run_daily_ingestion.bat`
 
+## Querying the Data
+
+Once ingestion is running, you can query the data through your chatbot system:
+
+### Events (SQL Queries)
+
+Best for temporal, structured queries:
+- "What events are happening this Saturday?"
+- "Show me all workshops in December"  
+- "List family activities next week"
+- "Find events at the community center"
+
+The SQL chatbot will automatically query the `weekly_events` table.
+
+### Articles & Documents (Vector DB Queries)
+
+Best for semantic, topic-based queries:
+- "What's the latest news about affordable housing?"
+- "Tell me about community safety initiatives"
+- "What are people saying about the new development?"
+- "Find information about youth programs"
+
+The RAG system will search through:
+- Newsletter articles
+- Client-uploaded documents
+- Community news and announcements
+
+### Hybrid Queries
+
+The chatbot automatically combines both when appropriate:
+- "What community events are this weekend, and what's been happening in local news?"
+- "Are there any housing-related events coming up? Also, what recent articles discuss housing?"
+
+### Filtering by Date
+
+For articles in Vector DB, metadata includes `publication_date`:
+- Recent articles can be prioritized in search results
+- Can filter by date range if needed
+- Useful for "latest news" type queries
+
 ## Monitoring
 
 ### Check Logs
@@ -208,13 +327,15 @@ cat .email_sync_state.json | jq '.'
 data_ingestion/
 ├── config.py                      # Configuration loader
 ├── google_drive_to_vectordb.py   # Google Drive sync script
-├── email_to_calendar_sql.py      # Email sync script
+├── email_to_calendar_sql.py      # Email sync script (OAuth 2.0)
 ├── main_daily_ingestion.py       # Main orchestrator
 ├── requirements.txt               # Python dependencies
 ├── env.example                    # Environment template
 ├── .env                          # Your configuration (not in git)
 ├── .gitignore                    # Git ignore rules
 ├── README.md                     # This file
+├── gmail_credentials.json        # Gmail OAuth credentials (not in git)
+├── gmail_token.json              # Gmail OAuth token (auto-generated, not in git)
 ├── utils/
 │   ├── __init__.py
 │   ├── document_processor.py     # Document parsing utilities
@@ -231,13 +352,26 @@ data_ingestion/
 
 **Solution:** Ensure the JSON file path in `.env` is correct and the file exists.
 
-### "Failed to connect to email server"
+### "Failed to connect to Gmail via OAuth"
 
 **Solutions:**
-- Verify email address and password in `.env`
-- For Gmail: Ensure you're using an app-specific password (not your regular password)
-- Check IMAP is enabled in Gmail settings
-- Verify IMAP server and port settings
+- Ensure `gmail_credentials.json` exists in the `data_ingestion/` folder
+- Check that Gmail API is enabled in Google Cloud Console
+- Verify IMAP is enabled in Gmail settings
+- Delete `gmail_token.json` and re-authenticate (the script will open a browser)
+- Make sure your Gmail account is added to "Test users" in OAuth consent screen
+
+### "Google hasn't verified this app" warning
+
+This is normal when using your own OAuth credentials. Click **Continue** to proceed. Your app is private and only you can access it.
+
+### Browser doesn't open for OAuth
+
+If running on a server without a browser:
+1. Run the script once locally on your computer
+2. Complete the OAuth flow (browser will open)
+3. Copy the generated `gmail_token.json` file to your server
+4. The token will work without a browser going forward
 
 ### "GOOGLE_DRIVE_FOLDER_ID is not set"
 

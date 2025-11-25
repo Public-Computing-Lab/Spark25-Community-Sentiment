@@ -1,9 +1,10 @@
 # Core dependencies for automated data ingestion
 
-# Google Drive API
+# Google Drive API and Gmail API
 google-api-python-client>=2.100.0
 google-auth-httplib2>=0.1.1
 google-auth-oauthlib>=1.1.0
+google-auth>=2.23.0
 
 # Document processing
 pypdf>=3.17.0

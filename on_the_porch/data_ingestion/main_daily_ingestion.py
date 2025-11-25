@@ -60,8 +60,11 @@ def print_final_summary(drive_stats: dict, email_stats: dict) -> None:
     # Email stats
     emails = email_stats.get('emails_processed', 0)
     events = email_stats.get('events_inserted', 0)
+    articles = email_stats.get('articles_added', 0)
     print(f"║ Emails Processed:             {emails:>5}                                      ║")
     print(f"║ Calendar Events Inserted:     {events:>5}                                      ║")
+    if config.EXTRACT_ARTICLES:
+        print(f"║ Newsletter Articles Added:    {articles:>5}                                      ║")
     
     # Total errors
     print(f"║ Total Errors:                 {total_errors:>5}                                      ║")
@@ -120,6 +123,8 @@ def main():
             "emails_processed": 0,
             "events_extracted": 0,
             "events_inserted": 0,
+            "articles_extracted": 0,
+            "articles_added": 0,
             "errors": [str(e)]
         }
     
