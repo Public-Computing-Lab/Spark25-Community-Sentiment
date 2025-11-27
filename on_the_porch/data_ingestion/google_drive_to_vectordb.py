@@ -4,6 +4,7 @@ Downloads new files from a shared Google Drive folder and adds them to the vecto
 For newsletters: extracts events page-by-page using LLM and stores in SQL.
 """
 import json
+import re
 import sys
 from pathlib import Path
 from typing import List, Dict
@@ -178,6 +179,66 @@ def download_file(service, file_id: str, file_name: str) -> Path:
     return local_path
 
 
+def _extract_date_from_pdf_content(file_path: Path) -> str | None:
+    """
+    Extract publication date from the first page of the PDF.
+    Looks for patterns like "Thursday, November 20, 2025" or "Volume X Issue Y, [Day], [Month] [Day], [Year]"
+    Returns date in YYYY-MM-DD format or None if not found.
+    """
+    try:
+        pages = extract_pages_from_pdf(file_path)
+        if not pages or len(pages) == 0:
+            return None
+        
+        # Get first page text
+        first_page_text = pages[0]['text']
+        
+        # Look for date patterns in the first page
+        # Pattern 1: "Thursday, November 20, 2025" or "Monday, January 1, 2025"
+        date_patterns = [
+            # Full format: "Day, Month Day, Year"
+            r'(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+'
+            r'(January|February|March|April|May|June|July|August|September|October|November|December)\s+'
+            r'(\d{1,2}),\s+(\d{4})',
+            # Without day of week: "November 20, 2025"
+            r'(January|February|March|April|May|June|July|August|September|October|November|December)\s+'
+            r'(\d{1,2}),\s+(\d{4})',
+            # Alternative: "Nov 20, 2025"
+            r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+'
+            r'(\d{1,2}),\s+(\d{4})',
+        ]
+        
+        month_map = {
+            'january': '01', 'february': '02', 'march': '03', 'april': '04',
+            'may': '05', 'june': '06', 'july': '07', 'august': '08',
+            'september': '09', 'october': '10', 'november': '11', 'december': '12',
+            'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
+            'may': '05', 'jun': '06', 'jul': '07', 'aug': '08',
+            'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+        }
+        
+        for pattern in date_patterns:
+            match = re.search(pattern, first_page_text, re.IGNORECASE)
+            if match:
+                try:
+                    if len(match.groups()) == 3:
+                        month_name, day, year = match.groups()
+                        month = month_map.get(month_name.lower(), None)
+                        if month:
+                            date_str = f"{year}-{month}-{day.zfill(2)}"
+                            # Validate the date
+                            datetime.strptime(date_str, '%Y-%m-%d')
+                            return date_str
+                except (ValueError, AttributeError):
+                    continue
+        
+        return None
+    except Exception as e:
+        if config.VERBOSE_LOGGING:
+            print(f"    ⚠ Could not extract date from PDF content: {e}")
+        return None
+
+
 def _extract_date_from_filename(filename: str) -> str | None:
     """
     Try to extract a publication date from newsletter filename.
@@ -185,7 +246,6 @@ def _extract_date_from_filename(filename: str) -> str | None:
     Returns date in YYYY-MM-DD format or None if not found.
     """
     import re
-    from datetime import datetime
     
     # Try various date patterns
     patterns = [
@@ -217,15 +277,17 @@ def _extract_date_from_filename(filename: str) -> str | None:
                 continue
     
     # Try to extract year from patterns like "REP 47_25web.pdf" (year 2025)
-    year_match = re.search(r'[_\s](\d{2})(?:web|\.pdf|$)', filename)
-    if year_match:
-        year_suffix = year_match.group(1)
-        # Assume 20XX for years 00-99
-        current_year = datetime.now().year
-        century = (current_year // 100) * 100
-        year = century + int(year_suffix)
-        # Use first day of year as fallback (better than nothing)
-        return f"{year}-01-01"
+    # But don't use this as a fallback - it's too unreliable
+    # Instead, return None and let the file modification date be used
+    # year_match = re.search(r'[_\s](\d{2})(?:web|\.pdf|$)', filename)
+    # if year_match:
+    #     year_suffix = year_match.group(1)
+    #     # Assume 20XX for years 00-99
+    #     current_year = datetime.now().year
+    #     century = (current_year // 100) * 100
+    #     year = century + int(year_suffix)
+    #     # Use first day of year as fallback (better than nothing)
+    #     return f"{year}-01-01"
     
     return None
 
@@ -258,7 +320,6 @@ def extract_events_from_page(page_text: str, page_num: int, source: str, publica
     date_context = ""
     if publication_date:
         try:
-            from datetime import datetime
             pub_dt = datetime.strptime(publication_date, '%Y-%m-%d')
             date_context = f"""
 IMPORTANT DATE CONTEXT:
@@ -299,8 +360,8 @@ Return ONLY valid JSON (no explanations, no markdown, no code fences), in this e
 ]
 
 Field rules:
-- "event_name": Short descriptive name
-- "event_date": Date label as written (e.g., "Monday", "June 3-5", "All week") - keep original text
+- "event_name": Short descriptive name (REQUIRED - must always be provided)
+- "event_date": Date label as written (REQUIRED - e.g., "Monday", "June 3-5", "All week", "Ongoing", "TBA" - always provide something, even if approximate)
 - "start_date": ISO date YYYY-MM-DD when event starts - CONVERT day names to exact dates using publication date
 - "end_date": ISO date YYYY-MM-DD when event ends (or null if same day) - CONVERT day names to exact dates
 - "start_time": 24-hour time HH:MM (or null)
@@ -326,6 +387,11 @@ Page {page_num} text:
         )
         text_response = (response.text or "").strip()
         
+        # Check if response is empty
+        if not text_response:
+            print(f"    ⚠ Empty response from LLM for page {page_num}")
+            return []
+        
         # Clean up potential code fences
         if text_response.startswith("```"):
             text_response = text_response.strip("`").strip()
@@ -333,17 +399,112 @@ Page {page_num} text:
             if lines and lines[0].strip().lower() in ("json", "javascript"):
                 text_response = "\n".join(lines[1:]).strip()
         
-        events = json.loads(text_response)
+        # Try to extract JSON if it's embedded in text
+        # Look for JSON array pattern
+        json_match = re.search(r'\[[\s\S]*\]', text_response)
+        if json_match:
+            text_response = json_match.group(0)
         
-        if not isinstance(events, list):
+        # Validate we have something that looks like JSON
+        text_response = text_response.strip()
+        if not text_response or not (text_response.startswith('[') or text_response.startswith('{')):
+            print(f"    ⚠ Invalid JSON response format for page {page_num} (response: {text_response[:100]}...)")
             return []
         
-        # Add source and page info to each event
+        try:
+            events = json.loads(text_response)
+        except json.JSONDecodeError as json_err:
+            # Try to fix common JSON issues
+            # Remove trailing commas before closing brackets/braces
+            text_response = re.sub(r',\s*([}\]])', r'\1', text_response)
+            
+            # Remove control characters (except newlines/tabs in string values which should be escaped)
+            # Replace unescaped control characters with spaces
+            # But we need to be careful - let's try a different approach
+            # Remove control characters that aren't part of valid JSON structure
+            # This regex removes control chars except \n, \r, \t when they're escaped
+            text_response = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', text_response)
+            
+            # Try parsing again
+            try:
+                events = json.loads(text_response)
+            except json.JSONDecodeError:
+                # Last resort: try to extract just the JSON array/object more aggressively
+                # Find the first [ or { and last ] or }
+                start_idx = text_response.find('[')
+                if start_idx == -1:
+                    start_idx = text_response.find('{')
+                if start_idx != -1:
+                    end_idx = text_response.rfind(']')
+                    if end_idx == -1 or end_idx < start_idx:
+                        end_idx = text_response.rfind('}')
+                    if end_idx != -1 and end_idx > start_idx:
+                        text_response = text_response[start_idx:end_idx+1]
+                        # Clean again
+                        text_response = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', text_response)
+                        try:
+                            events = json.loads(text_response)
+                        except json.JSONDecodeError:
+                            print(f"    ⚠ JSON parse error for page {page_num}: {json_err}")
+                            print(f"    Response preview: {text_response[:200]}...")
+                            return []
+                else:
+                    print(f"    ⚠ JSON parse error for page {page_num}: {json_err}")
+                    print(f"    Response preview: {text_response[:200]}...")
+                    return []
+        
+        if not isinstance(events, list):
+            print(f"    ⚠ Expected list but got {type(events).__name__} for page {page_num}")
+            return []
+        
+        # Validate and clean events before returning
+        validated_events = []
         for event in events:
+            if not isinstance(event, dict):
+                continue
+            
+            # Ensure required fields exist
+            if not event.get('event_name'):
+                continue  # Skip events without names
+            
+            # Ensure event_date exists (required by database)
+            if not event.get('event_date'):
+                # Try to construct from start_date/end_date or use placeholder
+                event['event_date'] = event.get('start_date') or event.get('end_date') or 'no info'
+            
+            # Clean string fields (remove extra whitespace)
+            for key in ['event_name', 'event_date', 'raw_text', 'location', 'category']:
+                if key in event and isinstance(event[key], str):
+                    event[key] = event[key].strip()
+            
+            # Validate date formats (start_date and end_date should be YYYY-MM-DD or null)
+            for date_key in ['start_date', 'end_date']:
+                if date_key in event and event[date_key]:
+                    date_val = str(event[date_key]).strip()
+                    if date_val.lower() not in ('null', 'none', ''):
+                        # Try to validate date format
+                        try:
+                            datetime.strptime(date_val, '%Y-%m-%d')
+                        except ValueError:
+                            # Invalid date format - set to null
+                            event[date_key] = None
+            
+            # Validate time formats (should be HH:MM or null)
+            for time_key in ['start_time', 'end_time']:
+                if time_key in event and event[time_key]:
+                    time_val = str(event[time_key]).strip()
+                    if time_val.lower() not in ('null', 'none', ''):
+                        # Try to validate time format (HH:MM or HH:MM:SS)
+                        if not re.match(r'^\d{1,2}:\d{2}(:\d{2})?$', time_val):
+                            event[time_key] = None
+            
+            # Add source and page info
             event['source'] = source
             event['page_number'] = page_num
+            
+            validated_events.append(event)
         
-        return events
+        return validated_events
         
     except Exception as e:
         print(f"    ⚠ Error extracting events from page {page_num}: {e}")
@@ -375,6 +536,24 @@ def insert_events_to_db(events: List[Dict]) -> int:
 
             for event in events:
                 try:
+                    # Validate required fields
+                    event_name = event.get('event_name', '').strip()
+                    event_date = event.get('event_date', '').strip()
+                    
+                    # Skip events without required fields
+                    if not event_name:
+                        if config.VERBOSE_LOGGING:
+                            print(f"    ⚠ Skipping event with no name")
+                        continue
+                    
+                    # event_date is required by database - provide default if missing
+                    if not event_date:
+                        # Try to use start_date or end_date as fallback
+                        event_date = event.get('start_date') or event.get('end_date') or ''
+                        if not event_date:
+                            # Last resort: use a placeholder
+                            event_date = 'no info'
+                    
                     cur.execute(
                         """
                         INSERT INTO weekly_events (
@@ -394,8 +573,8 @@ def insert_events_to_db(events: List[Dict]) -> int:
                         (
                             event.get('source', 'google_drive_newsletter'),
                             event.get('page_number'),
-                            event.get('event_name', ''),
-                            event.get('event_date', ''),
+                            event_name,
+                            event_date,
                             event.get('start_date'),
                             event.get('end_date'),
                             event.get('start_time'),
@@ -429,14 +608,18 @@ def process_newsletter_pdf(file_path: Path, file_metadata: Dict) -> Dict:
     source_name = file_metadata.get('name', 'unknown')
     print(f"  📰 Processing newsletter page-by-page: {source_name}")
     
-    # Try to determine publication date from filename or file metadata
-    publication_date = _extract_date_from_filename(source_name)
+    # Try to determine publication date from PDF content first (most accurate)
+    publication_date = _extract_date_from_pdf_content(file_path)
+    
+    # Fallback to filename
     if not publication_date:
-        # Fallback to file modification date
+        publication_date = _extract_date_from_filename(source_name)
+    
+    # Final fallback to file modification date
+    if not publication_date:
         try:
             modified_time = file_metadata.get('modifiedTime', '')
             if modified_time:
-                from datetime import datetime
                 # Parse ISO format datetime and extract date
                 pub_dt = datetime.fromisoformat(modified_time.replace('Z', '+00:00'))
                 publication_date = pub_dt.strftime('%Y-%m-%d')

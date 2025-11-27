@@ -92,9 +92,10 @@ def _route_question(question: str) -> Dict[str, Any]:
         "Use the following logic with examples grounded in our data:\n"
         "- 'sql': for pure statistics, counts, trends, comparisons, numeric breakdowns from Postgres/MySQL tables like\n"
         "  'service_requests' (311), 'arrests', 'offenses', 'homicides', 'shots_fired', or Dorchester-focused tables.\n"
+        "  NOTE: This system is configured for DORCHESTER ONLY. All SQL queries automatically filter to Dorchester data only.\n"
         "  Examples: 'How many 311 service requests were filed in Dorchester last month?',\n"
-        "  'What is the trend in shots fired by year in Boston?',\n"
-        "  'Which neighborhoods have the highest arrests in 2023?'\n"
+        "  'What is the trend in shots fired by year in Dorchester?',\n"
+        "  'Which areas in Dorchester have the highest arrests in 2023?'\n"
         "- 'rag': ONLY for purely qualitative, descriptive, or policy questions answered by documents/transcripts, such as\n"
         "  policy documents, interview transcripts, newsletters, or client-uploaded files.\n"
         "  Examples: 'What does the Slow Streets program aim to achieve?',\n"
@@ -105,8 +106,9 @@ def _route_question(question: str) -> Dict[str, Any]:
         "- 'hybrid': PREFERRED when both numbers and context are needed, OR when questions involve location/data visualization, "
         "  OR when questions are about events, calendars, schedules, or \"what is happening\" on a given day or week so you can use both weekly events SQL data and RAG documents.\n"
         "  Examples: 'How many homicides were recorded in Dorchester last year, and what concerns about safety come up in interviews?',\n"
-        "  'What are the monthly trends in 311 requests about street safety and how does Slow Streets address these?',\n"
+        "  'What are the monthly trends in 311 requests about street safety in Dorchester and how does Slow Streets address these?',\n"
         "  'Show me where crime incidents occurred in Dorchester',\n"
+        "  NOTE: This system is configured for DORCHESTER ONLY. All SQL queries automatically filter to Dorchester data only.\n"
         "  'What locations have the most service requests?',\n"
         "  'What events are happening this week?',\n"
         "  'What activities are available for kids on Saturday?',\n"
@@ -207,7 +209,8 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
     context = "\n".join(context_parts)
 
     system_prompt = (
-        "You are a friendly, non-technical assistant helping people understand Boston community data and policies.\n"
+        "You are a friendly, non-technical assistant helping people understand Dorchester community data and policies.\n"
+        "This system is configured for DORCHESTER ONLY. All data queries are automatically filtered to Dorchester only.\n"
         "Use clear, everyday language and imagine you are talking to a neighbor, not a technical expert.\n"
         "Use only the provided SOURCES and do not add information that is not supported by the text.\n\n"
         "When you quote or paraphrase people or documents, briefly explain who or what they are first, "
@@ -365,12 +368,14 @@ def _run_hybrid(question: str, plan: Dict[str, Any], conversation_history: Optio
     client = _get_llm_client()
     model = client.GenerativeModel(GEMINI_MODEL)
     merge_system = (
-        "You are a friendly, non-technical assistant explaining information to a general audience.\n"
+        "You are a friendly, non-technical assistant explaining information about DORCHESTER ONLY to a general audience.\n"
+        "This system is configured for DORCHESTER ONLY. All data queries are automatically filtered to Dorchester only.\n"
         "Use clear, everyday language and speak as if you are talking directly to the user.\n"
         "You have access to both numeric data (counts, trends, patterns) and contextual information (people's experiences, policy documents, community perspectives).\n\n"
         "Weave these together naturally into a single, cohesive answer that tells a complete story.\n"
         "Blend the numbers with the context so the user understands both what is happening and why it matters.\n"
-        "Focus on what the information means for people and communities, not on technical details or data sources.\n\n"
+        "Focus on what the information means for people in Dorchester, not on technical details or data sources.\n"
+        "If you see any data from other neighborhoods, ignore it completely and only discuss Dorchester.\n\n"
         "Do NOT mention SQL, databases, RAG, retrieval, or any internal tools. Just speak as a helpful information bot.\n"
         "Never invent data or trends not present in the inputs."
         + ("\n\nYou are in a conversation. Reference previous questions naturally when it helps the user." if conversation_history else "")

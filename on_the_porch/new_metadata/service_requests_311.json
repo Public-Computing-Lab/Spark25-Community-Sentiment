@@ -1,0 +1,462 @@
+{
+  "schema": "mysql",
+  "table": "service_requests_311",
+  "columns": {
+    "_id": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "case_id": {
+      "data_type": "varchar(255)",
+      "is_numeric": false
+    },
+    "open_date": {
+      "data_type": "datetime",
+      "is_numeric": false
+    },
+    "case_topic": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "Domestic Animal Issue",
+        "Fallen Tree or Branches",
+        "Lane Divider",
+        "Lost Pet",
+        "Planting Request",
+        "Pruning Request",
+        "Street Light Knockdown",
+        "Street Light Other",
+        "Street Light Outage",
+        "Tree or Stump Removal",
+        "Wild Animal Issue"
+      ]
+    },
+    "service_name": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "Domestic Animal Issue",
+        "Fallen Tree or Branches",
+        "Lane Divider",
+        "Lost Pet",
+        "Planting Request",
+        "Pruning Request",
+        "Street Light Knockdown",
+        "Street Light Other",
+        "Street Light Outage",
+        "Tree or Stump Removal",
+        "Wild Animal Issue"
+      ]
+    },
+    "assigned_department": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "Animal Care & Control",
+        "Boston Transportation Department (BTD)",
+        "Parks & Recreation",
+        "Public Works Department (PWD)"
+      ]
+    },
+    "assigned_team": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "Animal control staff",
+        "Boston Transportation Department General",
+        "BTD Traffic Investigation",
+        "PWD Street Lighting",
+        "Urban Forestry"
+      ]
+    },
+    "case_status": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "Closed",
+        "Create",
+        "In progress",
+        "Needs Reallocation"
+      ]
+    },
+    "closure_reason": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "Noted",
+        "Resolved",
+        "Resolved successfully",
+        "Transitioned"
+      ]
+    },
+    "closure_comments": {
+      "data_type": "varchar(886)",
+      "is_numeric": false
+    },
+    "close_date": {
+      "data_type": "varchar(255)",
+      "is_numeric": false
+    },
+    "target_close_date": {
+      "data_type": "varchar(255)",
+      "is_numeric": false
+    },
+    "on_time": {
+      "data_type": "varchar(255)",
+      "is_numeric": false
+    },
+    "report_source": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "BOS311",
+        "Call"
+      ]
+    },
+    "full_address": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "1 Avenue De Lafayette, Boston, MA 02111",
+        "1 Bay St, Bay Village, MA 02116",
+        "1 Beacon St, Downtown, MA 02108",
+        "1 Bennington St, Boston, MA 02128",
+        "1 Caddy Rd, Mattapan, MA 02126",
+        "1 Charles River Ave, Charlestown, MA 02129",
+        "1 City Hall Plz 817, Downtown, MA 02114",
+        "1 City Hall Plz 966, Downtown, MA 02114",
+        "1 City Hall Plz, Boston, MA 02114",
+        "1 City Hall Plz, Downtown, MA 02114",
+        "1 Congress St, Downtown, MA 02114",
+        "1 Constitution Rd, Charlestown, MA 02129",
+        "1 Day Sq, Boston, MA 02128",
+        "1 Deaconess Rd, Longwood, MA 02215",
+        "1 Dennis St, Roxbury, MA 02119",
+        "1 Eighth St, Charlestown, MA 02129",
+        "1 Holden Row, Boston, MA 02129",
+        "1 Lincoln St, Downtown, MA 02111",
+        "1 Marina Park Dr, South Boston Waterfront, MA 02210",
+        "1 Menlo St, Brighton, MA 02135",
+        "1 Mount Pleasant Ter, Boston, MA 02119",
+        "1 Pleasant St, Boston, MA 02129",
+        "1 Seaport Ln, South Boston Waterfront, MA 02210",
+        "1 Shenandoah St, Boston, MA 02124",
+        "1 Walnut St, Boston, MA 02108",
+        "1 Waverly St, Roxbury, MA 02119",
+        "1 Western Ave, Allston, MA 02163",
+        "1-15 Vallar Rd, East Boston, MA 02128",
+        "1-18 Howe Ter, Dorchester, MA 02125",
+        "1-1A State St, Boston, MA 02109",
+        "1-3 City Sq, Boston, MA 02129",
+        "1-3 Clifton St, Boston, MA 02119",
+        "1-4 Regent Sq, Boston, MA 02119",
+        "1-7A Charter St, Boston, MA 02113",
+        "10 A St, Boston, MA 02127",
+        "10 Bartlett St, Charlestown, MA 02129",
+        "10 Branchfield St 2, Dorchester, MA 02124",
+        "10 Cameron St, Dorchester, MA 02122",
+        "10 Chandler St, South End, MA 02116",
+        "10 Charlesgate E, Boston, MA 02115",
+        "10 Eden St, Boston, MA 02129",
+        "10 Eden St, Charlestown, MA 02129",
+        "10 Emerson Pl 17F, West End, MA 02114",
+        "10 Glenburne St, Roxbury, MA 02121",
+        "10 Gove St, East Boston, MA 02128",
+        "10 Groom St, Boston, MA 02125",
+        "10 Kerwin St 2, Dorchester, MA 02124",
+        "10 Kingsdale St 2, Dorchester, MA 02124",
+        "10 Leedsville St, Dorchester, MA 02122",
+        "10 Leighton Rd, Hyde Park, MA 02136",
+        "10 Orange St, Roslindale, MA 02131",
+        "10 Paisley Park, Dorchester, MA 02124",
+        "10 Pleasant St, Boston, MA 02125",
+        "10 Post Office Sq, Boston, MA 02109",
+        "10 Reddy Ave, Hyde Park, MA 02136",
+        "10 Rena St, Allston, MA 02134",
+        "10 Royal St, Boston, MA 02134",
+        "10 Sackville St, Charlestown, MA 02129",
+        "10 Shenandoah St, Boston, MA 02124",
+        "10 Stonley Rd, Boston, MA 02130",
+        "10 Sutton St 2, Mattapan, MA 02126",
+        "10 Sutton St, Mattapan, MA 02126",
+        "10 Tampa St, Hyde Park, MA 02136",
+        "10 Tremont St, Downtown, MA 02108",
+        "10 Upton St, Boston, MA 02118",
+        "10 West St, Downtown, MA 02111",
+        "10 Worthington St, Boston, MA 02120",
+        "10-12 Chestnut St, Boston, MA 02129",
+        "10-12 Sylvester Rd, Boston, MA 02122",
+        "10-14 Marion St, Boston, MA 02128",
+        "10-18 Walley St, Boston, MA 02128",
+        "10-99 Rossmore Rd, Jamaica Plain, MA 02130",
+        "100 Allandale St, Boston, MA 02130",
+        "100 Atlantic Ave, Downtown, MA 02110",
+        "100 Charles River Plz, West End, MA 02114",
+        "100 Clarendon St, Boston, MA 02116",
+        "100 Hebron St, Mattapan, MA 02126",
+        "100 Legends Way, West End, MA 02114",
+        "100 Lovejoy Whf, West End, MA 02114",
+        "100 Pearl St, Charlestown, MA 02129",
+        "100 Tremont St, Brighton, MA 02135",
+        "100-128 Dartmouth St, South End, MA 02116",
+        "1005 Columbia Rd, South Boston, MA 02127",
+        "101 Maple St, Boston, MA 02132",
+        "101 Rossmore Rd 3, Jamaica Plain, MA 02130",
+        "101 Saint Theresa Ave, West Roxbury, MA 02132",
+        "101 W Broadway, South Boston, MA 02127",
+        "1015 Truman Pkwy, Hyde Park, MA 02136",
+        "1017 River St, Hyde Park, MA 02136",
+        "102 Harrishof St, Roxbury, MA 02121",
+        "102 Margaretta Dr, West Roxbury, MA 02136",
+        "102 Prince St, Boston, MA 02113",
+        "102-104 Erie St, Dorchester, MA 02121",
+        "1024 Truman Pkwy, Hyde Park, MA 02136",
+        "103 Alexander St, Dorchester, MA 02125",
+        "103 Geneva Ave, Dorchester, MA 02121",
+        "103 Myrtle St, Boston, MA 02114",
+        "103 Pinckney St, Beacon Hill, MA 02114",
+        "1030-1036 Bennington St, Boston, MA 02128",
+        "104 Englewood Ave, Brighton, MA 02135",
+        "104 Princeton St 3, East Boston, MA 02128",
+        "104 W Concord St, Boston, MA 02118",
+        "1044 Hyde Park Ave, Hyde Park, MA 02136",
+        "105 Allston St, Boston, MA 02134",
+        "105 Appleton St, Boston, MA 02116",
+        "105 Chestnut Ave, Jamaica Plain, MA 02130",
+        "105 High St, Boston, MA 02129",
+        "105 King St, Dorchester, MA 02122",
+        "105 Washington St, Brighton, MA 02135",
+        "105-117 W Concord St, Boston, MA 02118",
+        "106 Cambridge St, Beacon Hill, MA 02114",
+        "106 Forest Hills St, Jamaica Plain, MA 02130",
+        "106 Hancock St 1, Dorchester, MA 02125",
+        "106 Hancock St, Dorchester, MA 02125",
+        "106-108 Kenrick St, Boston, MA 02135",
+        "106-108 Paul Gore St, Boston, MA 02130",
+        "1064 Bennington St, Boston, MA 02128",
+        "107 Academy Hill Rd, Boston, MA 02135",
+        "107 Bloomfield St 1, Dorchester, MA 02124",
+        "107 Chandler St, South End, MA 02116",
+        "107 Warren St, Boston, MA 02129",
+        "107-111 Erie St, Dorchester, MA 02121",
+        "1073-1075A Dorchester Ave, Boston, MA 02125",
+        "1075 Washington St 1, Mattapan, MA 02124",
+        "1077-1079 Dorchester Ave, Boston, MA 02125",
+        "108 Colberg Ave, Roslindale, MA 02131",
+        "108 Deering Rd, Mattapan, MA 02126",
+        "108 Hollingsworth St, Boston, MA 02126",
+        "108 Neponset Ave, Boston, MA 02136",
+        "108 Perkins St, Jamaica Plain, MA 02130",
+        "1082 Commonwealth Ave, Allston, MA 02446",
+        "109 Milton Ave, Dorchester, MA 02124",
+        "109-111 Dartmouth St, Boston, MA 02116",
+        "10A Mcgreevey Way, Mission Hill, MA 02120",
+        "11 Adams St, Dorchester, MA 02122",
+        "11 Carlisle St, Boston, MA 02121",
+        "11 Colonial Ave, Dorchester, MA 02124",
+        "11 Constellation Whf, Charlestown, MA 02129",
+        "11 Cricket Ln, Boston, MA 02132",
+        "11 Dana Ave, Hyde Park, MA 02136",
+        "11 Dunster Rd, Boston, MA 02130",
+        "11 E Lenox St, Roxbury, MA 02118",
+        "11 E Newton St 303, South End, MA 02118",
+        "11 Edge Hill St, Boston, MA 02130",
+        "11 Elven Rd, Boston, MA 02131",
+        "11 Granville St, Dorchester, MA 02124",
+        "11 Groom St, Boston, MA 02125",
+        "11 Ivory St, Boston, MA 02132",
+        "11 Jess St, Boston, MA 02130",
+        "11 Lafield St 1, Dorchester, MA 02122"
+      ]
+    },
+    "street_number": {
+      "data_type": "varchar(255)",
+      "is_numeric": false
+    },
+    "street_name": {
+      "data_type": "varchar(255)",
+      "is_numeric": false
+    },
+    "zip_code": {
+      "data_type": "varchar(255)",
+      "is_numeric": false
+    },
+    "neighborhood": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "Allston",
+        "Back Bay",
+        "Bay Village",
+        "Beacon Hill",
+        "Brighton",
+        "Charlestown",
+        "Chinatown",
+        "Dorchester",
+        "Downtown",
+        "East Boston",
+        "Fenway",
+        "Hyde Park",
+        "Jamaica Plain",
+        "Leather District",
+        "Longwood",
+        "Mattapan",
+        "Mission Hill",
+        "North End",
+        "Roslindale",
+        "Roxbury",
+        "South Boston",
+        "South Boston Waterfront",
+        "South End",
+        "West End",
+        "West Roxbury"
+      ]
+    },
+    "public_works_district": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "10A",
+        "10B",
+        "1A",
+        "1B",
+        "1C",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6A",
+        "6B",
+        "7A",
+        "7B",
+        "8A",
+        "8B",
+        "9"
+      ]
+    },
+    "city_council_district": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ]
+    },
+    "fire_district": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "0",
+        "1",
+        "10",
+        "11",
+        "12",
+        "3",
+        "4",
+        "6",
+        "7",
+        "8",
+        "9"
+      ]
+    },
+    "police_district": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "A1",
+        "A15",
+        "A7",
+        "B2",
+        "B3",
+        "C11",
+        "C6",
+        "D14",
+        "D4",
+        "E13",
+        "E18",
+        "E5"
+      ]
+    },
+    "ward": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22"
+      ]
+    },
+    "precinct": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22",
+        "23"
+      ]
+    },
+    "submitted_photo": {
+      "data_type": "varchar(255)",
+      "is_numeric": false
+    },
+    "closed_photo": {
+      "data_type": "varchar(255)",
+      "is_numeric": false
+    },
+    "longitude": {
+      "data_type": "varchar(255)",
+      "is_numeric": false
+    },
+    "latitude": {
+      "data_type": "varchar(255)",
+      "is_numeric": false
+    }
+  }
+}

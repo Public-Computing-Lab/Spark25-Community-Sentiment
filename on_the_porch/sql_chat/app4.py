@@ -247,6 +247,88 @@ def _extract_sql_from_text(text: str) -> str:
     return content
 
 
+def _ensure_dorchester_filter(sql: str, schema: str) -> str:
+    """
+    Post-process SQL to ensure it has a Dorchester filter. 
+    This is a safety net in case the LLM forgets to add it.
+    """
+    sql_upper = sql.upper()
+    
+    # Skip if it's the weekly_events table
+    if "WEEKLY_EVENTS" in sql_upper or "`weekly_events`" in sql or "'weekly_events'" in sql:
+        return sql
+    
+    # Check if Dorchester filter already exists (more robust check)
+    has_dorchester_filter = (
+        re.search(r"neighborhood.*LIKE.*['\"]?dorchester", sql, re.IGNORECASE) or
+        re.search(r"district.*=.*['\"]?C11['\"]?", sql, re.IGNORECASE) or
+        re.search(r"district.*IN.*\([^)]*['\"]?C11['\"]?", sql, re.IGNORECASE)
+    )
+    
+    if has_dorchester_filter:
+        return sql
+    
+    # Extract table name from FROM clause
+    from_match = re.search(r'FROM\s+`?(\w+)`?', sql, re.IGNORECASE)
+    if not from_match:
+        return sql
+    
+    table_name = from_match.group(1).lower()
+    
+    # Check schema for available columns - look for table definition in schema
+    schema_lower = schema.lower()
+    table_pattern = rf"{re.escape(table_name)}\s*\([^)]+\)"
+    table_match = re.search(table_pattern, schema_lower, re.IGNORECASE)
+    
+    if not table_match:
+        return sql
+    
+    table_def = table_match.group(0)
+    has_neighborhood = "neighborhood" in table_def
+    has_district = "district" in table_def
+    
+    # Build the filter - prioritize district over neighborhood
+    dorchester_filter = ""
+    if has_district:
+        # If table has district column, use it (C11 is Dorchester)
+        dorchester_filter = "`district` = 'C11'"
+    elif has_neighborhood:
+        # If table has neighborhood column but no district, use neighborhood
+        dorchester_filter = "(LOWER(`neighborhood`) LIKE 'dorchester%' OR `neighborhood` = 'Dorchester' OR LOWER(`neighborhood`) LIKE '%dorchester%')"
+    else:
+        # Try to find address/location columns
+        if "address" in table_def or "location" in table_def:
+            dorchester_filter = "(LOWER(`address`) LIKE '%dorchester%' OR LOWER(`location`) LIKE '%dorchester%')"
+        else:
+            # Can't determine filter, return as-is
+            return sql
+    
+    # Inject the filter into WHERE clause
+    where_match = re.search(r'\bWHERE\b', sql, re.IGNORECASE)
+    if where_match:
+        # Find the end of existing WHERE conditions (before ORDER BY, LIMIT, etc.)
+        insert_pos = where_match.end()
+        where_end_match = re.search(r'\b(?:ORDER BY|LIMIT|GROUP BY|HAVING)\b', sql[insert_pos:], re.IGNORECASE)
+        if where_end_match:
+            insert_pos = insert_pos + where_end_match.start()
+            # Insert before ORDER BY/LIMIT
+            sql = sql[:insert_pos].rstrip() + " AND " + dorchester_filter + " " + sql[insert_pos:].lstrip()
+        else:
+            # Add at end of WHERE clause
+            sql = sql.rstrip().rstrip(';') + " AND " + dorchester_filter
+    else:
+        # No WHERE clause, add one before ORDER BY/LIMIT
+        order_match = re.search(r'\b(?:ORDER BY|LIMIT|GROUP BY|HAVING)\b', sql, re.IGNORECASE)
+        if order_match:
+            insert_pos = order_match.start()
+            sql = sql[:insert_pos].rstrip() + " WHERE " + dorchester_filter + " " + sql[insert_pos:].lstrip()
+        else:
+            # No WHERE, ORDER BY, or LIMIT - add WHERE at the end
+            sql = sql.rstrip().rstrip(';') + " WHERE " + dorchester_filter
+    
+    return sql
+
+
 def _read_metadata_text() -> str:
     path = os.getenv("SCHEMA_METADATA_PATH")
     if not path:
@@ -368,20 +450,21 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
         "- If metadata indicates certain columns are UNIQUE/identifiers (e.g., primary keys or constrained categories), prefer those columns for exact filtering, grouping, or joining.\n"
         "- Prefer columns indicated in metadata (JSON) when filtering (e.g., request_type, category, subject, description).\n"
         "- When the question uses non-schema phrases (e.g., \"street violations\"), map them to appropriate text/category columns and use case-insensitive matches (for example, using LOWER(column) LIKE '%term%') rather than fabricating table names.\n"
-        "- For 311 tables (\"service_requests\", \"dorchester_311\", or \"bos311_data\"): use \"type\" or \"reason\" for category/topic filtering; avoid using \"subject\" (department) for problem categories.\n"
-        "- For police offenses (\"offenses\" or similar tables): map \"violation\" terms to the appropriate offense/Crime field (e.g., 'LICENSE VIOLATION', 'VIOLATIONS') using appropriate LIKE filters when helpful.\n"
-        "- For weekly calendar/event questions, prefer the `weekly_events` table when available. Use `event_name`, `event_date`, `start_date`, `end_date`, `start_time`, `end_time`, `category`, and `raw_text` to answer questions such as what events are happening on a given day, what is scheduled this week, or what activities are available.\n"
-        "  - The `category` column contains values like: \"Youth/Family\", \"Public Meeting\", \"Arts/Culture\", \"Health/Wellness\", \"Housing\", \"Safety\", \"Education\". Use these for filtering when the user asks for specific types of events (e.g., \"show me youth events\" -> WHERE `category` = 'Youth/Family' OR `category` LIKE '%Youth%').\n"
-        "  - When filtering by a specific day (e.g., 'Monday', 'Tuesday'), use case-insensitive LIKE matches on `event_date` and/or `raw_text` (for example, LOWER(`event_date`) LIKE '%monday%'). Do not assume `event_date` is a strict DATE type; treat it as descriptive text.\n"
-        "  If normalized dates (`start_date`, `end_date`) are populated, you may also use proper DATE comparisons (e.g., WHERE `start_date` >= '2025-06-01' AND `start_date` <= '2025-06-07').\n"
-        "  IMPORTANT: Do NOT search for the literal word 'week' in `event_date` or `raw_text` (e.g., avoid WHERE LOWER(`event_date`) LIKE '%week%'). When the question asks about 'this week' or 'this week's events', interpret that as 'all events in the weekly calendar' and simply select from `weekly_events` without an extra 'week' filter, optionally ordering by `start_date`, `start_time`, or `event_name`.\n"
+        "- For 311 service requests table (\"service_requests_311\"): use \"type\" or \"reason\" for category/topic filtering; avoid using \"subject\" (department) for problem categories.\n"
+        "- For crime incident reports table (\"crime_incident_reports\"): contains all reported crimes with offense codes, descriptions, locations, and dates. Use offense_code_group or offense_description for filtering by crime type.\n"
+        "- For shootings table (\"shootings\"): contains shooting incidents where victims were struck (fatal or non-fatal). Use for questions about shootings with victims, people shot, or shooting injuries.\n"
         "- IMPORTANT: Do NOT search generically for the literal word 'violation' (e.g., avoid WHERE col LIKE '%violation%'). Instead, select concrete categories/values from the appropriate columns (e.g., specific 311 'type'/'reason' values, or explicit 'Crime' values such as 'LICENSE VIOLATION').\n"
         "- Type correctness: NEVER compare text to timestamps incorrectly. If a date/time column is stored as text per metadata (e.g., 'open_dt' in 'dorchester_311'), CAST/convert it to a datetime type before comparing to NOW() or intervals.\n"
         "- If metadata.hints.need_location is true and the selected table includes latitude/longitude columns (e.g., 'latitude', 'longitude'), INCLUDE them in the SELECT. If returning many rows, LIMIT to a reasonable sample (e.g., 500).\n"
         "- If metadata.hints.prefer_location is true, strongly consider including latitude/longitude columns in the SELECT when available, especially for questions about locations, places, neighborhoods, or showing/visualizing data.\n"
         "- For queries involving 'where', 'location', 'show', 'find', 'map', or spatial concepts, ALWAYS include latitude and longitude columns when available in the table schema.\n"
-        "- CRITICAL: For most data tables, the user cares only about Dorchester. When those tables cover multiple neighborhoods or areas, restrict results and aggregations to Dorchester (e.g., WHERE neighborhood ILIKE 'dorchester%'). "
-        "If the question mentions another place, interpret it as \"in Dorchester\" unless explicitly told otherwise.\n"
+        "- CRITICAL - DORCHESTER ONLY: This system is configured to ONLY return data for Dorchester. For ALL data tables (except weekly_events), you MUST add a WHERE clause that filters to Dorchester only. "
+        "NEVER write a query without a Dorchester filter - even if there's already a WHERE clause, you MUST add the Dorchester filter using AND.\n"
+        "Filtering rules by table (check in this order):\n"
+        "  * If the table has a `district` column: WHERE (existing conditions) AND `district` = 'C11'\n"
+        "  * If the table has a `neighborhood` column (but no district): WHERE (existing conditions) AND (LOWER(`neighborhood`) LIKE 'dorchester%' OR `neighborhood` = 'Dorchester' OR LOWER(`neighborhood`) LIKE '%dorchester%')\n"
+        "  * If the table has location/address columns but no district/neighborhood: WHERE (existing conditions) AND (LOWER(`location`) LIKE '%dorchester%' OR LOWER(`address`) LIKE '%dorchester%')\n"
+        "NEVER return data from other neighborhoods or districts. If the question mentions another place, interpret it as \"in Dorchester\" and still filter to Dorchester only.\n"
         "- EXCEPTION: When querying the `weekly_events` table, DO NOT filter by Dorchester or any neighborhood; these events are general and should be returned regardless of location.\n"
         "- ALWAYS wrap table and column identifiers in backticks (`like_this`).\n"
         "- When using table aliases, always write them as separate backticked identifiers (for example, `T1`.`longitude`), never as a single backticked 'T1.longitude'."
@@ -420,7 +503,10 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
     
     try:
         content = _call_gemini_with_logging(default_model, full_prompt, temperature=0)
-        return _extract_sql_from_text(content)
+        sql = _extract_sql_from_text(content)
+        # Post-process to ensure Dorchester filter is present
+        sql = _ensure_dorchester_filter(sql, schema)
+        return sql
     except Exception as exc:
         raise RuntimeError(f"Gemini error: {exc}")
 
@@ -456,19 +542,20 @@ def _llm_refine_sql(
         "- ALWAYS check the schema snapshot to verify which columns actually exist before using them.\n"
         "- If metadata marks certain columns as UNIQUE/identifiers, prefer those for exact filters/joins instead of free-text conditions.\n"
         "- Prefer text/category columns identified in metadata for filtering ambiguous phrases (use case-insensitive LIKE patterns, e.g., LOWER(column) LIKE '%term%').\n"
-        "- For 311 tables (\"service_requests\", \"dorchester_311\", or \"bos311_data\"): prefer filtering on \"type\" or \"reason\" for categories; avoid \"subject\" when searching for problem types.\n"
-        "- For police offenses (\"offenses\" or similar tables): consider offense/Crime values like 'LICENSE VIOLATION' or 'VIOLATIONS' when the user mentions violations.\n"
-        "- For weekly calendar/event questions, prefer the `weekly_events` table when it exists in the schema. Use `event_name`, `event_date`, `start_date`, `end_date`, `start_time`, `end_time`, `category`, and `raw_text` to answer questions about what events are happening on specific days or during a given week.\n"
-        "  - The `category` column contains values like: \"Youth/Family\", \"Public Meeting\", \"Arts/Culture\", \"Health/Wellness\", \"Housing\", \"Safety\", \"Education\". Use these for filtering when appropriate.\n"
-        "  Treat `event_date` as descriptive text (not a strict DATE type); when refining filters, use case-insensitive LIKE on `event_date` and/or `raw_text` to match specific day names like 'Monday' or 'Tuesday'.\n"
-        "  When normalized dates are present, you may also refine queries using proper DATE comparisons on `start_date`/`end_date` instead of fuzzy text filters.\n"
-        "  IMPORTANT: Do NOT introduce filters that search for the literal word 'week' (e.g., WHERE LOWER(`event_date`) LIKE '%week%'). If the question mentions 'this week' or 'this week's events', leave out any 'week' filter and instead select from `weekly_events` without that condition, optionally ordering or limiting rows (for example, ORDER BY `start_date`, `start_time`).\n"
+        "- For 311 service requests table (\"service_requests_311\"): prefer filtering on \"type\" or \"reason\" for categories; avoid \"subject\" when searching for problem types.\n"
+        "- For crime incident reports table (\"crime_incident_reports\"): use offense_code_group or offense_description for filtering by crime type. Consider offense values like 'LICENSE VIOLATION' or 'VIOLATIONS' when the user mentions violations.\n"
+        "- For shootings table (\"shootings\"): contains shooting incidents where victims were struck (fatal or non-fatal). Use for questions about shootings with victims, people shot, or shooting injuries.\n"
         "- Type correctness: If the error indicates comparing text to datetime, CONVERT or CAST text date columns to datetime/timestamp before date math.\n"
         "- For filtering by year/month in MySQL, prefer DATE_FORMAT(date_column, '%Y-%m') = 'YYYY-MM' instead of PostgreSQL functions like TO_CHAR.\n"
         "- If metadata.hints.need_location is true and coordinates exist, INCLUDE latitude/longitude in the SELECT and consider applying a LIMIT (e.g., 500).\n"
         "- IMPORTANT: Do NOT use a generic LIKE '%violation%' filter. Choose specific, valid category/value filters instead.\n"
-        "- CRITICAL: For most data tables, the user cares only about Dorchester. When those tables cover multiple neighborhoods or areas, restrict results and aggregations to Dorchester (e.g., WHERE neighborhood ILIKE 'dorchester%'). "
-        "If the question mentions another place, interpret it as \"in Dorchester\" unless explicitly told otherwise.\n"
+        "- CRITICAL - DORCHESTER ONLY: This system is configured to ONLY return data for Dorchester. For ALL data tables (except weekly_events), you MUST add a WHERE clause that filters to Dorchester only. "
+        "NEVER write a query without a Dorchester filter - even if there's already a WHERE clause, you MUST add the Dorchester filter using AND.\n"
+        "Filtering rules by table (check in this order):\n"
+        "  * If the table has a `district` column: WHERE (existing conditions) AND `district` = 'C11'\n"
+        "  * If the table has a `neighborhood` column (but no district): WHERE (existing conditions) AND (LOWER(`neighborhood`) LIKE 'dorchester%' OR `neighborhood` = 'Dorchester' OR LOWER(`neighborhood`) LIKE '%dorchester%')\n"
+        "  * If the table has location/address columns but no district/neighborhood: WHERE (existing conditions) AND (LOWER(`location`) LIKE '%dorchester%' OR LOWER(`address`) LIKE '%dorchester%')\n"
+        "NEVER return data from other neighborhoods or districts. If the question mentions another place, interpret it as \"in Dorchester\" and still filter to Dorchester only.\n"
         "- EXCEPTION: When refining SQL that uses the `weekly_events` table, DO NOT add or enforce any Dorchester/neighborhood filter; `weekly_events` contains general events and should not be geographically restricted.\n"
         "- ALWAYS wrap table and column identifiers in backticks.\n"
         "- When using table aliases, always write them as separate backticked identifiers (for example, `T1`.`longitude`), never as a single backticked 'T1.longitude'."
@@ -491,7 +578,10 @@ def _llm_refine_sql(
 
     prompt = f"{system_prompt}\n\n{user_prompt}"
     content = _call_gemini_with_logging(default_model, prompt, temperature=0)
-    return _extract_sql_from_text(content)
+    sql = _extract_sql_from_text(content)
+    # Post-process to ensure Dorchester filter is present
+    sql = _ensure_dorchester_filter(sql, schema)
+    return sql
 
 
 @traceable(name="execute_sql")
@@ -776,11 +866,13 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
     }
 
     system_prompt = (
-        "You are a friendly, non-technical assistant explaining results about Dorchester to a general audience.\n"
+        "You are a friendly, non-technical assistant explaining results about Dorchester ONLY to a general audience.\n"
+        "This system is configured to show ONLY Dorchester data. All queries are filtered to Dorchester only.\n"
         "Use clear, everyday language and speak as if you are talking directly to the user.\n"
         "Focus on what the numbers mean for people in Dorchester (trends over time, comparisons within Dorchester, biggest/smallest values there), "
         "not on how the data was queried or any technical details.\n"
-        "If the underlying data includes other neighborhoods or areas, ignore them and talk only about Dorchester.\n"
+        "IMPORTANT: If you see any data from other neighborhoods in the results, ignore it completely and only discuss Dorchester data. "
+        "If the results are empty or don't contain Dorchester data, mention that no Dorchester-specific data was found.\n"
         "Do NOT mention SQL, queries, databases, or internal tools in your answer."
         + ("\n\nYou are in a conversation. Reference previous questions naturally when it helps the user." if conversation_history else "")
     )
