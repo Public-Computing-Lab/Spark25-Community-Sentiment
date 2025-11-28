@@ -102,3 +102,11 @@ on_the_porch/rag_stuff/data/*
 !setup/*.sql
 /on_the_porch/vectordb_new/8157fb6b-e92b-4627-95c4-98261938e938
 /on_the_porch/vectordb_new/8157fb6b-e92b-4627-95c4-98261938e938
+on_the_porch/data_ingestion/gmail_token.json
+on_the_porch/data_ingestion/gmail_credentials.json
+on_the_porch/data_ingestion/.email_sync_state.json
+on_the_porch/data_ingestion/.sync_state.json
+on_the_porch/data_ingestion/ingestion_log.jsonl
+on_the_porch/data_ingestion/ontheporch-ebc5a60fc214.json
+on_the_porch/data_ingestion/boston_data_sync/boston_datasets_config.json
+on_the_porch/data_ingestion/temp_downloads
