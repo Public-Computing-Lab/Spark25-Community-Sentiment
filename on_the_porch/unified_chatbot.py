@@ -125,6 +125,7 @@ def _route_question(question: str) -> Dict[str, Any]:
         "- up to 2 transcript_tags when relevant. NOTE: For podcast-related queries, usually use the 'media' tag.\n"
         "- policy_sources when asking about specific policy documents\n"
         "- folder_categories when asking about client-uploaded documents (newsletters, policy, transcripts)\n"
+        "- 'k': number of document chunks to retrieve (must be between 3 and 10, default 5). For event/calendar questions, use at least 5.\n"
         "Respond ONLY as compact JSON with keys: mode, transcript_tags, policy_sources, folder_categories, k."
     )
 
@@ -173,20 +174,32 @@ def _route_question(question: str) -> Dict[str, Any]:
     folders = plan.get("folder_categories")
     k = plan.get("k", 5)
     
+    # Normalize and validate k
+    try:
+        k = int(k)
+    except (ValueError, TypeError):
+        k = 5
+    
+    # Ensure k is at least 3 (minimum for useful retrieval)
+    if k < 3:
+        k = 3
+    
     # Force higher k for calendar questions to ensure good event coverage
     if _is_calendar_question(question):
         # Ensure at least 5 results for calendar queries
-        if isinstance(k, int) and k < 5:
+        if k < 5:
             k = 5
-        elif not isinstance(k, int):
-            k = 5
+    
+    # Cap k at reasonable maximum (20)
+    if k > 20:
+        k = 20
 
     return {
         "mode": mode,
         "transcript_tags": tags if isinstance(tags, list) or tags is None else None,
         "policy_sources": sources if isinstance(sources, list) or sources is None else None,
         "folder_categories": folders if isinstance(folders, list) or folders is None else None,
-        "k": int(k) if isinstance(k, int) else 5,
+        "k": k,
     }
 
 
