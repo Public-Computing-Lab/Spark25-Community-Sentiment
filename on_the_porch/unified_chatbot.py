@@ -1,8 +1,13 @@
 import os
 import sys
 import json
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 # Ensure we can import RAG utilities from the directory with a space in its name
@@ -81,34 +86,53 @@ def _route_question(question: str) -> Dict[str, Any]:
     client = _get_llm_client()
 
     system_prompt = (
+        f"Today's date is {date.today().strftime('%A, %B %d, %Y')}.\n\n"
         "You are a routing classifier for a chatbot that combines SQL (structured data) and RAG (text documents).\n"
         "Classify the user's question into one of three modes: 'sql', 'rag', or 'hybrid'.\n\n"
         "Use the following logic with examples grounded in our data:\n"
-        "- 'sql': for pure statistics, counts, trends, comparisons, numeric breakdowns from Postgres tables like\n"
+        "- 'sql': for pure statistics, counts, trends, comparisons, numeric breakdowns from Postgres/MySQL tables like\n"
         "  'service_requests' (311), 'arrests', 'offenses', 'homicides', 'shots_fired', or Dorchester-focused tables.\n"
+        "  NOTE: This system is configured for DORCHESTER ONLY. All SQL queries automatically filter to Dorchester data only.\n"
         "  Examples: 'How many 311 service requests were filed in Dorchester last month?',\n"
-        "  'What is the trend in shots fired by year in Boston?',\n"
-        "  'Which neighborhoods have the highest arrests in 2023?'\n"
+        "  'What is the trend in shots fired by year in Dorchester?',\n"
+        "  'Which areas in Dorchester have the highest arrests in 2023?'\n"
         "- 'rag': ONLY for purely qualitative, descriptive, or policy questions answered by documents/transcripts, such as\n"
-        "  'Boston Anti-Displacement Plan Analysis.txt', 'Boston Slow Streets Plan Analysis.txt', 'Imagine Boston 2030 Analysis.txt',\n"
-        "  or interview transcripts tagged with 'safety', 'violence', 'youth', 'media', 'community', 'displacement', 'government', 'structural racism'.\n"
+        "  policy documents, interview transcripts, newsletters, or client-uploaded files.\n"
         "  Examples: 'What does the Slow Streets program aim to achieve?',\n"
         "  'How do community members describe media representation of Dorchester?',\n"
-        "  'What strategies does the Anti-Displacement Plan propose?'\n"
-        "- 'hybrid': PREFERRED when both numbers and context are needed, OR when questions involve location/data visualization.\n"
+        "  'What strategies does the Anti-Displacement Plan propose?',\n"
+        "  'What was in the latest newsletter?',\n"
+        "  'Summarize the recent meeting transcripts'\n"
+        "- 'hybrid': PREFERRED when both numbers and context are needed, OR when questions involve location/data visualization, "
+        "  OR when questions are about events, calendars, schedules, or \"what is happening\" on a given day or week so you can use both weekly events SQL data and RAG documents.\n"
         "  Examples: 'How many homicides were recorded in Dorchester last year, and what concerns about safety come up in interviews?',\n"
-        "  'What are the monthly trends in 311 requests about street safety and how does Slow Streets address these?',\n"
+        "  'What are the monthly trends in 311 requests about street safety in Dorchester and how does Slow Streets address these?',\n"
         "  'Show me where crime incidents occurred in Dorchester',\n"
-        "  'What locations have the most service requests?'\n\n"
-        "IMPORTANT: When questions involve 'where', 'location', 'map', 'show', 'visualize', 'geography', or spatial data, prefer 'hybrid' mode to combine data with context.\n"
-        "If you choose 'rag' or 'hybrid', you may suggest up to 2 transcript_tags and policy_sources when clearly relevant.\n"
-        "Respond ONLY as compact JSON with keys: mode, transcript_tags, policy_sources, k."
+        "  NOTE: This system is configured for DORCHESTER ONLY. All SQL queries automatically filter to Dorchester data only.\n"
+        "  'What locations have the most service requests?',\n"
+        "  'What events are happening this week?',\n"
+        "  'What activities are available for kids on Saturday?',\n"
+        "  'Show me only public meetings happening next week'\n\n"
+        "IMPORTANT: When questions involve 'where', 'location', 'map', 'show', 'visualize', 'geography', spatial data, "
+        "or events/calendars/schedules, prefer 'hybrid' mode to combine SQL (including weekly events tables) with RAG context.\n\n"
+        "For event/calendar questions, set 'k' to at least 5 to ensure multiple events are retrieved. The SQL 'weekly_events' table now includes a 'category' column (e.g., 'Youth/Family', 'Public Meeting') which can be used for filtering.\n\n"
+        "Available document types in the vector database:\n"
+        "- 'transcript': community meeting transcripts with tags like 'safety', 'youth', 'media', 'community', 'displacement', 'government', 'structural racism'\n"
+        "- 'policy': city policy documents like 'Boston Anti-Displacement Plan Analysis.txt', 'Boston Slow Streets Plan Analysis.txt', 'Imagine Boston 2030 Analysis.txt'\n"
+        "- 'client_upload': documents uploaded from Google Drive, organized in folders: 'newsletters', 'policy', 'transcripts'\n\n"
+        "NOTE: Calendar events and schedules are stored in SQL (weekly_events table), NOT in the vector database. Use 'sql' or 'hybrid' mode for event queries.\n\n"
+        "If you choose 'rag' or 'hybrid', you may suggest:\n"
+        "- up to 2 transcript_tags when relevant. NOTE: For podcast-related queries, usually use the 'media' tag.\n"
+        "- policy_sources when asking about specific policy documents\n"
+        "- folder_categories when asking about client-uploaded documents (newsletters, policy, transcripts)\n"
+        "Respond ONLY as compact JSON with keys: mode, transcript_tags, policy_sources, folder_categories, k."
     )
 
     user_prompt = (
         "Question:\n" + question + "\n\n"
         "Policy sources include: 'Boston Anti-Displacement Plan Analysis.txt', 'Boston Slow Streets Plan Analysis.txt', 'Imagine Boston 2030 Analysis.txt'.\n"
         "Transcript tags include: safety, violence, youth, media, community, displacement, government, structural racism.\n"
+        "Folder categories (for client uploads): newsletters, policy, transcripts.\n"
         "Output JSON only."
     )
 
@@ -116,6 +140,7 @@ def _route_question(question: str) -> Dict[str, Any]:
         "mode": "hybrid",
         "transcript_tags": None,
         "policy_sources": None,
+        "folder_categories": None,
         "k": 5,
     }
 
@@ -145,12 +170,22 @@ def _route_question(question: str) -> Dict[str, Any]:
         mode = "hybrid"  # Default to hybrid for safety
     tags = plan.get("transcript_tags")
     sources = plan.get("policy_sources")
+    folders = plan.get("folder_categories")
     k = plan.get("k", 5)
+    
+    # Force higher k for calendar questions to ensure good event coverage
+    if _is_calendar_question(question):
+        # Ensure at least 5 results for calendar queries
+        if isinstance(k, int) and k < 5:
+            k = 5
+        elif not isinstance(k, int):
+            k = 5
 
     return {
         "mode": mode,
         "transcript_tags": tags if isinstance(tags, list) or tags is None else None,
         "policy_sources": sources if isinstance(sources, list) or sources is None else None,
+        "folder_categories": folders if isinstance(folders, list) or folders is None else None,
         "k": int(k) if isinstance(k, int) else 5,
     }
 
@@ -174,19 +209,20 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
     context = "\n".join(context_parts)
 
     system_prompt = (
-        "You are a friendly information assistant helping people understand Boston community data and policies.\n"
-        "Answer in clear, everyday language and imagine you are talking to a non-technical neighbor.\n"
+        "You are a friendly, non-technical assistant helping people understand Dorchester community data and policies.\n"
+        "This system is configured for DORCHESTER ONLY. All data queries are automatically filtered to Dorchester only.\n"
+        "Use clear, everyday language and imagine you are talking to a neighbor, not a technical expert.\n"
         "Use only the provided SOURCES and do not add information that is not supported by the text.\n\n"
-        "When you quote or paraphrase people or documents, briefly explain who/what they are first, "
-        "then include the quote in a natural way. Avoid technical jargon, and do not mention retrieval methods or internal tools.\n"
+        "When you quote or paraphrase people or documents, briefly explain who or what they are first, "
+        "then include the quote in a natural way. Avoid technical jargon, and do not mention SQL, databases, RAG, "
+        "retrieval methods, or internal tools.\n"
         "If the question involves numbers, be honest when the sources are limited and avoid inventing precise figures.\n"
-        "Write your answer in 1–3 short paragraphs."
         + ("\n\nYou are in a conversation. Use previous messages for context when the current question references earlier topics or asks for follow-ups." if conversation_history else "")
     )
     user_prompt = (
         "SOURCES:\n" + context + "\n\n" +
         "QUESTION: " + question + "\n\n" +
-        "ANSWER (2 short paragraphs):"
+        "Please answer for the user in clear, everyday language:"
     )
 
     client = _get_llm_client()
@@ -211,6 +247,18 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
         return "\n\n".join(context_parts[:10])  # fallback: show a sample of context
 
 
+def _is_calendar_question(question: str) -> bool:
+    """Check if the question is about events, calendar, or schedules."""
+    calendar_keywords = [
+        "event", "events", "happening", "schedule", "calendar", "activity", "activities",
+        "this week", "next week", "today", "tomorrow", "weekend", "saturday", "sunday",
+        "monday", "tuesday", "wednesday", "thursday", "friday", "what's on", "what is on",
+        "going on", "things to do", "community event", "meeting", "workshop"
+    ]
+    question_lower = question.lower()
+    return any(kw in question_lower for kw in calendar_keywords)
+
+
 def _run_rag(question: str, plan: Dict[str, Any], conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     k = int(plan.get("k", 5))
     tags = plan.get("transcript_tags")
@@ -219,13 +267,18 @@ def _run_rag(question: str, plan: Dict[str, Any], conversation_history: Optional
     combined_chunks: List[str] = []
     combined_meta: List[Dict[str, Any]] = []
 
+    # NOTE: Calendar events are now SQL-only (weekly_events table), not in vector DB.
+    # Event queries should use 'sql' or 'hybrid' mode which handles them via SQL.
+
     # transcripts
     try:
         t_res = retrieval.retrieve_transcripts(question, tags=tags, k=k)
-        combined_chunks.extend(t_res.get("chunks", []))
+        t_chunks = t_res.get("chunks", [])
+        print(f"  📝 Transcripts: {len(t_chunks)} chunks found")
+        combined_chunks.extend(t_chunks)
         combined_meta.extend(t_res.get("metadata", []))
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"  ⚠️ Transcript retrieval error: {e}")
 
     # policies
     try:
@@ -236,10 +289,12 @@ def _run_rag(question: str, plan: Dict[str, Any], conversation_history: Optional
                 combined_meta.extend(p_res.get("metadata", []))
         else:
             p_res = retrieval.retrieve_policies(question, k=k)
-            combined_chunks.extend(p_res.get("chunks", []))
+            p_chunks = p_res.get("chunks", [])
+            print(f"  📋 Policies: {len(p_chunks)} chunks found")
+            combined_chunks.extend(p_chunks)
             combined_meta.extend(p_res.get("metadata", []))
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"  ⚠️ Policy retrieval error: {e}")
 
     answer = _compose_rag_answer(question, combined_chunks, combined_meta, conversation_history)
     return {"answer": answer, "chunks": combined_chunks, "metadata": combined_meta}
@@ -313,15 +368,17 @@ def _run_hybrid(question: str, plan: Dict[str, Any], conversation_history: Optio
     client = _get_llm_client()
     model = client.GenerativeModel(GEMINI_MODEL)
     merge_system = (
-        "You are a friendly assistant answering questions for a non-technical user.\n"
-        "You receive two kinds of input: (1) numeric data about counts and trends, and (2) contextual text explaining people's experiences and policies.\n"
-        "Blend these into a single, clear answer in everyday language.\n\n"
-        "Write a concise answer in 2 short paragraphs:\n"
-        "- First paragraph: summarize the most important numbers and patterns (who/what/when/where).\n"
-        "- Second paragraph: explain what those numbers might mean in people's lives, using the contextual text.\n"
-        "Do NOT mention SQL, databases, RAG, retrieval, or any internal tools. Just speak as a normal information bot.\n"
+        "You are a friendly, non-technical assistant explaining information about DORCHESTER ONLY to a general audience.\n"
+        "This system is configured for DORCHESTER ONLY. All data queries are automatically filtered to Dorchester only.\n"
+        "Use clear, everyday language and speak as if you are talking directly to the user.\n"
+        "You have access to both numeric data (counts, trends, patterns) and contextual information (people's experiences, policy documents, community perspectives).\n\n"
+        "Weave these together naturally into a single, cohesive answer that tells a complete story.\n"
+        "Blend the numbers with the context so the user understands both what is happening and why it matters.\n"
+        "Focus on what the information means for people in Dorchester, not on technical details or data sources.\n"
+        "If you see any data from other neighborhoods, ignore it completely and only discuss Dorchester.\n\n"
+        "Do NOT mention SQL, databases, RAG, retrieval, or any internal tools. Just speak as a helpful information bot.\n"
         "Never invent data or trends not present in the inputs."
-        + ("\n\nYou are in a conversation. Use previous messages for context when the current question references earlier topics." if conversation_history else "")
+        + ("\n\nYou are in a conversation. Reference previous questions naturally when it helps the user." if conversation_history else "")
     )
     blob = {
         "sql_answer": sql_part.get("answer"),
@@ -379,6 +436,9 @@ def main() -> None:
 
         plan = _route_question(question)
         mode = plan.get("mode", "rag")
+        
+        # Print the routing plan
+        print(f"\n🧭 Routing Plan: {json.dumps(plan, indent=2)}\n")
 
         try:
             if mode == "sql":
