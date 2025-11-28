@@ -14,7 +14,7 @@ except Exception:  # pragma: no cover
 DUMP_PATH = Path("goebel_iad1-mysql-e2-17b_dreamhost_com.sql")
 
 # Only generate metadata for these tables
-TARGET_TABLES = {"bos311_data", "homicide_data", "shots_fired_data"}
+TARGET_TABLES = {"crime_incident_reports", "service_requests_311", "shootings"}
 
 
 # Heuristic: which MySQL types should we treat as numeric?

@@ -27,7 +27,6 @@ llm_query_log.csv
 logs/
 *.sqlite
 *.db
-*.sqlite3
 *.sql
 
 
@@ -100,5 +99,5 @@ on_the_porch/rag_stuff/data/*
 !api/datastore/Boston Anti-Displacement Plan Analysis.txt
 !api/*.sql
 !setup/*.sql
-/on_the_porch/vectordb_new/8157fb6b-e92b-4627-95c4-98261938e938
-/on_the_porch/vectordb_new/8157fb6b-e92b-4627-95c4-98261938e938
+on_the_porch/data_ingestion/boston_data_sync/boston_sync_log.jsonl
+

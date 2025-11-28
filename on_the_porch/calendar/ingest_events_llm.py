@@ -203,19 +203,25 @@ def _insert_events_into_db(
 
 def main() -> None:
     """
-    1) Read page 2 of REP 46_25web.pdf.
-    2) Use Gemini to extract events + dates as JSON.
+    1) Read ALL pages of REP 46_25web.pdf.
+    2) Use Gemini to extract events + dates from each page as JSON.
     3) Write them into the weekly_events table.
     """
     pdf_path = "REP 46_25web.pdf"
-    page_index = 1  # 0-based; this is page 2
 
     try:
-        events = _extract_events_from_pdf(pdf_path, page_index=page_index)
-        print(f"LLM extracted {len(events)} events:")
-        for ev in events:
-            print(f"- {ev['event_name']} | {ev['event_date']}")
-        _insert_events_into_db(events, source_pdf=pdf_path, page_number=page_index + 1)
+        reader = PdfReader(pdf_path)
+        num_pages = len(reader.pages)
+        total_events = 0
+        for page_index in range(num_pages):
+            print(f"\n=== Processing page {page_index + 1} / {num_pages} ===")
+            events = _extract_events_from_pdf(pdf_path, page_index=page_index)
+            print(f"LLM extracted {len(events)} events from page {page_index + 1}:")
+            for ev in events:
+                print(f"- {ev['event_name']} | {ev['event_date']}")
+            _insert_events_into_db(events, source_pdf=pdf_path, page_number=page_index + 1)
+            total_events += len(events)
+        print(f"\nDone. Inserted a total of {total_events} events from {num_pages} pages.")
     except Exception as exc:  # noqa: BLE001
         print(f"Error ingesting events: {exc}", file=sys.stderr)
         sys.exit(1)

@@ -1,0 +1,80 @@
+{
+  "schema": "mysql",
+  "table": "shootings",
+  "columns": {
+    "_id": {
+      "data_type": "bigint",
+      "is_numeric": true
+    },
+    "incident_num": {
+      "data_type": "varchar(255)",
+      "is_numeric": false
+    },
+    "shooting_date": {
+      "data_type": "datetime",
+      "is_numeric": false
+    },
+    "district": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "A1",
+        "A15",
+        "A7",
+        "B2",
+        "B3",
+        "C11",
+        "C6",
+        "D14",
+        "D4",
+        "E13",
+        "E18",
+        "E5"
+      ]
+    },
+    "shooting_type_v2": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "Fatal",
+        "Non-Fatal"
+      ]
+    },
+    "victim_gender": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "Female",
+        "Male",
+        "Unknown"
+      ]
+    },
+    "victim_race": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "Asian",
+        "Black or African American",
+        "Unknown",
+        "White"
+      ]
+    },
+    "victim_ethnicity_nibrs": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "Hispanic or Latinx",
+        "Not Hispanic or Latinx",
+        "Unknown"
+      ]
+    },
+    "multi_victim": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "f",
+        "t"
+      ]
+    }
+  }
+}

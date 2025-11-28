@@ -1,12 +1,42 @@
-from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from pathlib import Path
+import os
+import google.generativeai as genai  # type: ignore
 
 VECTORDB_DIR = Path("../vectordb_new")
+GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "models/text-embedding-004")
+
+
+def _configure_gemini() -> None:
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY not configured")
+    genai.configure(api_key=api_key)
+
+
+class GeminiEmbeddings:
+    """
+    Minimal embeddings wrapper using Gemini's embedding API, compatible with LangChain's interface.
+    """
+
+    def __init__(self, model: str | None = None) -> None:
+        _configure_gemini()
+        self.model = model or GEMINI_EMBED_MODEL
+
+    def _embed(self, text: str):
+        res = genai.embed_content(model=self.model, content=text)
+        return res["embedding"]
+
+    def embed_documents(self, texts):
+        return [self._embed(t) for t in texts]
+
+    def embed_query(self, text):
+        return self._embed(text)
+
 
 def load_vectordb():
-    """Load the existing vector database."""
-    embeddings = OpenAIEmbeddings()
+    """Load the unified vector database (policies, transcripts, client uploads, etc.)."""
+    embeddings = GeminiEmbeddings()
     vectordb = Chroma(
         persist_directory=str(VECTORDB_DIR),
         embedding_function=embeddings,
@@ -14,14 +44,14 @@ def load_vectordb():
     return vectordb
 
 
-def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None):
+def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None, vectordb=None):
     """
     Universal retrieval with flexible metadata filtering.
     
     Args:
         query: Search query string
         k: Number of results to return
-        doc_type: Filter by document type ('transcript' or 'policy')
+        doc_type: Filter by document type ('transcript', 'policy', or 'client_upload')
         tags: Filter by tags (list of tags, e.g., ['media', 'community'])
                For transcripts only - uses OR logic (chunk must have ANY tag)
         source: Filter by specific source filename
@@ -46,23 +76,34 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None):
         # Everything
         retrieve(query)
     """
-    vectordb = load_vectordb()
+    if vectordb is None:
+        vectordb = load_vectordb()
     
-    # Build filter dictionary (Chroma requires $and for multiple conditions)
+    # Build filter dictionary (Chroma requires $and / $or for combinations)
     filter_dict = None
-    
-    if doc_type and source:
-        # Multiple filters - use $and
+
+    # Allow doc_type to be a single value or a list of values
+    doc_filter = None
+    if isinstance(doc_type, (list, tuple)):
+        doc_types = [dt for dt in doc_type if dt]
+        if len(doc_types) == 1:
+            doc_filter = {"doc_type": doc_types[0]}
+        elif len(doc_types) > 1:
+            doc_filter = {"$or": [{"doc_type": dt} for dt in doc_types]}
+    elif doc_type:
+        doc_filter = {"doc_type": doc_type}
+
+    if doc_filter and source:
         filter_dict = {
             "$and": [
-                {"doc_type": doc_type},
-                {"source": source}
+                doc_filter,
+                {"source": source},
             ]
         }
-    elif doc_type:
-        filter_dict = {'doc_type': doc_type}
+    elif doc_filter:
+        filter_dict = doc_filter
     elif source:
-        filter_dict = {'source': source}
+        filter_dict = {"source": source}
     
     # Note: Tag filtering is more complex in Chroma
     # For now, we'll filter tags in post-processing if specified
@@ -76,7 +117,7 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None):
             filter=filter_dict if filter_dict else None
         )
         
-        # Post-process tag filtering if needed
+        # Post-process tag filtering if needed (soft filter: fall back to unfiltered if no matches)
         if tags:
             filtered_results = []
             for doc, score in results_with_scores:
@@ -88,7 +129,9 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None):
                         filtered_results.append((doc, score))
                         if len(filtered_results) >= k:
                             break
-            results_with_scores = filtered_results
+            # Only apply tag filter if it yields at least one result
+            if filtered_results:
+                results_with_scores = filtered_results
         
         # Apply score threshold
         filtered_results = [(doc, score) for doc, score in results_with_scores if score <= min_score]
@@ -106,7 +149,7 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None):
             filter=filter_dict if filter_dict else None
         )
         
-        # Post-process tag filtering if needed
+        # Post-process tag filtering if needed (soft filter: fall back to unfiltered if no matches)
         if tags:
             filtered_results = []
             for doc in results:
@@ -118,7 +161,9 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None):
                         filtered_results.append(doc)
                         if len(filtered_results) >= k:
                             break
-            results = filtered_results
+            # Only apply tag filter if it yields at least one result
+            if filtered_results:
+                results = filtered_results
         
         return {
             'chunks': [doc.page_content for doc in results[:k]],
