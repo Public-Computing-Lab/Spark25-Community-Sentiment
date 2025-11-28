@@ -76,6 +76,14 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None, 
         # Everything
         retrieve(query)
     """
+    # Defensive clamp: Chroma requires k >= 1
+    try:
+        k = int(k)
+    except (TypeError, ValueError):
+        k = 5
+    if k <= 0:
+        k = 5
+
     if vectordb is None:
         vectordb = load_vectordb()
     
