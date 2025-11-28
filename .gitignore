@@ -99,3 +99,5 @@ on_the_porch/rag_stuff/data/*
 !api/datastore/Boston Anti-Displacement Plan Analysis.txt
 !api/*.sql
 !setup/*.sql
+on_the_porch/data_ingestion/boston_data_sync/boston_sync_log.jsonl
+
