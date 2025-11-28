@@ -466,6 +466,7 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
         "  * If the table has location/address columns but no district/neighborhood: WHERE (existing conditions) AND (LOWER(`location`) LIKE '%dorchester%' OR LOWER(`address`) LIKE '%dorchester%')\n"
         "NEVER return data from other neighborhoods or districts. If the question mentions another place, interpret it as \"in Dorchester\" and still filter to Dorchester only.\n"
         "- EXCEPTION: When querying the `weekly_events` table, DO NOT filter by Dorchester or any neighborhood; these events are general and should be returned regardless of location.\n"
+        "- CRITICAL for `weekly_events` table: For date comparisons (e.g., 'this weekend', 'next week', date ranges), ALWAYS use `start_date` or `end_date` (DATE fields), NEVER use `event_date` (which is VARCHAR text like 'Monday' or 'June 3-5'). Use `event_date` only for display, not for filtering by date.\n"
         "- ALWAYS wrap table and column identifiers in backticks (`like_this`).\n"
         "- When using table aliases, always write them as separate backticked identifiers (for example, `T1`.`longitude`), never as a single backticked 'T1.longitude'."
     )
@@ -557,6 +558,7 @@ def _llm_refine_sql(
         "  * If the table has location/address columns but no district/neighborhood: WHERE (existing conditions) AND (LOWER(`location`) LIKE '%dorchester%' OR LOWER(`address`) LIKE '%dorchester%')\n"
         "NEVER return data from other neighborhoods or districts. If the question mentions another place, interpret it as \"in Dorchester\" and still filter to Dorchester only.\n"
         "- EXCEPTION: When refining SQL that uses the `weekly_events` table, DO NOT add or enforce any Dorchester/neighborhood filter; `weekly_events` contains general events and should not be geographically restricted.\n"
+        "- CRITICAL for `weekly_events` table: For date comparisons, ALWAYS use `start_date` or `end_date` (DATE fields), NEVER use `event_date` (VARCHAR). Use `event_date` only for display.\n"
         "- ALWAYS wrap table and column identifiers in backticks.\n"
         "- When using table aliases, always write them as separate backticked identifiers (for example, `T1`.`longitude`), never as a single backticked 'T1.longitude'."
     )
