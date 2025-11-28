@@ -78,6 +78,74 @@ def _safe_json_loads(text: str, default: Dict[str, Any]) -> Dict[str, Any]:
         return default
 
 
+def _check_if_needs_new_data(question: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
+    """
+    Check if the question can be answered from conversation history or needs new data retrieval.
+    Returns: {"needs_new_data": bool, "reason": str}
+    """
+    # If no history exists, always need new data
+    if not conversation_history or len(conversation_history) == 0:
+        return {"needs_new_data": True, "reason": "No conversation history available"}
+    
+    client = _get_llm_client()
+    
+    # Build conversation context for analysis
+    history_context = ""
+    if conversation_history:
+        for msg in conversation_history[-10:]:  # Last 10 messages
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role and content:
+                history_context += f"{role.upper()}: {content}\n\n"
+    
+    system_prompt = (
+        "You analyze if a user's question can be answered from conversation history or needs new data retrieval.\n\n"
+        "Rules:\n"
+        "- If question is a follow-up, clarification, or reference to previous answers (e.g., 'what about last year?', 'tell me more', 'break that down', 'can you elaborate') → needs_new_data = false\n"
+        "- If question asks for new data, different time period not mentioned before, different metrics, or completely new topic → needs_new_data = true\n"
+        "- If question references specific numbers/statistics from previous answers → needs_new_data = false\n"
+        "- If question asks to compare, explain further, or provide more detail on previously discussed topics → needs_new_data = false\n\n"
+        "Return ONLY valid JSON with keys: needs_new_data (boolean) and reason (brief string explaining your decision)."
+    )
+    
+    user_prompt = (
+        "Conversation History:\n" + (history_context if history_context else "(No previous conversation)") + "\n\n"
+        "Current Question: " + question + "\n\n"
+        "Analyze if this question can be answered from the conversation history above, or if it needs new data retrieval.\n"
+        "Return JSON only."
+    )
+    
+    default_result = {"needs_new_data": True, "reason": "Error analyzing question, defaulting to new data"}
+    
+    try:
+        model = client.GenerativeModel(GEMINI_MODEL)
+        prompt = f"{system_prompt}\n\n{user_prompt}"
+        resp = model.generate_content(
+            prompt,
+            generation_config={"temperature": 0}
+        )
+        content = (resp.text or "").strip()
+        
+        # Remove code fences if present
+        if content.startswith("```"):
+            content = content.strip("`").strip()
+            lines = content.splitlines()
+            if lines and lines[0].strip().lower() in ("json", "javascript", "js"):
+                content = "\n".join(lines[1:]).strip()
+        
+        result = _safe_json_loads(content, default_result)
+        
+        # Ensure needs_new_data is boolean
+        needs_new = result.get("needs_new_data", True)
+        if isinstance(needs_new, str):
+            needs_new = needs_new.lower() in ("true", "yes", "1")
+        result["needs_new_data"] = bool(needs_new)
+        
+        return result
+    except Exception:
+        return default_result
+
+
 def _route_question(question: str) -> Dict[str, Any]:
     """
     Decide whether to answer via SQL, RAG, or HYBRID.
@@ -258,6 +326,52 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
         return (resp.text or "").strip()
     except Exception:
         return "\n\n".join(context_parts[:10])  # fallback: show a sample of context
+
+
+def _answer_from_history(question: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> str:
+    """
+    Generate an answer from conversation history only, without retrieving new data.
+    This is used for follow-up questions that can be answered from previous context.
+    """
+    if not conversation_history:
+        return "I don't have any previous conversation to reference. Could you ask your question again?"
+    
+    client = _get_llm_client()
+    model = client.GenerativeModel(GEMINI_MODEL)
+    
+    system_prompt = (
+        "You are a friendly, non-technical assistant helping people understand Dorchester community data and policies.\n"
+        "This system is configured for DORCHESTER ONLY. All data queries are automatically filtered to Dorchester only.\n"
+        "Use clear, everyday language and imagine you are talking to a neighbor, not a technical expert.\n\n"
+        "Answer the user's question based ONLY on the conversation history provided. "
+        "Do not mention that you're using conversation history - just answer naturally as if continuing the conversation.\n"
+        "If the question references previous answers, numbers, or statistics mentioned earlier, use those in your response.\n"
+        "If you cannot answer from the conversation history, politely say so and suggest they ask a new question.\n"
+        "Avoid technical jargon, and do not mention SQL, databases, RAG, retrieval methods, or internal tools."
+    )
+    
+    # Build conversation context
+    history_text = ""
+    for msg in conversation_history[-20:]:  # Last 20 messages for context
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        if role and content:
+            history_text += f"{role.upper()}: {content}\n\n"
+    
+    user_prompt = (
+        "Conversation History:\n" + history_text + "\n\n"
+        "Current Question: " + question + "\n\n"
+        "Please answer the current question based on the conversation history above:"
+    )
+    
+    try:
+        resp = model.generate_content(
+            user_prompt,
+            generation_config={"temperature": 0.3}
+        )
+        return (resp.text or "").strip()
+    except Exception:
+        return "I encountered an error answering from conversation history. Could you rephrase your question?"
 
 
 def _is_calendar_question(question: str) -> bool:

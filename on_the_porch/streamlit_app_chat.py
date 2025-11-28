@@ -188,48 +188,166 @@ def main() -> None:
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    if mode_choice == "auto":
-                        plan = uc._route_question(prompt)
-                    else:
-                        plan = _build_manual_plan(mode_choice, k, tags_raw, sources_raw)
-
-                    mode = plan.get("mode", "rag")
-                    
-                    # Display the routing plan
-                    with st.expander("🧭 Routing Plan", expanded=False):
-                        st.json(plan)
-                    
                     # Prepare conversation history (format: list of {"role": "user"/"assistant", "content": "..."})
                     conversation_history = st.session_state.conversation_history.copy()
-
-                    if mode == "sql":
-                        if not os.getenv("DATABASE_URL"):
-                            st.error("DATABASE_URL not set. SQL mode unavailable.")
-                            response_text = "DATABASE_URL not set. SQL mode unavailable."
+                    
+                    # Check if we can answer from conversation history before routing
+                    needs_new_data = True
+                    history_check_result = None
+                    
+                    if conversation_history and len(conversation_history) > 0 and mode_choice == "auto":
+                        try:
+                            history_check_result = uc._check_if_needs_new_data(prompt, conversation_history)
+                            needs_new_data = history_check_result.get("needs_new_data", True)
+                            
+                            if not needs_new_data:
+                                # Can answer from history - skip routing and retrieval
+                                response_text = uc._answer_from_history(prompt, conversation_history)
+                                
+                                # Add assistant message to chat display
+                                assistant_msg = {
+                                    "role": "assistant",
+                                    "content": response_text,
+                                }
+                                st.session_state.messages.append(assistant_msg)
+                                
+                                # Update conversation history
+                                st.session_state.conversation_history.append({"role": "user", "content": prompt})
+                                st.session_state.conversation_history.append({"role": "assistant", "content": response_text})
+                                
+                                # Keep conversation history manageable (last 20 messages)
+                                if len(st.session_state.conversation_history) > 20:
+                                    st.session_state.conversation_history = st.session_state.conversation_history[-20:]
+                                
+                                st.write(response_text)
+                                
+                                # Show history check info in expander
+                                if history_check_result:
+                                    with st.expander("💭 Answered from conversation history", expanded=False):
+                                        st.json(history_check_result)
+                                
+                                # Skip the rest - answer from history complete, exit early
+                                needs_new_data = False  # Flag to skip routing/retrieval
+                        except Exception as history_exc:
+                            # If history check fails, fall back to normal routing
+                            print(f"History check error: {history_exc}")
+                            needs_new_data = True
+                    
+                    # Normal flow: routing and retrieval needed (only if we haven't answered from history)
+                    if needs_new_data:
+                        if mode_choice == "auto":
+                            plan = uc._route_question(prompt)
                         else:
-                            out = uc._run_sql(prompt, conversation_history)
-                            response_text = out.get("answer", "")
-                            
-                            # Store message with metadata
-                            assistant_msg = {
-                                "role": "assistant",
-                                "content": response_text,
-                                "sql": out.get("sql", ""),
-                                "result": out.get("result", {}),
-                                "show_sql": show_sql,
-                                "show_map": show_map,
-                            }
-                            
-                            if show_sql:
-                                with st.expander("View SQL"):
-                                    st.code(out.get("sql", ""), language="sql")
-                                _display_sql_result(out.get("result", {}))
-                            if show_map:
-                                _render_map_from_result(out.get("result", {}), key_suffix="sql")
+                            plan = _build_manual_plan(mode_choice, k, tags_raw, sources_raw)
 
-                    elif mode == "hybrid":
-                        if not os.getenv("DATABASE_URL"):
-                            st.info("DATABASE_URL not set. Running RAG-only.")
+                        mode = plan.get("mode", "rag")
+                        
+                        # Display the routing plan
+                        with st.expander("🧭 Routing Plan", expanded=False):
+                            st.json(plan)
+                            if history_check_result:
+                                st.json({"history_check": history_check_result})
+
+                        if mode == "sql":
+                            if not os.getenv("DATABASE_URL"):
+                                st.error("DATABASE_URL not set. SQL mode unavailable.")
+                                response_text = "DATABASE_URL not set. SQL mode unavailable."
+                            else:
+                                out = uc._run_sql(prompt, conversation_history)
+                                response_text = out.get("answer", "")
+                                
+                                # Store message with metadata
+                                assistant_msg = {
+                                    "role": "assistant",
+                                    "content": response_text,
+                                    "sql": out.get("sql", ""),
+                                    "result": out.get("result", {}),
+                                    "show_sql": show_sql,
+                                    "show_map": show_map,
+                                }
+                                
+                                if show_sql:
+                                    with st.expander("View SQL"):
+                                        st.code(out.get("sql", ""), language="sql")
+                                    _display_sql_result(out.get("result", {}))
+                                if show_map:
+                                    _render_map_from_result(out.get("result", {}), key_suffix="sql")
+
+                        elif mode == "hybrid":
+                            if not os.getenv("DATABASE_URL"):
+                                st.info("DATABASE_URL not set. Running RAG-only.")
+                                out = uc._run_rag(prompt, plan, conversation_history)
+                                response_text = out.get("answer", "")
+                                metas: List[Dict[str, Any]] = out.get("metadata", [])
+                                
+                                # Show retrieval stats by doc type
+                                doc_type_counts: Dict[str, int] = {}
+                                for m in metas:
+                                    dt = m.get("doc_type", "unknown")
+                                    doc_type_counts[dt] = doc_type_counts.get(dt, 0) + 1
+                                
+                                with st.expander("📊 Retrieval Stats", expanded=False):
+                                    for dt, count in doc_type_counts.items():
+                                        st.write(f"- **{dt}**: {count} chunks")
+                                    if not doc_type_counts:
+                                        st.write("No chunks retrieved")
+                                
+                                assistant_msg = {
+                                    "role": "assistant",
+                                    "content": response_text,
+                                    "sources": [m.get("source", "Unknown") for m in metas[:20]],
+                                }
+                                
+                                if metas:
+                                    with st.expander("Sources"):
+                                        for m in metas[:20]:
+                                            st.write(m.get("source", "Unknown"))
+                            else:
+                                out = uc._run_hybrid(prompt, plan, conversation_history)
+                                response_text = out.get("answer", "")
+                                
+                                sqlp = out.get("sql", {})
+                                assistant_msg = {
+                                    "role": "assistant",
+                                    "content": response_text,
+                                    "sql": sqlp.get("sql", ""),
+                                    "result": sqlp.get("result", {}),
+                                    "show_sql": show_sql,
+                                    "show_map": show_map,
+                                }
+                                
+                                if show_sql:
+                                    sqlp = out.get("sql", {})
+                                    with st.expander("View SQL"):
+                                        st.code(sqlp.get("sql", ""), language="sql")
+                                    _display_sql_result(sqlp.get("result", {}))
+                                if show_map:
+                                    sqlp = out.get("sql", {})
+                                    result = sqlp.get("result", {}) if isinstance(sqlp, dict) else {}
+                                    _render_map_from_result(result, key_suffix="hybrid")
+                                
+                                ragp = out.get("rag", {})
+                                metas: List[Dict[str, Any]] = ragp.get("metadata", [])
+                                
+                                # Show retrieval stats by doc type
+                                doc_type_counts: Dict[str, int] = {}
+                                for m in metas:
+                                    dt = m.get("doc_type", "unknown")
+                                    doc_type_counts[dt] = doc_type_counts.get(dt, 0) + 1
+                                
+                                with st.expander("📊 RAG Retrieval Stats", expanded=False):
+                                    for dt, count in doc_type_counts.items():
+                                        st.write(f"- **{dt}**: {count} chunks")
+                                    if not doc_type_counts:
+                                        st.write("No chunks retrieved")
+                                
+                                if metas:
+                                    assistant_msg["sources"] = [m.get("source", "Unknown") for m in metas[:20]]
+                                    with st.expander("Sources"):
+                                        for m in metas[:20]:
+                                            st.write(m.get("source", "Unknown"))
+
+                        else:  # rag
                             out = uc._run_rag(prompt, plan, conversation_history)
                             response_text = out.get("answer", "")
                             metas: List[Dict[str, Any]] = out.get("metadata", [])
@@ -256,91 +374,19 @@ def main() -> None:
                                 with st.expander("Sources"):
                                     for m in metas[:20]:
                                         st.write(m.get("source", "Unknown"))
-                        else:
-                            out = uc._run_hybrid(prompt, plan, conversation_history)
-                            response_text = out.get("answer", "")
-                            
-                            sqlp = out.get("sql", {})
-                            assistant_msg = {
-                                "role": "assistant",
-                                "content": response_text,
-                                "sql": sqlp.get("sql", ""),
-                                "result": sqlp.get("result", {}),
-                                "show_sql": show_sql,
-                                "show_map": show_map,
-                            }
-                            
-                            if show_sql:
-                                sqlp = out.get("sql", {})
-                                with st.expander("View SQL"):
-                                    st.code(sqlp.get("sql", ""), language="sql")
-                                _display_sql_result(sqlp.get("result", {}))
-                            if show_map:
-                                sqlp = out.get("sql", {})
-                                result = sqlp.get("result", {}) if isinstance(sqlp, dict) else {}
-                                _render_map_from_result(result, key_suffix="hybrid")
-                            
-                            ragp = out.get("rag", {})
-                            metas: List[Dict[str, Any]] = ragp.get("metadata", [])
-                            
-                            # Show retrieval stats by doc type
-                            doc_type_counts: Dict[str, int] = {}
-                            for m in metas:
-                                dt = m.get("doc_type", "unknown")
-                                doc_type_counts[dt] = doc_type_counts.get(dt, 0) + 1
-                            
-                            with st.expander("📊 RAG Retrieval Stats", expanded=False):
-                                for dt, count in doc_type_counts.items():
-                                    st.write(f"- **{dt}**: {count} chunks")
-                                if not doc_type_counts:
-                                    st.write("No chunks retrieved")
-                            
-                            if metas:
-                                assistant_msg["sources"] = [m.get("source", "Unknown") for m in metas[:20]]
-                                with st.expander("Sources"):
-                                    for m in metas[:20]:
-                                        st.write(m.get("source", "Unknown"))
 
-                    else:  # rag
-                        out = uc._run_rag(prompt, plan, conversation_history)
-                        response_text = out.get("answer", "")
-                        metas: List[Dict[str, Any]] = out.get("metadata", [])
+                        # Update conversation history for LLM context (only for routing path)
+                        st.session_state.conversation_history.append({"role": "user", "content": prompt})
+                        st.session_state.conversation_history.append({"role": "assistant", "content": response_text})
                         
-                        # Show retrieval stats by doc type
-                        doc_type_counts: Dict[str, int] = {}
-                        for m in metas:
-                            dt = m.get("doc_type", "unknown")
-                            doc_type_counts[dt] = doc_type_counts.get(dt, 0) + 1
+                        # Keep conversation history manageable (last 20 messages)
+                        if len(st.session_state.conversation_history) > 20:
+                            st.session_state.conversation_history = st.session_state.conversation_history[-20:]
                         
-                        with st.expander("📊 Retrieval Stats", expanded=False):
-                            for dt, count in doc_type_counts.items():
-                                st.write(f"- **{dt}**: {count} chunks")
-                            if not doc_type_counts:
-                                st.write("No chunks retrieved")
+                        # Add assistant message to chat display
+                        st.session_state.messages.append(assistant_msg)
                         
-                        assistant_msg = {
-                            "role": "assistant",
-                            "content": response_text,
-                            "sources": [m.get("source", "Unknown") for m in metas[:20]],
-                        }
-                        
-                        if metas:
-                            with st.expander("Sources"):
-                                for m in metas[:20]:
-                                    st.write(m.get("source", "Unknown"))
-
-                    # Update conversation history for LLM context
-                    st.session_state.conversation_history.append({"role": "user", "content": prompt})
-                    st.session_state.conversation_history.append({"role": "assistant", "content": response_text})
-                    
-                    # Keep conversation history manageable (last 20 messages)
-                    if len(st.session_state.conversation_history) > 20:
-                        st.session_state.conversation_history = st.session_state.conversation_history[-20:]
-                    
-                    # Add assistant message to chat display
-                    st.session_state.messages.append(assistant_msg)
-                    
-                    st.write(response_text)
+                        st.write(response_text)
 
                 except Exception as exc:  # noqa: BLE001
                     error_msg = f"Error: {exc}"
