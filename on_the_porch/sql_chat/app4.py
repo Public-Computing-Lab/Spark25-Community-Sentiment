@@ -465,7 +465,14 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
         "Instead, use specific categories from the appropriate table's type/reason/offense_code_group columns.\n"
         "- Type correctness: NEVER compare text to timestamps incorrectly. If a date/time column is stored as text per metadata (e.g., 'open_dt' in 'dorchester_311'), CAST/convert it to a datetime type before comparing to NOW() or intervals.\n"
         "- CRITICAL: This is a MySQL database. Use MySQL syntax and functions only. "
-        "Use MySQL date functions (DATE_FORMAT, YEAR, MONTH, DAY, etc.), not functions from other databases (SQLite, PostgreSQL, etc.).\n"
+        "Use MySQL date functions (DATE_FORMAT, YEAR, MONTH, DAY, DATE_SUB, DATE_ADD, CURDATE, NOW, etc.), not functions from other databases (SQLite, PostgreSQL, etc.).\n"
+        "- For relative date queries (e.g., 'last month', 'this month', 'last week', 'last year'):\n"
+        "  * 'last month' = the previous calendar month (e.g., if today is December 2024, 'last month' is November 2024)\n"
+        "  * Use DATE_SUB or DATE_ADD with INTERVAL to calculate date ranges\n"
+        "  * Example for 'last month': WHERE DATE_FORMAT(date_column, '%Y-%m') = DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m')\n"
+        "  * Or use: WHERE date_column >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND date_column < DATE_FORMAT(CURDATE(), '%Y-%m-01')\n"
+        "  * For 311 requests, use the appropriate date column (often 'open_dt' or 'created_date') and CAST to DATE if needed\n"
+        "- ALWAYS generate a query that will return actual results. If the question asks for a count, use COUNT(*). If it asks for a number, make sure the query returns that number.\n"
         "- If metadata.hints.need_location is true and the selected table includes latitude/longitude columns (e.g., 'latitude', 'longitude'), INCLUDE them in the SELECT. If returning many rows, LIMIT to a reasonable sample (e.g., 500).\n"
         "- If metadata.hints.prefer_location is true, strongly consider including latitude/longitude columns in the SELECT when available, especially for questions about locations, places, neighborhoods, or showing/visualizing data.\n"
         "- For queries involving 'where', 'location', 'show', 'find', 'map', or spatial concepts, ALWAYS include latitude and longitude columns when available in the table schema.\n"
@@ -894,7 +901,11 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
         "not on how the data was queried or any technical details.\n"
         "IMPORTANT: If you see any data from other neighborhoods in the results, ignore it completely and only discuss Dorchester data. "
         "If the results are empty or don't contain Dorchester data, mention that no Dorchester-specific data was found.\n"
-        "Do NOT mention SQL, queries, databases, or internal tools in your answer."
+        "Do NOT mention SQL, queries, databases, or internal tools in your answer.\n\n"
+        "CRITICAL: You MUST answer the question using the SQL results provided below. The results contain the actual data from the database. "
+        "NEVER say you need more information when results are provided - use the data in the 'Result (JSON)' section to answer the question directly. "
+        "If the results show a number, report that number. If the results show rows of data, summarize or report the key findings. "
+        "Only say you need more information if the results section is completely empty or shows an error."
         + ("\n\nYou are in a conversation. Reference previous questions naturally when it helps the user." if conversation_history else "")
     )
 

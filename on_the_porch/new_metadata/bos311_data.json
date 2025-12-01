@@ -6,9 +6,14 @@
       "data_type": "int",
       "is_numeric": true
     },
+    "case_id": {
+      "data_type": "varchar(255)",
+      "is_numeric": false
+    },
     "case_enquiry_id": {
       "data_type": "bigint",
-      "is_numeric": true
+      "is_numeric": true,
+      "note": "Legacy field - new system uses case_id"
     },
     "open_dt": {
       "data_type": "datetime",
