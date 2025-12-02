@@ -23,11 +23,14 @@ output_path = download_latest_pdf(
 
 ## How it works
 
-The script:
-1. Fetches the HTML from the inprint page using `requests`
-2. Parses the HTML with `BeautifulSoup` to find "Read Issue" links
-3. Selects the first (latest) link from the News Archives section
-4. Downloads the PDF and saves it to the specified output directory
+The script follows the website's structure:
+1. Fetches the HTML from the `/inprint/` page using `requests`
+2. Finds the latest monthly archive link (e.g., "November 2025")
+3. Fetches that monthly archive page
+4. Finds the latest "Download issue" link
+5. Fetches that individual issue page
+6. Finds the PDF URL in an `<embed>` tag
+7. Downloads the PDF and saves it to the specified output directory
 
 No Selenium required - just standard HTTP requests and HTML parsing.
 
