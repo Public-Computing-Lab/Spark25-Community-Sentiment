@@ -10,11 +10,6 @@
     "metadata_file": "bos311_data.json"
   },
   {
-    "table": "shootings",
-    "description": "Shooting incidents from Boston Police Department (victims struck); one row per incident with date, location, and victim details.",
-    "metadata_file": "shootings.json"
-  },
-  {
     "table": "weekly_events",
     "description": "Events schedule extracted from PDF calendars; one row per event with event name, original date label, normalized start/end dates, and raw text.",
     "metadata_file": "weekly_events.json"
