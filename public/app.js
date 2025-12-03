@@ -2,6 +2,7 @@
 
 // Configuration
 const API_BASE_URL = 'http://127.0.0.1:8888';
+const API_KEY = 'banana'; // Set your RETHINKAI_API_KEY here
 
 // Application State
 const state = {
@@ -119,7 +120,11 @@ async function updateApiStatus() {
   const text = elements.apiStatus.querySelector('.status-text');
   
   try {
-    const response = await fetch(`${API_BASE_URL}/health`);
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      headers: {
+        'RethinkAI-API-Key': API_KEY,
+      },
+    });
     const data = await response.json();
     
     elements.apiStatus.className = 'status-indicator';
@@ -274,6 +279,7 @@ async function handleChatSubmit(e) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'RethinkAI-API-Key': API_KEY,
       },
       body: JSON.stringify({
         message: backendMessage.trim(),
@@ -369,7 +375,11 @@ async function loadEvents() {
   setEventsLoading(true);
   
   try {
-    const response = await fetch(`${API_BASE_URL}/events?days_ahead=${days}&limit=${limit}`);
+    const response = await fetch(`${API_BASE_URL}/events?days_ahead=${days}&limit=${limit}`, {
+      headers: {
+        'RethinkAI-API-Key': API_KEY,
+      },
+    });
     const data = await response.json();
     
     if (response.ok && data.events && data.events.length > 0) {

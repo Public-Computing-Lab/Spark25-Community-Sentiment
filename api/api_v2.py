@@ -53,7 +53,53 @@ from unified_chatbot import (
     _run_rag,
     _run_hybrid,
     _answer_from_history,
+    create_empty_cache,
+    build_retrieval_cache,
 )
+
+# In-memory cache storage per session (for retrieval data)
+# Key: session_id, Value: retrieval cache dict
+_session_caches: Dict[str, Dict[str, Any]] = {}
+
+# Cache settings
+_CACHE_MAX_SESSIONS = 100  # Max number of sessions to keep in cache
+_CACHE_MAX_AGE_MINUTES = 60  # Max age of cache before considered stale
+
+
+def _cleanup_old_caches():
+    """Remove old caches to prevent memory growth."""
+    if len(_session_caches) <= _CACHE_MAX_SESSIONS:
+        return
+    
+    # Sort by timestamp and remove oldest
+    now = datetime.datetime.now()
+    to_remove = []
+    
+    for sid, cache in _session_caches.items():
+        ts = cache.get("timestamp")
+        if ts:
+            try:
+                cache_time = datetime.datetime.fromisoformat(ts)
+                age_minutes = (now - cache_time).total_seconds() / 60
+                if age_minutes > _CACHE_MAX_AGE_MINUTES:
+                    to_remove.append(sid)
+            except Exception:
+                pass
+    
+    # Remove stale caches
+    for sid in to_remove:
+        del _session_caches[sid]
+    
+    # If still over limit, remove oldest
+    if len(_session_caches) > _CACHE_MAX_SESSIONS:
+        # Sort by timestamp
+        sorted_sessions = sorted(
+            _session_caches.items(),
+            key=lambda x: x[1].get("timestamp", ""),
+        )
+        # Remove oldest until under limit
+        for sid, _ in sorted_sessions[:len(_session_caches) - _CACHE_MAX_SESSIONS]:
+            del _session_caches[sid]
 
 
 # =============================================================================
@@ -61,7 +107,8 @@ from unified_chatbot import (
 # =============================================================================
 class Config:
     API_VERSION = "v2.0"
-    API_KEYS = [k.strip() for k in os.getenv("API_KEYS", "").split(",") if k.strip()]
+    _raw_keys = os.getenv("RETHINKAI_API_KEYS", "").split(",")
+    RETHINKAI_API_KEYS = [k.strip() for k in _raw_keys if k.strip()]
     HOST = os.getenv("API_HOST", "127.0.0.1")
     PORT = int(os.getenv("API_PORT", "8888"))
     
@@ -92,8 +139,9 @@ app.config.update(
 CORS(
     app,
     supports_credentials=True,
+    expose_headers=["RethinkAI-API-Key"],
     resources={r"/*": {"origins": "*"}},
-    allow_headers=["Content-Type", "X-API-Key"],
+    allow_headers=["Content-Type", "RethinkAI-API-Key"],
 )
 
 
@@ -149,11 +197,10 @@ def before_request_handler():
     if request.method == "OPTIONS":
         return ("", 204)
     
-    # Validate API key if configured
-    if Config.API_KEYS:
-        api_key = request.headers.get("X-API-Key", "")
-        if api_key not in Config.API_KEYS:
-            return jsonify({"error": "Invalid or missing API key"}), 401
+    # Validate API key (mandatory)
+    rethinkai_api_key = request.headers.get("RethinkAI-API-Key")
+    if not rethinkai_api_key or rethinkai_api_key not in Config.RETHINKAI_API_KEYS:
+        return jsonify({"error": "Invalid or missing API key"}), 401
     
     # Ensure session ID exists
     if "session_id" not in session:
@@ -308,13 +355,25 @@ def chat():
     
     session_id = g.session_id
     
+    # Cleanup old caches periodically
+    _cleanup_old_caches()
+    
+    # Get or create retrieval cache for this session
+    retrieval_cache = _session_caches.get(session_id, create_empty_cache())
+    
     try:
-        # Check if we can answer from history
-        history_check = _check_if_needs_new_data(message, conversation_history)
+        # Check if we can answer from history and/or cache
+        has_history = conversation_history and len(conversation_history) > 0
+        has_cache = retrieval_cache and retrieval_cache.get("mode")
         
-        if not history_check.get("needs_new_data", True) and conversation_history:
-            # Answer from conversation history
-            answer = _answer_from_history(message, conversation_history)
+        if has_history or has_cache:
+            history_check = _check_if_needs_new_data(message, conversation_history, retrieval_cache)
+        else:
+            history_check = {"needs_new_data": True, "reason": "No history or cache"}
+        
+        if not history_check.get("needs_new_data", True) and (has_history or has_cache):
+            # Answer from conversation history and/or cache
+            answer = _answer_from_history(message, conversation_history, retrieval_cache)
             mode = "history"
             sources = []
             result = {"answer": answer}
@@ -325,10 +384,38 @@ def chat():
             
             if mode == "sql":
                 result = _run_sql(message, conversation_history)
+                # Build and store retrieval cache
+                _session_caches[session_id] = build_retrieval_cache(
+                    mode="sql",
+                    question=message,
+                    answer=result.get("answer", ""),
+                    sql_result=result.get("result"),
+                    sql_query=result.get("sql"),
+                )
             elif mode == "rag":
                 result = _run_rag(message, plan, conversation_history)
+                # Build and store retrieval cache
+                _session_caches[session_id] = build_retrieval_cache(
+                    mode="rag",
+                    question=message,
+                    answer=result.get("answer", ""),
+                    rag_chunks=result.get("chunks"),
+                    rag_metadata=result.get("metadata"),
+                )
             else:  # hybrid
                 result = _run_hybrid(message, plan, conversation_history)
+                sqlp = result.get("sql", {})
+                ragp = result.get("rag", {})
+                # Build and store retrieval cache
+                _session_caches[session_id] = build_retrieval_cache(
+                    mode="hybrid",
+                    question=message,
+                    answer=result.get("answer", ""),
+                    sql_result=sqlp.get("result") if isinstance(sqlp, dict) else None,
+                    sql_query=sqlp.get("sql") if isinstance(sqlp, dict) else None,
+                    rag_chunks=ragp.get("chunks") if isinstance(ragp, dict) else None,
+                    rag_metadata=ragp.get("metadata") if isinstance(ragp, dict) else None,
+                )
             
             answer = result.get("answer", "I couldn't find an answer to your question.")
             sources = extract_sources(mode, result)
@@ -516,7 +603,7 @@ if __name__ == "__main__":
     
     print(f"\n🚀 Agent API {Config.API_VERSION}")
     print(f"   Host: {Config.HOST}:{Config.PORT}")
-    print(f"   Auth: {'Enabled' if Config.API_KEYS else 'Disabled'}")
+    print(f"   Auth: {'Enabled' if Config.RETHINKAI_API_KEYS else 'Disabled'}")
     print()
     
     app.run(host=Config.HOST, port=Config.PORT, debug=True)

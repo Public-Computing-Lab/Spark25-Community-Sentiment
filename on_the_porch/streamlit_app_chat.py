@@ -114,11 +114,13 @@ def main() -> None:
     st.caption("Ask questions and have a conversation! The bot remembers our chat history.")
     _ensure_env()
 
-    # Initialize conversation history in session state
+    # Initialize conversation history and retrieval cache in session state
     if "messages" not in st.session_state:
         st.session_state.messages = []
     if "conversation_history" not in st.session_state:
         st.session_state.conversation_history: List[Dict[str, str]] = []
+    if "retrieval_cache" not in st.session_state:
+        st.session_state.retrieval_cache = uc.create_empty_cache()
 
     with st.sidebar:
         st.header("⚙️ Options")
@@ -143,6 +145,8 @@ def main() -> None:
                 del st.session_state.messages
             if "conversation_history" in st.session_state:
                 del st.session_state.conversation_history
+            if "retrieval_cache" in st.session_state:
+                del st.session_state.retrieval_cache
             st.rerun()
 
     # Display chat history
@@ -190,19 +194,23 @@ def main() -> None:
                 try:
                     # Prepare conversation history (format: list of {"role": "user"/"assistant", "content": "..."})
                     conversation_history = st.session_state.conversation_history.copy()
+                    retrieval_cache = st.session_state.retrieval_cache
                     
-                    # Check if we can answer from conversation history before routing
+                    # Check if we can answer from conversation history and/or cache before routing
                     needs_new_data = True
                     history_check_result = None
                     
-                    if conversation_history and len(conversation_history) > 0 and mode_choice == "auto":
+                    has_history = conversation_history and len(conversation_history) > 0
+                    has_cache = retrieval_cache and retrieval_cache.get("mode")
+                    
+                    if (has_history or has_cache) and mode_choice == "auto":
                         try:
-                            history_check_result = uc._check_if_needs_new_data(prompt, conversation_history)
+                            history_check_result = uc._check_if_needs_new_data(prompt, conversation_history, retrieval_cache)
                             needs_new_data = history_check_result.get("needs_new_data", True)
                             
                             if not needs_new_data:
-                                # Can answer from history - skip routing and retrieval
-                                response_text = uc._answer_from_history(prompt, conversation_history)
+                                # Can answer from history/cache - skip routing and retrieval
+                                response_text = uc._answer_from_history(prompt, conversation_history, retrieval_cache)
                                 
                                 # Add assistant message to chat display
                                 assistant_msg = {
@@ -256,6 +264,15 @@ def main() -> None:
                                 out = uc._run_sql(prompt, conversation_history)
                                 response_text = out.get("answer", "")
                                 
+                                # Build and store retrieval cache
+                                st.session_state.retrieval_cache = uc.build_retrieval_cache(
+                                    mode="sql",
+                                    question=prompt,
+                                    answer=response_text,
+                                    sql_result=out.get("result"),
+                                    sql_query=out.get("sql"),
+                                )
+                                
                                 # Store message with metadata
                                 assistant_msg = {
                                     "role": "assistant",
@@ -279,6 +296,15 @@ def main() -> None:
                                 out = uc._run_rag(prompt, plan, conversation_history)
                                 response_text = out.get("answer", "")
                                 metas: List[Dict[str, Any]] = out.get("metadata", [])
+                                
+                                # Build and store retrieval cache
+                                st.session_state.retrieval_cache = uc.build_retrieval_cache(
+                                    mode="rag",
+                                    question=prompt,
+                                    answer=response_text,
+                                    rag_chunks=out.get("chunks"),
+                                    rag_metadata=metas,
+                                )
                                 
                                 # Show retrieval stats by doc type
                                 doc_type_counts: Dict[str, int] = {}
@@ -307,6 +333,20 @@ def main() -> None:
                                 response_text = out.get("answer", "")
                                 
                                 sqlp = out.get("sql", {})
+                                ragp = out.get("rag", {})
+                                metas: List[Dict[str, Any]] = ragp.get("metadata", [])
+                                
+                                # Build and store retrieval cache (with both SQL and RAG data)
+                                st.session_state.retrieval_cache = uc.build_retrieval_cache(
+                                    mode="hybrid",
+                                    question=prompt,
+                                    answer=response_text,
+                                    sql_result=sqlp.get("result"),
+                                    sql_query=sqlp.get("sql"),
+                                    rag_chunks=ragp.get("chunks"),
+                                    rag_metadata=metas,
+                                )
+                                
                                 assistant_msg = {
                                     "role": "assistant",
                                     "content": response_text,
@@ -317,17 +357,12 @@ def main() -> None:
                                 }
                                 
                                 if show_sql:
-                                    sqlp = out.get("sql", {})
                                     with st.expander("View SQL"):
                                         st.code(sqlp.get("sql", ""), language="sql")
                                     _display_sql_result(sqlp.get("result", {}))
                                 if show_map:
-                                    sqlp = out.get("sql", {})
                                     result = sqlp.get("result", {}) if isinstance(sqlp, dict) else {}
                                     _render_map_from_result(result, key_suffix="hybrid")
-                                
-                                ragp = out.get("rag", {})
-                                metas: List[Dict[str, Any]] = ragp.get("metadata", [])
                                 
                                 # Show retrieval stats by doc type
                                 doc_type_counts: Dict[str, int] = {}
@@ -351,6 +386,15 @@ def main() -> None:
                             out = uc._run_rag(prompt, plan, conversation_history)
                             response_text = out.get("answer", "")
                             metas: List[Dict[str, Any]] = out.get("metadata", [])
+                            
+                            # Build and store retrieval cache
+                            st.session_state.retrieval_cache = uc.build_retrieval_cache(
+                                mode="rag",
+                                question=prompt,
+                                answer=response_text,
+                                rag_chunks=out.get("chunks"),
+                                rag_metadata=metas,
+                            )
                             
                             # Show retrieval stats by doc type
                             doc_type_counts: Dict[str, int] = {}

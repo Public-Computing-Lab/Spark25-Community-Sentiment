@@ -4,6 +4,7 @@
 const ApiConfig = {
   baseUrl: 'http://127.0.0.1:8888',
   timeoutMs: 30000,
+  apiKey: 'banana', // Set your RETHINKAI_API_KEY here
 };
 
 /**
@@ -20,8 +21,10 @@ async function apiRequest(path, options = {}) {
     const response = await fetch(`${ApiConfig.baseUrl}${path}`, {
       headers: {
         'Content-Type': 'application/json',
+        'RethinkAI-API-Key': ApiConfig.apiKey,
         ...(options.headers || {}),
       },
+      credentials: 'include', // Include cookies for session management
       signal: controller.signal,
       ...options,
     });

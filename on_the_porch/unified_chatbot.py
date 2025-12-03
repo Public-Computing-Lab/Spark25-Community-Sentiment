@@ -1,7 +1,7 @@
 import os
 import sys
 import json
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -78,14 +78,116 @@ def _safe_json_loads(text: str, default: Dict[str, Any]) -> Dict[str, Any]:
         return default
 
 
-def _check_if_needs_new_data(question: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
+# ---------------------------------------------------------------------------
+# Retrieval Cache: stores the most recent retrieval results for follow-up use
+# ---------------------------------------------------------------------------
+
+def create_empty_cache() -> Dict[str, Any]:
+    """Create an empty retrieval cache structure."""
+    return {
+        "mode": None,  # "sql", "rag", or "hybrid"
+        "timestamp": None,
+        "question": None,
+        "sql_result": None,  # Raw SQL rows/data
+        "sql_query": None,
+        "rag_chunks": None,  # List of text chunks
+        "rag_metadata": None,  # List of metadata dicts
+        "answer": None,  # The generated answer
+    }
+
+
+def build_retrieval_cache(
+    mode: str,
+    question: str,
+    answer: str,
+    sql_result: Optional[Dict[str, Any]] = None,
+    sql_query: Optional[str] = None,
+    rag_chunks: Optional[List[str]] = None,
+    rag_metadata: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Build a retrieval cache from the results of a query."""
+    return {
+        "mode": mode,
+        "timestamp": datetime.now().isoformat(),
+        "question": question,
+        "sql_result": sql_result,
+        "sql_query": sql_query,
+        "rag_chunks": rag_chunks[:20] if rag_chunks else None,  # Cap chunks
+        "rag_metadata": rag_metadata[:20] if rag_metadata else None,
+        "answer": answer,
+    }
+
+
+def summarize_cache(cache: Optional[Dict[str, Any]]) -> str:
+    """Create a concise text summary of what's in the cache for the LLM."""
+    if not cache or not cache.get("mode"):
+        return "(No cached data available)"
+    
+    parts = []
+    mode = cache.get("mode", "unknown")
+    question = cache.get("question", "")
+    timestamp = cache.get("timestamp", "")
+    
+    parts.append(f"Cached data from mode '{mode}' for question: \"{question}\"")
+    if timestamp:
+        parts.append(f"Retrieved at: {timestamp}")
+    
+    # Summarize SQL results
+    sql_result = cache.get("sql_result")
+    if sql_result:
+        rows = sql_result.get("rows", [])
+        columns = sql_result.get("columns", [])
+        row_count = len(rows) if isinstance(rows, list) else 0
+        col_names = ", ".join(columns[:10]) if columns else "unknown columns"
+        parts.append(f"SQL data: {row_count} rows with columns [{col_names}]")
+        
+        # Include actual data preview (first few rows)
+        if rows and row_count > 0:
+            preview_rows = rows[:10]  # First 10 rows for preview
+            parts.append(f"Data preview (first {len(preview_rows)} rows):")
+            for i, row in enumerate(preview_rows, 1):
+                if isinstance(row, dict):
+                    row_str = ", ".join(f"{k}: {v}" for k, v in list(row.items())[:6])
+                elif isinstance(row, (list, tuple)):
+                    row_str = ", ".join(str(v) for v in row[:6])
+                else:
+                    row_str = str(row)[:200]
+                parts.append(f"  Row {i}: {row_str}")
+    
+    # Summarize RAG chunks
+    rag_meta = cache.get("rag_metadata")
+    rag_chunks = cache.get("rag_chunks")
+    if rag_meta:
+        chunk_count = len(rag_meta)
+        sources = list(set(m.get("source", "unknown") for m in rag_meta[:10]))
+        doc_types = list(set(m.get("doc_type", "unknown") for m in rag_meta[:10]))
+        parts.append(f"RAG data: {chunk_count} chunks from sources: {sources[:5]}, types: {doc_types}")
+        
+        # Include chunk previews
+        if rag_chunks:
+            parts.append(f"Chunk previews (first {min(5, len(rag_chunks))}):")
+            for i, chunk in enumerate(rag_chunks[:5], 1):
+                preview = chunk[:300] + "..." if len(chunk) > 300 else chunk
+                parts.append(f"  Chunk {i}: {preview}")
+    
+    return "\n".join(parts)
+
+
+def _check_if_needs_new_data(
+    question: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    retrieval_cache: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
-    Check if the question can be answered from conversation history or needs new data retrieval.
+    Check if the question can be answered from conversation history and/or cached data.
     Returns: {"needs_new_data": bool, "reason": str}
     """
-    # If no history exists, always need new data
-    if not conversation_history or len(conversation_history) == 0:
-        return {"needs_new_data": True, "reason": "No conversation history available"}
+    # If no history and no cache, always need new data
+    has_history = conversation_history and len(conversation_history) > 0
+    has_cache = retrieval_cache and retrieval_cache.get("mode")
+    
+    if not has_history and not has_cache:
+        return {"needs_new_data": True, "reason": "No conversation history or cached data available"}
     
     client = _get_llm_client()
     
@@ -98,20 +200,29 @@ def _check_if_needs_new_data(question: str, conversation_history: Optional[List[
             if role and content:
                 history_context += f"{role.upper()}: {content}\n\n"
     
+    # Build cache summary
+    cache_summary = summarize_cache(retrieval_cache)
+    
     system_prompt = (
-        "You analyze if a user's question can be answered from conversation history or needs new data retrieval.\n\n"
+        "You analyze if a user's question can be answered from conversation history and/or cached retrieval data, or if it needs new data retrieval.\n\n"
+        "You have access to:\n"
+        "1. Conversation history (previous Q&A exchanges)\n"
+        "2. Cached data (the actual data rows/chunks from the most recent retrieval)\n\n"
         "Rules:\n"
-        "- If question is a follow-up, clarification, or reference to previous answers (e.g., 'what about last year?', 'tell me more', 'break that down', 'can you elaborate') → needs_new_data = false\n"
-        "- If question asks for new data, different time period not mentioned before, different metrics, or completely new topic → needs_new_data = true\n"
-        "- If question references specific numbers/statistics from previous answers → needs_new_data = false\n"
-        "- If question asks to compare, explain further, or provide more detail on previously discussed topics → needs_new_data = false\n\n"
+        "- If the cached data contains the information needed to answer the question → needs_new_data = false\n"
+        "- If question is a follow-up asking for more detail about items in the cached data (e.g., 'tell me more about event #2', 'what about the first one') → needs_new_data = false\n"
+        "- If question is a follow-up, clarification, or reference to previous answers → needs_new_data = false\n"
+        "- If question asks for new data, different time period not in cache, different metrics, or completely new topic → needs_new_data = true\n"
+        "- If question references specific items visible in the cached data preview → needs_new_data = false\n"
+        "- If question asks to compare, explain, or provide more detail on cached data → needs_new_data = false\n\n"
         "Return ONLY valid JSON with keys: needs_new_data (boolean) and reason (brief string explaining your decision)."
     )
     
     user_prompt = (
         "Conversation History:\n" + (history_context if history_context else "(No previous conversation)") + "\n\n"
+        "Cached Data:\n" + cache_summary + "\n\n"
         "Current Question: " + question + "\n\n"
-        "Analyze if this question can be answered from the conversation history above, or if it needs new data retrieval.\n"
+        "Analyze if this question can be answered from the conversation history and/or cached data above, or if it needs new data retrieval.\n"
         "Return JSON only."
     )
     
@@ -155,62 +266,82 @@ def _route_question(question: str) -> Dict[str, Any]:
 
     system_prompt = (
         f"Today's date is {date.today().strftime('%A, %B %d, %Y')}.\n\n"
-        "You are a routing classifier for a chatbot that combines SQL (structured data) and RAG (text documents).\n"
-        "Classify the user's question into one of three modes: 'sql', 'rag', or 'hybrid'.\n\n"
-        "CRITICAL ROUTING RULES - Follow these explicitly:\n\n"
-        "1. CRIME-RELATED QUESTIONS → Use 'hybrid' mode (SQL tables + vector DB)\n"
-        "   - ANY question about crime, arrests, offenses, homicides, shots fired, safety incidents, or criminal activity\n"
-        "   - MUST use both SQL tables (for statistics/data) AND vector DB (for context/community perspectives)\n"
-        "   - Examples: 'What crimes happened in Dorchester?', 'How many arrests were there?', 'Tell me about safety incidents',\n"
-        "     'What do people say about crime in the community?', 'Show me crime trends and community concerns'\n"
-        "   - SQL tables include: 'arrests', 'offenses', 'homicides', 'shots_fired', 'bos311_data' (for safety-related 311 requests)\n"
-        "   - Vector DB contains: community meeting transcripts with 'safety' and 'violence' tags, policy documents\n\n"
-        "2. EVENT/CALENDAR/FUN QUESTIONS → Use 'sql' mode (weekly_events table)\n"
-        "   - Questions about events, activities, schedules, calendars, 'what's happening', 'what's going on', fun activities\n"
-        "   - Examples: 'What events are happening this week?', 'Show me fun activities for kids',\n"
-        "     'What public meetings are scheduled?', 'Tell me about upcoming events', 'What's happening on Saturday?',\n"
-        "     'Are there any community events?', 'What activities are available?'\n"
-        "   - Use the 'weekly_events' SQL table which contains event details, dates, times, categories, descriptions\n"
-        "   - Set 'k' to at least 5 for event queries to ensure multiple events are retrieved\n"
-        "   - NOTE: Calendar events are stored in SQL (weekly_events table), NOT in the vector database\n\n"
-        "3. OPINION/PERSPECTIVE QUESTIONS → Use 'rag' mode (vector DB only)\n"
-        "   - Questions asking for opinions, perspectives, feelings, community views, what people think/say/believe\n"
-        "   - Examples: 'What do people think about...?', 'How do community members feel about...?',\n"
-        "     'What are people's opinions on...?', 'What do residents say about...?', 'How do people describe...?',\n"
-        "     'What concerns do community members have?', 'What are people's views on displacement?'\n"
-        "   - Use vector DB with transcript tags like 'community', 'displacement', 'safety', 'youth', 'media', etc.\n"
-        "   - These are qualitative questions that require searching community meeting transcripts and documents\n\n"
-        "GENERAL ROUTING GUIDELINES:\n\n"
-        "- 'sql': for pure statistics, counts, trends, comparisons, numeric breakdowns from Postgres/MySQL tables\n"
-        "  (service_requests/311, arrests, offenses, homicides, shots_fired, weekly_events, or other Dorchester-focused tables).\n"
-        "  NOTE: This system is configured for DORCHESTER ONLY. All SQL queries automatically filter to Dorchester data only.\n"
-        "  Examples: 'How many 311 service requests were filed in Dorchester last month?',\n"
-        "  'What is the trend in shots fired by year in Dorchester?',\n"
-        "  'Which areas in Dorchester have the highest arrests in 2023?',\n"
-        "  'What events are happening this week?' (use SQL for events)\n\n"
-        "- 'rag': ONLY for purely qualitative, descriptive, or policy questions answered by documents/transcripts\n"
-        "  (policy documents, interview transcripts, newsletters, client-uploaded files, OR opinion/perspective questions).\n"
-        "  Examples: 'What does the Slow Streets program aim to achieve?',\n"
-        "  'What strategies does the Anti-Displacement Plan propose?',\n"
-        "  'What was in the latest newsletter?',\n"
-        "  'What do people think about media representation?' (opinion question → RAG)\n\n"
-        "- 'hybrid': Use when BOTH numbers/data AND context are needed, OR for crime-related questions (see rule #1 above).\n"
-        "  Examples: 'How many homicides were recorded in Dorchester last year, and what concerns about safety come up in interviews?',\n"
-        "  'What are the monthly trends in 311 requests about street safety in Dorchester and how does Slow Streets address these?',\n"
-        "  'Show me where crime incidents occurred in Dorchester' (crime question → hybrid)\n"
-        "  NOTE: This system is configured for DORCHESTER ONLY. All SQL queries automatically filter to Dorchester data only.\n\n"
-        "Available document types in the vector database:\n"
-        "- 'transcript': community meeting transcripts with tags like 'safety', 'violence', 'youth', 'media', 'community', 'displacement', 'government', 'structural racism'\n"
-        "- 'policy': city policy documents like 'Boston Anti-Displacement Plan Analysis.txt', 'Boston Slow Streets Plan Analysis.txt', 'Imagine Boston 2030 Analysis.txt'\n"
-        "- 'client_upload': documents uploaded from Google Drive, organized in folders: 'newsletters', 'policy', 'transcripts'\n\n"
-        "If you choose 'rag' or 'hybrid', you may suggest:\n"
-        "- up to 2 transcript_tags when relevant. NOTE: For podcast-related queries, usually use the 'media' tag.\n"
-        "  For crime-related hybrid queries, use tags like 'safety' or 'violence'.\n"
-        "  For opinion questions, use tags like 'community', 'displacement', 'youth', etc.\n"
-        "- policy_sources when asking about specific policy documents\n"
-        "- folder_categories when asking about client-uploaded documents (newsletters, policy, transcripts)\n"
-        "- 'k': number of document chunks to retrieve (must be between 3 and 10, default 5). For event/calendar questions, use at least 5.\n"
-        "Respond ONLY as compact JSON with keys: mode, transcript_tags, policy_sources, folder_categories, k."
+        "You are a STRICT routing classifier for a chatbot that combines SQL (structured data) and RAG (text documents).\n"
+        "You MUST classify the user's question into EXACTLY one of three modes: 'sql', 'rag', or 'hybrid'.\n"
+        "These rules are MANDATORY and NON-NEGOTIABLE. Follow them EXACTLY.\n\n"
+        "═══════════════════════════════════════════════════════════════════════════════\n"
+        "CRITICAL ROUTING RULES - ABSOLUTE PRIORITY (CHECK IN THIS ORDER):\n"
+        "═══════════════════════════════════════════════════════════════════════════════\n\n"
+        "RULE 1: CRIME-RELATED QUESTIONS → Route based on question type\n"
+        "   - If the question mentions ANY of: crime, crimes, arrest, arrests, offense, offenses, homicide, homicides, shooting, shootings, shots fired, safety incident, safety incidents, criminal activity, violence, violent\n"
+        "   - THEN apply these sub-rules:\n"
+        "     a) If asking for STATISTICS/NUMBERS ONLY (counts, trends, comparisons, breakdowns) → mode MUST be 'sql'\n"
+        "        Examples: 'How many arrests were there?', 'What is the trend in shots fired?', 'Show me crime statistics', 'Which areas have highest arrests?' → sql\n"
+        "     b) If asking for OPINIONS/CONTEXT ONLY (what people think/say about crime) → mode MUST be 'hybrid'\n"
+        "        Examples: 'What do people say about crime?', 'How do residents feel about safety?' → hybrid\n"
+        "     c) If asking for BOTH statistics AND context/opinions → mode MUST be 'hybrid'\n"
+        "        Examples: 'How many homicides and what concerns come up?', 'Show crime trends and community concerns' → hybrid\n"
+        "   - DO NOT use 'rag' alone for crime questions\n\n"
+        "RULE 2: EVENT/CALENDAR/ACTIVITY QUESTIONS → ALWAYS 'sql' mode\n"
+        "   - If the question mentions ANY of: event, events, happening, schedule, calendar, activity, activities, 'what's on', 'what is on', 'going on', meeting, meetings, workshop, workshops, 'this week', 'next week', 'today', 'tomorrow', 'weekend', day of week\n"
+        "   - THEN mode MUST be 'sql' (NO EXCEPTIONS)\n"
+        "   - DO NOT use 'rag' or 'hybrid' for event/calendar questions\n"
+        "   - Examples that MUST be 'sql':\n"
+        "     * 'What events are happening this week?' → sql\n"
+        "     * 'Show me fun activities for kids' → sql\n"
+        "     * 'What public meetings are scheduled?' → sql\n"
+        "     * 'What's happening on Saturday?' → sql\n"
+        "     * 'Are there any community events?' → sql\n\n"
+        "RULE 3: OPINION/PERSPECTIVE QUESTIONS → ALWAYS 'rag' mode\n"
+        "   - If the question asks for: opinions, perspectives, feelings, views, what people think/say/believe/feel/describe, community views, resident views\n"
+        "   - AND the question is NOT about crime (see Rule 1)\n"
+        "   - THEN mode MUST be 'rag' (NO EXCEPTIONS)\n"
+        "   - DO NOT use 'sql' or 'hybrid' for pure opinion questions\n"
+        "   - Examples that MUST be 'rag':\n"
+        "     * 'What do people think about displacement?' → rag\n"
+        "     * 'How do community members feel about housing?' → rag\n"
+        "     * 'What are people's opinions on media representation?' → rag\n"
+        "     * 'What do residents say about the neighborhood?' → rag\n\n"
+        "═══════════════════════════════════════════════════════════════════════════════\n"
+        "SECONDARY ROUTING RULES (Apply if Rules 1-3 don't match):\n"
+        "═══════════════════════════════════════════════════════════════════════════════\n\n"
+        "RULE 4: PURE STATISTICS/NUMBERS → 'sql' mode\n"
+        "   - Questions asking ONLY for: counts, numbers, statistics, trends, comparisons, breakdowns, aggregations\n"
+        "   - Questions that can be answered with numeric data from tables\n"
+        "   - This INCLUDES crime statistics (see Rule 1a)\n"
+        "   - Examples: 'How many 311 requests?', 'What is the trend in shots fired?', 'Which areas have highest arrests?', 'How many homicides last year?'\n"
+        "   - DO NOT use 'rag' or 'hybrid' if the question is purely numeric\n\n"
+        "RULE 5: POLICY/DOCUMENT CONTENT → 'rag' mode\n"
+        "   - Questions asking about: what a policy/document says, what a program aims to achieve, document content, newsletter content\n"
+        "   - Examples: 'What does Slow Streets aim to achieve?', 'What strategies does the Anti-Displacement Plan propose?', 'What was in the newsletter?'\n"
+        "   - DO NOT use 'sql' for document content questions\n\n"
+        "RULE 6: COMBINED DATA + CONTEXT → 'hybrid' mode\n"
+        "   - Questions that explicitly ask for BOTH numbers/data AND context/explanation\n"
+        "   - Examples: 'How many homicides and what concerns come up?', 'Show trends and how policies address them'\n"
+        "   - DO NOT use 'sql' or 'rag' alone if question explicitly requires both\n\n"
+        "═══════════════════════════════════════════════════════════════════════════════\n"
+        "STRICT VALIDATION REQUIREMENTS:\n"
+        "═══════════════════════════════════════════════════════════════════════════════\n\n"
+        "1. Mode MUST be exactly one of: 'sql', 'rag', or 'hybrid' (lowercase, no quotes in JSON)\n"
+        "2. If mode is 'sql': transcript_tags, policy_sources, and folder_categories MUST be null\n"
+        "3. If mode is 'rag' or 'hybrid':\n"
+        "   - transcript_tags: array of 0-2 strings OR null (valid tags: safety, violence, youth, media, community, displacement, government, structural racism)\n"
+        "   - policy_sources: array of strings OR null (valid: 'Boston Anti-Displacement Plan Analysis.txt', 'Boston Slow Streets Plan Analysis.txt', 'Imagine Boston 2030 Analysis.txt')\n"
+        "   - folder_categories: array of strings OR null (valid: newsletters, policy, transcripts)\n"
+        "   - k: integer between 3 and 10 (default 5, minimum 5 for event queries)\n"
+        "4. For crime questions using 'hybrid' mode (Rule 1b or 1c): transcript_tags MUST include at least one of: 'safety' or 'violence'\n"
+        "   For crime questions using 'sql' mode (Rule 1a): transcript_tags, policy_sources, and folder_categories MUST be null\n"
+        "5. For opinion questions (Rule 3): transcript_tags should include relevant tags like 'community', 'displacement', 'youth', 'media'\n"
+        "6. For event questions (Rule 2): k MUST be at least 5\n\n"
+        "═══════════════════════════════════════════════════════════════════════════════\n"
+        "OUTPUT FORMAT (STRICT):\n"
+        "═══════════════════════════════════════════════════════════════════════════════\n\n"
+        "Return ONLY valid JSON with EXACTLY these keys: mode, transcript_tags, policy_sources, folder_categories, k\n"
+        "DO NOT include any explanatory text, markdown, code blocks, or additional content.\n"
+        "DO NOT use backticks or markdown formatting.\n"
+        "Example valid output:\n"
+        '{"mode": "hybrid", "transcript_tags": ["safety"], "policy_sources": null, "folder_categories": null, "k": 5}\n\n'
+        "NOTE: This system is configured for DORCHESTER ONLY. All SQL queries automatically filter to Dorchester data only."
     )
 
     user_prompt = (
@@ -344,50 +475,112 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
         return "\n\n".join(context_parts[:10])  # fallback: show a sample of context
 
 
-def _answer_from_history(question: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> str:
+def _answer_from_history(
+    question: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    retrieval_cache: Optional[Dict[str, Any]] = None,
+) -> str:
     """
-    Generate an answer from conversation history only, without retrieving new data.
+    Generate an answer from conversation history and/or cached retrieval data.
     This is used for follow-up questions that can be answered from previous context.
     """
-    if not conversation_history:
-        return "I don't have any previous conversation to reference. Could you ask your question again?"
+    has_history = conversation_history and len(conversation_history) > 0
+    has_cache = retrieval_cache and retrieval_cache.get("mode")
+    
+    if not has_history and not has_cache:
+        return "I don't have any previous conversation or data to reference. Could you ask your question again?"
     
     client = _get_llm_client()
     model = client.GenerativeModel(GEMINI_MODEL)
+    
+    # Build the context from cache
+    cache_context = ""
+    if has_cache:
+        cache_context = _build_cache_context_for_answer(retrieval_cache)
     
     system_prompt = (
         "You are a friendly, non-technical assistant helping people understand Dorchester community data and policies.\n"
         "This system is configured for DORCHESTER ONLY. All data queries are automatically filtered to Dorchester only.\n"
         "Use clear, everyday language and imagine you are talking to a neighbor, not a technical expert.\n\n"
-        "Answer the user's question based ONLY on the conversation history provided. "
-        "Do not mention that you're using conversation history - just answer naturally as if continuing the conversation.\n"
-        "If the question references previous answers, numbers, or statistics mentioned earlier, use those in your response.\n"
-        "If you cannot answer from the conversation history, politely say so and suggest they ask a new question.\n"
+        "Answer the user's question based on the conversation history and cached data provided. "
+        "Do not mention that you're using cached data or conversation history - just answer naturally as if continuing the conversation.\n"
+        "If the question asks about specific items (e.g., 'tell me more about event #2', 'what about the first one'), "
+        "use the cached data to provide detailed information about those specific items.\n"
+        "If the question references previous answers, numbers, or statistics, use those in your response.\n"
+        "If you cannot answer from the available information, politely say so and suggest they ask a new question.\n"
         "Avoid technical jargon, and do not mention SQL, databases, RAG, retrieval methods, or internal tools."
     )
     
     # Build conversation context
     history_text = ""
-    for msg in conversation_history[-20:]:  # Last 20 messages for context
-        role = msg.get("role", "")
-        content = msg.get("content", "")
-        if role and content:
-            history_text += f"{role.upper()}: {content}\n\n"
+    if conversation_history:
+        for msg in conversation_history[-20:]:  # Last 20 messages for context
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role and content:
+                history_text += f"{role.upper()}: {content}\n\n"
     
-    user_prompt = (
-        "Conversation History:\n" + history_text + "\n\n"
-        "Current Question: " + question + "\n\n"
-        "Please answer the current question based on the conversation history above:"
-    )
+    user_prompt = ""
+    if history_text:
+        user_prompt += "Conversation History:\n" + history_text + "\n\n"
+    if cache_context:
+        user_prompt += "Available Data (from recent retrieval):\n" + cache_context + "\n\n"
+    user_prompt += "Current Question: " + question + "\n\n"
+    user_prompt += "Please answer the current question using the available information:"
     
     try:
+        full_prompt = system_prompt + "\n\n" + user_prompt
         resp = model.generate_content(
-            user_prompt,
+            full_prompt,
             generation_config={"temperature": 0.3}
         )
         return (resp.text or "").strip()
     except Exception:
-        return "I encountered an error answering from conversation history. Could you rephrase your question?"
+        return "I encountered an error answering from the available information. Could you rephrase your question?"
+
+
+def _build_cache_context_for_answer(cache: Dict[str, Any]) -> str:
+    """Build a detailed context string from cache for answering questions."""
+    parts = []
+    
+    # Include SQL results
+    sql_result = cache.get("sql_result")
+    if sql_result:
+        rows = sql_result.get("rows", [])
+        columns = sql_result.get("columns", [])
+        
+        if rows and columns:
+            parts.append(f"Data table with {len(rows)} entries:")
+            parts.append(f"Columns: {', '.join(columns)}")
+            parts.append("")
+            
+            # Include all rows (up to a reasonable limit) with numbering
+            for i, row in enumerate(rows[:50], 1):
+                if isinstance(row, dict):
+                    row_items = [f"{k}: {v}" for k, v in row.items()]
+                    parts.append(f"Entry {i}: {', '.join(row_items)}")
+                elif isinstance(row, (list, tuple)) and columns:
+                    row_items = [f"{columns[j]}: {row[j]}" for j in range(min(len(columns), len(row)))]
+                    parts.append(f"Entry {i}: {', '.join(row_items)}")
+                else:
+                    parts.append(f"Entry {i}: {row}")
+            
+            if len(rows) > 50:
+                parts.append(f"... and {len(rows) - 50} more entries")
+    
+    # Include RAG chunks
+    rag_chunks = cache.get("rag_chunks", [])
+    rag_meta = cache.get("rag_metadata", [])
+    
+    if rag_chunks:
+        parts.append("")
+        parts.append(f"Document excerpts ({len(rag_chunks)} chunks):")
+        for i, (chunk, meta) in enumerate(zip(rag_chunks, rag_meta or [{}] * len(rag_chunks)), 1):
+            source = meta.get("source", "Unknown source") if meta else "Unknown source"
+            parts.append(f"\nExcerpt {i} (from {source}):")
+            parts.append(chunk)
+    
+    return "\n".join(parts)
 
 
 def _is_calendar_question(question: str) -> bool:
