@@ -115,7 +115,7 @@ Add this line:
 **What it does:**
 - Downloads latest Dotnews newsletter
 - Syncs Google Drive documents to vector database
-- Syncs email newsletters (extracts events to MySQL, articles to vector DB)
+- Syncs email newsletters (extracts events to MySQL)
 - Syncs Boston Open Data (311 requests, 911 reports)
 - Updates vector database with new documents
 

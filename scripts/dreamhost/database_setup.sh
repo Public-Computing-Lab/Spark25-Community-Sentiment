@@ -79,12 +79,7 @@ $MYSQL_CMD -e "CREATE DATABASE IF NOT EXISTS \`$MYSQL_DB\` CHARACTER SET utf8mb4
 # Run database initialization scripts
 print_status "Initializing database schema..."
 
-# Check if data ingestion setup script exists
-if [ -f "$PROJECT_DIR/on_the_porch/data_ingestion/mysql_setup.py" ]; then
-    print_status "Running MySQL setup script..."
-    cd "$PROJECT_DIR/on_the_porch/data_ingestion"
-    python mysql_setup.py || print_warning "MySQL setup script had issues (may be expected if tables already exist)"
-fi
+# Note: weekly_events table is created automatically by the data ingestion pipeline
 
 # Create interaction_log table (for API v2)
 print_status "Creating interaction_log table..."

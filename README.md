@@ -42,7 +42,6 @@ ml-misi-community-sentiment/
 - Python 3.11+
 - MySQL 8.0+ (for structured data)
 - Google Gemini API key
-- (Optional) PostgreSQL for vector database storage
 
 ### Installation
 
@@ -103,14 +102,14 @@ The project uses environment variables for configuration. See `.env.example` fil
 - **Community Events**: Calendar events extracted from newsletters
 
 ### Unstructured Data (Vector Database)
-- **Community Newsletters**: PDF newsletters with event listings and articles
+
 - **Meeting Transcripts**: Community meeting notes and discussions
 - **Policy Documents**: City planning documents, budgets, and initiatives
 
 ### Data Ingestion
 The system automatically syncs data from:
 - **Google Drive**: Client-uploaded documents (PDF, DOCX, TXT, MD)
-- **Email Newsletters**: Automated extraction of events and articles
+- **Email Newsletters**: Automated extraction of events to calendar
 
 See `on_the_porch/data_ingestion/README.md` for details.
 
@@ -167,7 +166,7 @@ This project implements a **hybrid AI system** that combines:
 1. **Start Here**: Review `on_the_porch/unified_chatbot.py` to understand the core routing logic
 2. **Test the API**: Use `api/test_api_v2.py` to test endpoints
 3. **Explore Data**: Check `dataset-documentation/` for available data sources
-4. **Frontend Integration**: See `test_frontend/` for example frontend code
+4. **Frontend Integration**: See `test_frontend/` for example frontend code and test the api via an interface.
 
 ### Development Workflow
 
@@ -210,7 +209,7 @@ This project implements a **hybrid AI system** that combines:
 
 ## 🌐 Deployment
 
-### DreamHost Setup
+### DreamHost Setup (needs to be tested)
 
 See `scripts/dreamhost/` for deployment scripts:
 - `setup.sh` - Initial server setup

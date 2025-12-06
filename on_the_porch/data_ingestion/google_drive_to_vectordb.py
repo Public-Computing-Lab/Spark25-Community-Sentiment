@@ -525,6 +525,23 @@ def insert_events_to_db(events: List[Dict]) -> int:
     
     try:
         with conn.cursor() as cur:
+            # Ensure weekly_events table exists
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS weekly_events (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    source_pdf VARCHAR(255) NULL,
+                    page_number INT NULL,
+                    event_name VARCHAR(255) NOT NULL,
+                    event_date VARCHAR(255) NOT NULL,
+                    start_date DATE NULL,
+                    end_date DATE NULL,
+                    start_time TIME NULL,
+                    end_time TIME NULL,
+                    raw_text TEXT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """)
+            
             # Check if category column exists, add it if not
             cur.execute("SHOW COLUMNS FROM weekly_events LIKE 'category'")
             if not cur.fetchone():

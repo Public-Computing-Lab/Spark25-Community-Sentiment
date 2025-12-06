@@ -105,7 +105,7 @@ on_the_porch\pocEnv\Scripts\activate
 source on_the_porch/pocEnv/bin/activate
 
 # Install required packages
-pip install flask flask-cors python-dotenv pymysql google-generativeai chromadb
+pip install flask flask-cors python-dotenv mysql-connector-python google-generativeai chromadb
 ```
 
 ### Required Environment Variables
@@ -124,14 +124,14 @@ MYSQL_USER=root
 MYSQL_PASSWORD=your-password
 MYSQL_DB=rethink_ai_boston
 
-# API Configuration (optional)
+# API Configuration
 API_HOST=127.0.0.1
 API_PORT=8888
-API_KEYS=key1,key2,key3  # Comma-separated, leave empty to disable auth
+RETHINKAI_API_KEYS=key1,key2,key3  # Comma-separated (required)
 
 # Flask Settings (optional)
 FLASK_SECRET_KEY=your-secret-key
-FLASK_SESSION_COOKIE_SECURE=False
+FLASK_SESSION_COOKIE_SECURE=False  # Set to True for HTTPS in production
 ```
 
 ---
@@ -143,11 +143,11 @@ The `Config` class in `api_v2.py` manages all configuration:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `API_VERSION` | `v2.0` | API version string |
-| `API_KEYS` | `[]` | List of valid API keys (empty = no auth) |
+| `RETHINKAI_API_KEYS` | (required) | Comma-separated list of valid API keys |
 | `HOST` | `127.0.0.1` | Server bind address |
 | `PORT` | `8888` | Server port |
-| `SECRET_KEY` | `agent-api-secret-2025` | Flask session secret |
-| `SESSION_COOKIE_SECURE` | `False` | Require HTTPS for cookies |
+| `SECRET_KEY` | `agent-api-secret-2025` | Flask session secret key |
+| `SESSION_COOKIE_SECURE` | `False` | Require HTTPS for cookies (set True in production) |
 | `MYSQL_HOST` | `127.0.0.1` | MySQL server host |
 | `MYSQL_PORT` | `3306` | MySQL server port |
 | `MYSQL_USER` | `root` | MySQL username |
@@ -420,41 +420,112 @@ curl http://127.0.0.1:8888/health
 
 ## Authentication
 
-Authentication is optional and controlled by the `API_KEYS` environment variable.
+Authentication is **mandatory** and controlled by the `RETHINKAI_API_KEYS` environment variable.
 
-### Enabling Authentication
+### How Authentication Works
 
-Set `API_KEYS` in your `.env` file:
+The API uses header-based authentication with the following mechanism:
+
+1. **API Keys Configuration:** Multiple API keys can be configured via `RETHINKAI_API_KEYS` (comma-separated)
+2. **Header Requirement:** All requests must include the `RethinkAI-API-Key` header
+3. **Validation:** The API key is validated before processing any request
+4. **CORS Handling:** OPTIONS requests (CORS preflight) are automatically allowed without authentication
+
+### Setting Up API Keys
+
+Add API keys to your `.env` file:
+
 ```env
-API_KEYS=my-secret-key-1,my-secret-key-2,production-key
+RETHINKAI_API_KEYS=my-secret-key-1,my-secret-key-2,production-key-abc123
 ```
+
+**Important:**
+- Keys are comma-separated
+- Whitespace is automatically trimmed
+- At least one valid key must be configured
+- Each key should be unique and secure
 
 ### Using Authentication
 
-Include the API key in the `X-API-Key` header:
+Include the API key in the `RethinkAI-API-Key` header:
 
+**Example (curl):**
 ```bash
 curl -X POST http://127.0.0.1:8888/chat \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: my-secret-key-1" \
-  -d '{"message": "Hello"}'
+  -H "RethinkAI-API-Key: my-secret-key-1" \
+  -d '{
+    "message": "What events are happening this week?",
+    "conversation_history": []
+  }'
 ```
+
+**Example (JavaScript):**
+```javascript
+fetch('http://127.0.0.1:8888/chat', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'RethinkAI-API-Key': 'my-secret-key-1'
+  },
+  body: JSON.stringify({
+    message: 'What events are happening this week?',
+    conversation_history: []
+  })
+});
+```
+
+**Example (Python):**
+```python
+import requests
+
+response = requests.post(
+    'http://127.0.0.1:8888/chat',
+    headers={
+        'Content-Type': 'application/json',
+        'RethinkAI-API-Key': 'my-secret-key-1'
+    },
+    json={
+        'message': 'What events are happening this week?',
+        'conversation_history': []
+    }
+)
+```
+
+### Session Management
+
+After successful authentication, the API creates a persistent session:
+
+- **Session Duration:** 7 days (permanent session)
+- **Session ID:** Automatically generated UUID for each new session
+- **Session Storage:** Server-side Flask sessions
+- **Cookie Settings:**
+  - `HttpOnly`: True (prevents JavaScript access)
+  - `Secure`: Configurable via `FLASK_SESSION_COOKIE_SECURE` environment variable
+  - Default: False (set to True for HTTPS in production)
 
 ### Authentication Errors
 
-**401 Unauthorized:**
+**401 Unauthorized - Invalid API Key:**
 ```json
 {
   "error": "Invalid or missing API key"
 }
 ```
 
-### Disabling Authentication
+This error occurs when:
+- No `RethinkAI-API-Key` header is provided
+- The provided API key is not in the configured list
+- The API key contains only whitespace
 
-Leave `API_KEYS` empty or unset:
-```env
-API_KEYS=
-```
+### Security Best Practices
+
+1. **Use Strong Keys:** Generate long, random API keys (e.g., 32+ characters)
+2. **Rotate Keys Regularly:** Update keys periodically and remove old ones
+3. **Use HTTPS in Production:** Always use HTTPS to prevent key interception
+4. **Environment Variables:** Never commit API keys to version control
+5. **Different Keys per Environment:** Use different keys for dev/staging/production
+6. **Monitor Usage:** Log and monitor API key usage for suspicious activity
 
 ---
 
@@ -511,7 +582,7 @@ CREATE TABLE interaction_log (
 
 ### weekly_events Table
 
-Used by the `/events` endpoint. Created by `mysql_setup.py`.
+Used by the `/events` endpoint. Automatically created by the data ingestion pipeline.
 
 ```sql
 CREATE TABLE weekly_events (
@@ -550,10 +621,22 @@ CREATE TABLE weekly_events (
 
 | Function | Purpose |
 |----------|---------|
-| `get_db_connection()` | Create MySQL connection |
+| `get_db_connection()` | Get MySQL connection from connection pool |
 | `ensure_interaction_log_table()` | Create log table if missing |
 | `extract_sources()` | Parse sources from result for citations |
 | `log_interaction()` | Insert/update interaction logs |
+
+### Connection Pooling
+
+The API uses MySQL connection pooling for improved performance and scalability:
+
+- **Pool Size:** 10 connections
+- **Library:** `mysql-connector-python`
+- **Benefits:**
+  - Reuses existing connections instead of creating new ones
+  - Prevents connection exhaustion under concurrent load
+  - Better performance with multiple simultaneous users
+  - Automatic connection management and cleanup
 
 ---
 

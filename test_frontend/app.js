@@ -2,6 +2,9 @@
 // Configuration
 // =============================================================================
 const API_BASE_URL = 'http://127.0.0.1:8888';
+// API Authentication Key
+// IMPORTANT: This must match one of the keys in RETHINKAI_API_KEYS in your backend .env
+const API_KEY = 'banana';
 
 // Conversation history for context
 let conversationHistory = [];
@@ -71,7 +74,11 @@ function initNavigation() {
 // =============================================================================
 async function checkApiStatus() {
     try {
-        const response = await fetch(`${API_BASE_URL}/health`);
+        const response = await fetch(`${API_BASE_URL}/health`, {
+            headers: {
+                'RethinkAI-API-Key': API_KEY,
+            },
+        });
         const data = await response.json();
         
         if (data.status === 'ok') {
@@ -175,6 +182,7 @@ async function sendChatMessage(message) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'RethinkAI-API-Key': API_KEY,
             },
             body: JSON.stringify({
                 message: message,
@@ -237,7 +245,11 @@ async function loadEvents() {
     elements.eventsGrid.innerHTML = '<div class="loading-state">Loading events...</div>';
     
     try {
-        const response = await fetch(`${API_BASE_URL}/events?days_ahead=${daysAhead}&limit=${limit}`);
+        const response = await fetch(`${API_BASE_URL}/events?days_ahead=${daysAhead}&limit=${limit}`, {
+            headers: {
+                'RethinkAI-API-Key': API_KEY,
+            },
+        });
         const data = await response.json();
         
         if (response.ok && data.events && data.events.length > 0) {
@@ -305,6 +317,7 @@ async function sendApiRequest() {
     let options = {
         headers: {
             'Content-Type': 'application/json',
+            'RethinkAI-API-Key': API_KEY,
         },
     };
     

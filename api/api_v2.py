@@ -21,8 +21,8 @@ from typing import Any, Dict, List, Optional
 from flask import Flask, request, jsonify, g, session
 from flask_cors import CORS
 from dotenv import load_dotenv
-import pymysql
-from pymysql.cursors import DictCursor
+import mysql.connector
+from mysql.connector.pooling import MySQLConnectionPool
 
 # Load environment variables
 load_dotenv()
@@ -125,6 +125,21 @@ class Config:
 
 
 # =============================================================================
+# Database Connection Pool
+# =============================================================================
+# Create connection pool
+db_pool = MySQLConnectionPool(
+    host=Config.MYSQL_HOST,
+    port=Config.MYSQL_PORT,
+    user=Config.MYSQL_USER,
+    password=Config.MYSQL_PASSWORD,
+    database=Config.MYSQL_DB,
+    pool_name="api_v2_pool",
+    pool_size=10
+)
+
+
+# =============================================================================
 # Flask App Setup
 # =============================================================================
 app = Flask(__name__)
@@ -149,42 +164,40 @@ CORS(
 # Database Connection
 # =============================================================================
 def get_db_connection():
-    """Get a MySQL connection using pymysql."""
-    return pymysql.connect(
-        host=Config.MYSQL_HOST,
-        port=Config.MYSQL_PORT,
-        user=Config.MYSQL_USER,
-        password=Config.MYSQL_PASSWORD,
-        database=Config.MYSQL_DB,
-        charset="utf8mb4",
-        cursorclass=DictCursor,
-        autocommit=True,
-    )
+    """Get a database connection from the connection pool."""
+    return db_pool.get_connection()
 
 
 def ensure_interaction_log_table():
     """Create interaction_log table if it doesn't exist."""
+    conn = None
+    cursor = None
     try:
         conn = get_db_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS interaction_log (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    session_id VARCHAR(255),
-                    app_version VARCHAR(50),
-                    data_selected TEXT,
-                    data_attributes TEXT,
-                    prompt_preamble TEXT,
-                    client_query TEXT,
-                    app_response TEXT,
-                    client_response_rating VARCHAR(50),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-        conn.close()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS interaction_log (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                session_id VARCHAR(255),
+                app_version VARCHAR(50),
+                data_selected TEXT,
+                data_attributes TEXT,
+                prompt_preamble TEXT,
+                client_query TEXT,
+                app_response TEXT,
+                client_response_rating VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
         print("✓ interaction_log table ready")
     except Exception as e:
         print(f"Warning: Could not ensure interaction_log table: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 # =============================================================================
@@ -283,39 +296,45 @@ def log_interaction(
     rating: str = "",
 ) -> Optional[int]:
     """Log an interaction to the database."""
+    conn = None
+    cursor = None
     try:
         conn = get_db_connection()
-        with conn.cursor() as cursor:
-            if log_id:
-                # Update existing entry
-                update_fields = []
-                values = []
-                if rating:
-                    update_fields.append("client_response_rating = %s")
-                    values.append(rating)
-                if app_response:
-                    update_fields.append("app_response = %s")
-                    values.append(app_response)
-                
-                if update_fields:
-                    values.append(log_id)
-                    query = f"UPDATE interaction_log SET {', '.join(update_fields)} WHERE id = %s"
-                    cursor.execute(query, values)
-                return log_id
-            else:
-                # Insert new entry
-                query = """
-                    INSERT INTO interaction_log 
-                    (session_id, app_version, client_query, app_response, data_selected)
-                    VALUES (%s, %s, %s, %s, %s)
-                """
-                cursor.execute(query, (session_id, Config.API_VERSION, client_query, app_response, mode))
-                return cursor.lastrowid
+        cursor = conn.cursor(dictionary=True)
+        if log_id:
+            # Update existing entry
+            update_fields = []
+            values = []
+            if rating:
+                update_fields.append("client_response_rating = %s")
+                values.append(rating)
+            if app_response:
+                update_fields.append("app_response = %s")
+                values.append(app_response)
+            
+            if update_fields:
+                values.append(log_id)
+                query = f"UPDATE interaction_log SET {', '.join(update_fields)} WHERE id = %s"
+                cursor.execute(query, values)
+            conn.commit()
+            return log_id
+        else:
+            # Insert new entry
+            query = """
+                INSERT INTO interaction_log 
+                (session_id, app_version, client_query, app_response, data_selected)
+                VALUES (%s, %s, %s, %s, %s)
+            """
+            cursor.execute(query, (session_id, Config.API_VERSION, client_query, app_response, mode))
+            conn.commit()
+            return cursor.lastrowid
     except Exception as e:
         print(f"Error logging interaction: {e}")
         return None
     finally:
-        if 'conn' in locals():
+        if cursor:
+            cursor.close()
+        if conn:
             conn.close()
 
 
@@ -525,51 +544,55 @@ def events():
     limit = max(1, min(limit, 100))
     days_ahead = max(1, min(days_ahead, 30))
     
+    conn = None
+    cursor = None
     try:
         conn = get_db_connection()
-        with conn.cursor() as cursor:
-            # Build query using actual weekly_events table columns
-            query = """
-                SELECT 
-                    id, event_name, event_date, start_date, end_date, 
-                    start_time, end_time, raw_text, source_pdf
-                FROM weekly_events
-                WHERE start_date >= CURDATE()
-                  AND start_date <= DATE_ADD(CURDATE(), INTERVAL %s DAY)
-                ORDER BY start_date ASC, start_time ASC 
-                LIMIT %s
-            """
-            params = [days_ahead, limit]
-            
-            cursor.execute(query, params)
-            rows = cursor.fetchall()
-            
-            # Format events
-            events_list = []
-            for row in rows:
-                event = {
-                    "id": row["id"],
-                    "event_name": row["event_name"],
-                    "event_date": row["event_date"],
-                    "start_date": str(row["start_date"]) if row["start_date"] else None,
-                    "end_date": str(row["end_date"]) if row["end_date"] else None,
-                    "start_time": str(row["start_time"]) if row["start_time"] else None,
-                    "end_time": str(row["end_time"]) if row["end_time"] else None,
-                    "description": row["raw_text"],
-                    "source": row["source_pdf"],
-                }
-                events_list.append(event)
-            
-            return jsonify({
-                "events": events_list,
-                "total": len(events_list),
-            })
+        cursor = conn.cursor(dictionary=True)
+        # Build query using actual weekly_events table columns
+        query = """
+            SELECT 
+                id, event_name, event_date, start_date, end_date, 
+                start_time, end_time, raw_text, source_pdf
+            FROM weekly_events
+            WHERE start_date >= CURDATE()
+              AND start_date <= DATE_ADD(CURDATE(), INTERVAL %s DAY)
+            ORDER BY start_date ASC, start_time ASC 
+            LIMIT %s
+        """
+        params = [days_ahead, limit]
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        # Format events
+        events_list = []
+        for row in rows:
+            event = {
+                "id": row["id"],
+                "event_name": row["event_name"],
+                "event_date": row["event_date"],
+                "start_date": str(row["start_date"]) if row["start_date"] else None,
+                "end_date": str(row["end_date"]) if row["end_date"] else None,
+                "start_time": str(row["start_time"]) if row["start_time"] else None,
+                "end_time": str(row["end_time"]) if row["end_time"] else None,
+                "description": row["raw_text"],
+                "source": row["source_pdf"],
+            }
+            events_list.append(event)
+        
+        return jsonify({
+            "events": events_list,
+            "total": len(events_list),
+        })
     
     except Exception as e:
         print(f"Error in /events: {e}")
         return jsonify({"error": f"Failed to fetch events: {str(e)}"}), 500
     finally:
-        if 'conn' in locals():
+        if cursor:
+            cursor.close()
+        if conn:
             conn.close()
 
 

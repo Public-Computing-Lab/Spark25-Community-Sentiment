@@ -60,6 +60,8 @@ frontend/
 
 ## Configuration
 
+### API Base URL
+
 The API base URL is configured in `app.js`:
 
 ```javascript
@@ -67,6 +69,43 @@ const API_BASE_URL = 'http://127.0.0.1:8888';
 ```
 
 Change this if your API is running on a different host/port.
+
+### API Authentication
+
+**IMPORTANT:** This frontend requires API authentication to work with the backend.
+
+#### Setup:
+
+1. Open `app.js`
+2. Find the `API_KEY` constant (around line 7)
+3. The default key is already set to `'banana'` which matches the backend default
+
+```javascript
+const API_KEY = 'banana';
+```
+
+#### Getting an API Key:
+
+The API key must match one of the keys configured in your backend's `.env` file:
+
+```env
+RETHINKAI_API_KEYS=banana,key2,key3
+```
+
+If you've changed the backend keys, update the `API_KEY` constant in `app.js` to match.
+
+#### Troubleshooting Authentication:
+
+**401 Unauthorized errors:**
+- Check that `API_KEY` in `app.js` matches a key in backend's `RETHINKAI_API_KEYS`
+- Make sure the backend server is running
+- Check browser console (F12) for error details
+- Verify the API status indicator shows "API Connected"
+
+**All requests failing:**
+- The `RethinkAI-API-Key` header must be sent with every request
+- This is automatically handled by the frontend code
+- If you see authentication errors, the keys don't match
 
 ## Design
 

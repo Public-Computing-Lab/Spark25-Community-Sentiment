@@ -271,169 +271,6 @@ Text:
         return []
 
 
-def extract_articles_with_llm(text: str, source: str, publication_date: str = None) -> List[Dict]:
-    """Use LLM to extract news articles/stories from newsletter text (excluding events)."""
-    if not config.GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY is not configured")
-    
-    genai.configure(api_key=config.GEMINI_API_KEY)
-    model = genai.GenerativeModel(config.GEMINI_MODEL)
-    
-    # Truncate very long text to avoid token limits
-    max_chars = 15000
-    if len(text) > max_chars:
-        text = text[:max_chars] + "\n\n[... text truncated ...]"
-    
-    prompt = f"""
-You are reading a community newsletter that contains news articles, stories, and announcements.
-
-Extract ALL distinct news articles, stories, opinion pieces, and announcements from the text below.
-EXCLUDE event listings, calendars, and schedules (those are handled separately).
-
-Return ONLY valid JSON (no explanations, no markdown, no code fences), in this exact format:
-[
-  {{
-    "title": "...",
-    "content": "...",
-    "section": "...",
-    "topics": ["...", "..."],
-    "summary": "..."
-  }},
-  ...
-]
-
-Field rules:
-- "title": Article headline or title (brief)
-- "content": Full article text
-- "section": Type of content - one of: "news", "opinion", "announcement", "feature_story", "community_update", "other"
-- "topics": List of 2-5 main topics/themes (e.g., ["housing", "community", "safety"])
-- "summary": 1-2 sentence summary of the article
-
-Only extract substantial content (at least 50 words). Skip:
-- Event listings and calendars
-- Advertisements
-- Boilerplate text (headers, footers, contact info)
-- Navigation elements
-
-Be conservative: only extract clear, distinct articles. Never invent content.
-
-Text:
-\"\"\"
-{text}
-\"\"\"
-"""
-    
-    try:
-        response = model.generate_content(
-            prompt,
-            generation_config={"temperature": 0}
-        )
-        text_response = (response.text or "").strip()
-        
-        # Clean up potential code fences
-        if text_response.startswith("```"):
-            text_response = text_response.strip("`").strip()
-            lines = text_response.splitlines()
-            if lines and lines[0].strip().lower() in ("json", "javascript"):
-                text_response = "\n".join(lines[1:]).strip()
-        
-        articles = json.loads(text_response)
-        
-        if not isinstance(articles, list):
-            return []
-        
-        # Add source and publication date to each article
-        for article in articles:
-            article['source'] = source
-            if publication_date:
-                article['publication_date'] = publication_date
-        
-        return articles
-        
-    except Exception as e:
-        print(f"  ✗ Error extracting articles with LLM: {e}")
-        return []
-
-
-def add_articles_to_vectordb(articles: List[Dict]) -> int:
-    """Add newsletter articles to the vector database."""
-    if not articles:
-        return 0
-    
-    # Import here to avoid circular dependencies
-    from langchain_core.documents import Document
-    from langchain_community.vectorstores import Chroma
-    sys.path.insert(0, str(Path(__file__).parent.parent / "rag stuff"))
-    from retrieval import GeminiEmbeddings
-    
-    documents = []
-    for article in articles:
-        # Skip articles that are too short
-        content = article.get('content', '')
-        if len(content.split()) < config.ARTICLE_MIN_LENGTH:
-            continue
-        
-        # Create metadata
-        metadata = {
-            'source': article.get('source', 'newsletter'),
-            'doc_type': 'newsletter_article',
-            'title': article.get('title', 'Untitled'),
-            'section': article.get('section', 'other'),
-            'publication_date': article.get('publication_date', datetime.now().isoformat()[:10]),
-            'ingestion_date': datetime.now().isoformat(),
-        }
-        
-        # Add topics as comma-separated string for filtering
-        topics = article.get('topics', [])
-        if topics and isinstance(topics, list):
-            metadata['topics'] = ', '.join(topics)
-        
-        # Add summary if available
-        summary = article.get('summary', '')
-        if summary:
-            metadata['summary'] = summary
-        
-        # Create document with title + summary + content
-        doc_content = f"# {article.get('title', 'Article')}\n\n"
-        if summary:
-            doc_content += f"**Summary:** {summary}\n\n"
-        doc_content += content
-        
-        doc = Document(
-            page_content=doc_content,
-            metadata=metadata
-        )
-        documents.append(doc)
-    
-    if not documents:
-        return 0
-    
-    # Add to vector database
-    embeddings = GeminiEmbeddings()
-    
-    try:
-        if config.VECTORDB_DIR.exists():
-            vectordb = Chroma(
-                persist_directory=str(config.VECTORDB_DIR),
-                embedding_function=embeddings
-            )
-            vectordb.add_documents(documents)
-            print(f"  ✓ Added {len(documents)} articles to vector DB")
-        else:
-            # Create new vector DB if it doesn't exist
-            vectordb = Chroma.from_documents(
-                documents=documents,
-                embedding=embeddings,
-                persist_directory=str(config.VECTORDB_DIR)
-            )
-            print(f"  ✓ Created vector DB with {len(documents)} articles")
-        
-        return len(documents)
-    except Exception as e:
-        print(f"  ✗ Error adding articles to vector DB: {e}")
-        return 0
-
-
 def insert_events_to_db(events: List[Dict]) -> int:
     """Insert events into the weekly_events table."""
     if not events:
@@ -447,6 +284,23 @@ def insert_events_to_db(events: List[Dict]) -> int:
     
     try:
         with conn.cursor() as cur:
+            # Ensure weekly_events table exists
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS weekly_events (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    source_pdf VARCHAR(255) NULL,
+                    page_number INT NULL,
+                    event_name VARCHAR(255) NOT NULL,
+                    event_date VARCHAR(255) NOT NULL,
+                    start_date DATE NULL,
+                    end_date DATE NULL,
+                    start_time TIME NULL,
+                    end_time TIME NULL,
+                    raw_text TEXT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """)
+            
             for event in events:
                 try:
                     cur.execute(
@@ -501,8 +355,6 @@ def sync_email_newsletters_to_sql() -> dict:
         'emails_processed': 0,
         'events_extracted': 0,
         'events_inserted': 0,
-        'articles_extracted': 0,
-        'articles_added': 0,
         'errors': []
     }
     
@@ -536,7 +388,6 @@ def sync_email_newsletters_to_sql() -> dict:
             return stats
         
         all_events = []
-        all_articles = []
         
         # Process each newsletter
         for i, (email_id, msg) in enumerate(newsletters, 1):
@@ -579,22 +430,6 @@ def sync_email_newsletters_to_sql() -> dict:
                 else:
                     print("  ⚠ No events found")
                 
-                # Extract articles using LLM (if enabled)
-                if config.EXTRACT_ARTICLES:
-                    articles = extract_articles_with_llm(
-                        full_text, 
-                        source=f"Newsletter: {subject}",
-                        publication_date=pub_date
-                    )
-                    
-                    if articles:
-                        print(f"  ✓ Extracted {len(articles)} articles")
-                        all_articles.extend(articles)
-                    else:
-                        print("  ⚠ No articles found")
-                    
-                    stats['articles_extracted'] += len(articles)
-                
                 # Mark as processed
                 processed_ids.append(email_id)
                 stats['emails_processed'] += 1
@@ -612,13 +447,6 @@ def sync_email_newsletters_to_sql() -> dict:
             stats['events_inserted'] = inserted
             print(f"✓ Inserted {inserted} events successfully")
         
-        # Add all articles to vector database (if enabled)
-        if config.EXTRACT_ARTICLES and all_articles:
-            print(f"\nAdding {len(all_articles)} articles to vector database...")
-            added = add_articles_to_vectordb(all_articles)
-            stats['articles_added'] = added
-            print(f"✓ Added {added} articles successfully")
-        
         # Save updated sync state (keep last 1000 IDs to prevent file from growing too large)
         state['processed_email_ids'] = processed_ids[-1000:]
         save_email_sync_state(state)
@@ -635,9 +463,6 @@ def sync_email_newsletters_to_sql() -> dict:
     print(f"Emails processed: {stats['emails_processed']}")
     print(f"Events extracted: {stats['events_extracted']}")
     print(f"Events inserted (SQL): {stats['events_inserted']}")
-    if config.EXTRACT_ARTICLES:
-        print(f"Articles extracted: {stats['articles_extracted']}")
-        print(f"Articles added to vector DB: {stats['articles_added']}")
     print(f"Errors: {len(stats['errors'])}")
     print("=" * 80)
     
