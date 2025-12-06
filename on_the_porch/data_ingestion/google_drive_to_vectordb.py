@@ -525,6 +525,23 @@ def insert_events_to_db(events: List[Dict]) -> int:
     
     try:
         with conn.cursor() as cur:
+            # Ensure weekly_events table exists
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS weekly_events (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    source_pdf VARCHAR(255) NULL,
+                    page_number INT NULL,
+                    event_name VARCHAR(255) NOT NULL,
+                    event_date VARCHAR(255) NOT NULL,
+                    start_date DATE NULL,
+                    end_date DATE NULL,
+                    start_time TIME NULL,
+                    end_time TIME NULL,
+                    raw_text TEXT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """)
+            
             # Check if category column exists, add it if not
             cur.execute("SHOW COLUMNS FROM weekly_events LIKE 'category'")
             if not cur.fetchone():
@@ -645,7 +662,8 @@ def process_newsletter_pdf(file_path: Path, file_metadata: Dict) -> Dict:
     print(f"    Found {len(pages)} pages")
     
     all_events = []
-    all_documents = []
+    # We no longer add newsletter pages to the vector DB; only extract events for SQL
+    all_documents: List = []
     
     # Process each page
     for page_info in pages:
@@ -667,37 +685,9 @@ def process_newsletter_pdf(file_path: Path, file_metadata: Dict) -> Dict:
         else:
             print("no events")
         
-        # Also create document chunks for the vector DB
-        from langchain_text_splitters import RecursiveCharacterTextSplitter
-        from langchain_core.documents import Document
-        
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=2500,
-            chunk_overlap=300,
-            separators=["\n\n", "\n", ". ", " ", ""]
-        )
-        
-        chunks = text_splitter.split_text(page_text)
-        
-        for i, chunk in enumerate(chunks):
-            doc = Document(
-                page_content=chunk,
-                metadata={
-                    'source': source_name,
-                    'doc_type': 'client_upload',
-                    'folder_category': 'newsletters',
-                    'chunk_id': len(all_documents),
-                    'page_num': page_num,
-                    'total_pages': total_pages,
-                    'drive_file_id': file_metadata.get('id', ''),
-                    'modified_time': file_metadata.get('modifiedTime', ''),
-                    'ingestion_date': datetime.now().isoformat(),
-                    'file_extension': '.pdf'
-                }
-            )
-            all_documents.append(doc)
+        # No vectordb chunks created for newsletters anymore
     
-    print(f"    ✓ Total: {len(all_events)} events, {len(all_documents)} document chunks")
+    print(f"    ✓ Total: {len(all_events)} events, 0 document chunks (vectordb disabled for newsletters)")
     
     return {
         'documents': all_documents,
@@ -732,6 +722,137 @@ def add_documents_to_vectordb(documents: List) -> None:
         print(f"✓ Created new vector DB with {len(documents)} document chunks.")
 
 
+def delete_chunks_by_file_id(file_id: str) -> int:
+    """Delete all chunks from vector database that belong to a specific Google Drive file ID."""
+    if not config.VECTORDB_DIR.exists():
+        return 0
+    
+    try:
+        embeddings = GeminiEmbeddings()
+        vectordb = Chroma(
+            persist_directory=str(config.VECTORDB_DIR),
+            embedding_function=embeddings
+        )
+        
+        # Get all document IDs that match this file_id
+        results = vectordb.get(where={"drive_file_id": file_id})
+        
+        if results and results.get('ids') and len(results['ids']) > 0:
+            # Delete by IDs
+            vectordb.delete(ids=results['ids'])
+            return len(results['ids'])
+        else:
+            # No chunks found for this file_id
+            return 0
+        
+    except Exception as e:
+        if config.VERBOSE_LOGGING:
+            print(f"    ⚠ Error deleting chunks for file ID {file_id}: {e}")
+        return 0
+
+
+def get_all_current_file_ids(service, folder_id: str) -> set:
+    """Get all file IDs currently in Google Drive folder (including subfolders)."""
+    current_file_ids = set()
+    
+    try:
+        # Get files in root folder
+        query = f"'{folder_id}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false"
+        results = service.files().list(
+            q=query,
+            fields="files(id)",
+            pageSize=1000
+        ).execute()
+        
+        for file in results.get('files', []):
+            current_file_ids.add(file['id'])
+        
+        # Get subfolders and their files
+        subfolders = list_subfolders(service, folder_id)
+        for subfolder in subfolders:
+            subfolder_query = f"'{subfolder['id']}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false"
+            subfolder_results = service.files().list(
+                q=subfolder_query,
+                fields="files(id)",
+                pageSize=1000
+            ).execute()
+            
+            for file in subfolder_results.get('files', []):
+                current_file_ids.add(file['id'])
+    
+    except Exception as e:
+        if config.VERBOSE_LOGGING:
+            print(f"    ⚠ Error getting current file IDs: {e}")
+    
+    return current_file_ids
+
+
+def remove_deleted_files_from_vectordb(service, folder_id: str, processed_files: dict) -> dict:
+    """
+    Detect files deleted from Google Drive and remove their chunks from vector DB.
+    Returns dict with deletion stats.
+    """
+    deletion_stats = {
+        'files_deleted': 0,
+        'chunks_removed': 0,
+        'errors': []
+    }
+    
+    if not processed_files:
+        return deletion_stats
+    
+    print("\nChecking for deleted files in Google Drive...")
+    
+    try:
+        # Get all file IDs currently in Drive
+        current_file_ids = get_all_current_file_ids(service, folder_id)
+        
+        # Find files that were processed but no longer exist in Drive
+        processed_file_ids = set(processed_files.keys())
+        deleted_file_ids = processed_file_ids - current_file_ids
+        
+        if not deleted_file_ids:
+            print("  ✓ No deleted files detected")
+            return deletion_stats
+        
+        print(f"  Found {len(deleted_file_ids)} deleted file(s) to remove from vector DB")
+        
+        # Delete chunks for each deleted file
+        for file_id in deleted_file_ids:
+            file_name = processed_files[file_id].get('name', 'unknown')
+            expected_chunks = processed_files[file_id].get('chunks', 0)
+            
+            try:
+                print(f"  🗑️  Removing chunks for deleted file: {file_name}")
+                chunks_deleted = delete_chunks_by_file_id(file_id)
+                
+                if chunks_deleted > 0:
+                    print(f"    ✓ Deleted {chunks_deleted} chunk(s)")
+                else:
+                    print(f"    ⚠ No chunks found to delete (may have been already removed)")
+                
+                # Remove from processed_files dict
+                del processed_files[file_id]
+                
+                deletion_stats['files_deleted'] += 1
+                deletion_stats['chunks_removed'] += chunks_deleted
+                
+            except Exception as e:
+                error_msg = f"Error removing chunks for {file_name}: {str(e)}"
+                print(f"    ✗ {error_msg}")
+                deletion_stats['errors'].append(error_msg)
+        
+        if deletion_stats['files_deleted'] > 0:
+            print(f"  ✓ Removed {deletion_stats['files_deleted']} deleted file(s) from vector DB")
+    
+    except Exception as e:
+        error_msg = f"Error detecting deleted files: {str(e)}"
+        print(f"  ✗ {error_msg}")
+        deletion_stats['errors'].append(error_msg)
+    
+    return deletion_stats
+
+
 def cleanup_temp_files() -> None:
     """Clean up temporary downloaded files."""
     for file in config.TEMP_DOWNLOAD_DIR.glob("*"):
@@ -755,6 +876,8 @@ def sync_google_drive_to_vectordb() -> dict:
     stats = {
         'files_processed': 0,
         'chunks_added': 0,
+        'files_deleted': 0,
+        'chunks_removed': 0,
         'events_extracted': 0,
         'events_sql_inserted': 0,
         'errors': []
@@ -779,8 +902,18 @@ def sync_google_drive_to_vectordb() -> dict:
         service = get_drive_service()
         print("✓ Authenticated successfully")
         
+        # Check for and remove deleted files from vector DB
+        deletion_stats = remove_deleted_files_from_vectordb(
+            service, 
+            config.GOOGLE_DRIVE_FOLDER_ID, 
+            processed_files
+        )
+        stats['files_deleted'] = deletion_stats['files_deleted']
+        stats['chunks_removed'] = deletion_stats['chunks_removed']
+        stats['errors'].extend(deletion_stats['errors'])
+        
         # List new files
-        print(f"Scanning folder {config.GOOGLE_DRIVE_FOLDER_ID}...")
+        print(f"\nScanning folder {config.GOOGLE_DRIVE_FOLDER_ID}...")
         new_files = list_new_files_from_drive(
             service, 
             config.GOOGLE_DRIVE_FOLDER_ID, 
@@ -790,7 +923,12 @@ def sync_google_drive_to_vectordb() -> dict:
         print(f"Found {len(new_files)} new or updated files to process.")
         
         if not new_files:
-            print("No new files to process. Exiting.")
+            print("No new files to process.")
+            # Still save sync state in case files were deleted
+            state['processed_files'] = processed_files
+            save_sync_state(state)
+            if stats['files_deleted'] > 0:
+                print("✓ Sync state updated (deleted files removed)")
             return stats
         
         all_documents = []
@@ -882,6 +1020,9 @@ def sync_google_drive_to_vectordb() -> dict:
     print("Google Drive Sync Complete")
     print(f"Files processed: {stats['files_processed']}")
     print(f"Document chunks added: {stats['chunks_added']}")
+    if stats['files_deleted'] > 0:
+        print(f"Files deleted: {stats['files_deleted']}")
+        print(f"Chunks removed: {stats['chunks_removed']}")
     print(f"Events extracted: {stats['events_extracted']}")
     print(f"Events inserted (SQL): {stats['events_sql_inserted']}")
     print(f"Errors: {len(stats['errors'])}")

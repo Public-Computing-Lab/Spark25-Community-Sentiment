@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>On The Porch</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏘️</text></svg>">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Main App Container -->
+  <div class="app-container">
+    <!-- Sidebar (Events Panel) -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2>Upcoming Events</h2>
+      </div>
+      
+      <div class="sidebar-filters">
+        <div class="filter-group">
+          <label for="events-days">Time Range</label>
+          <select id="events-days">
+            <option value="7">Next 7 days</option>
+            <option value="14" selected>Next 14 days</option>
+            <option value="30">Next 30 days</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="events-limit">Show</label>
+          <select id="events-limit">
+            <option value="5">5 events</option>
+            <option value="10" selected>10 events</option>
+            <option value="20">20 events</option>
+          </select>
+        </div>
+        <button class="btn-refresh" id="events-refresh" aria-label="Refresh events">↻</button>
+      </div>
+      
+      <div class="sidebar-content">
+        <div class="loading-state" id="events-loading" hidden>
+          <div class="spinner"></div>
+          <p>Loading events...</p>
+        </div>
+        
+        <div class="error-state" id="events-error" hidden role="alert"></div>
+        
+        <div class="events-list" id="events-list"></div>
+        
+        <div class="empty-state" id="events-empty" hidden>
+          <p>No upcoming events found</p>
+        </div>
+      </div>
+    </aside>
+    
+    <!-- Main Chat Area -->
+    <main class="chat-container">
+      <!-- Top Bar -->
+      <header class="chat-header">
+        <div class="header-left">
+          <div class="logo">
+            <div class="logo-icon">🏘️</div>
+            <div class="logo-text">
+              <h1>On The Porch</h1>
+              <p>Dorchester Decoded</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="header-right">
+          <div class="status-indicator" id="api-status">
+            <span class="status-dot"></span>
+            <span class="status-text">Checking...</span>
+          </div>
+        </div>
+      </header>
+      
+      <!-- Chat Messages -->
+      <div class="chat-messages" id="chat-messages">
+        <div class="message assistant welcome">
+          <div class="message-avatar">🤖</div>
+          <div class="message-content">
+            <div class="message-text">
+              <p><strong>Welcome to the Dorchester Community Assistant!</strong></p>
+              <p>I'm here to help you discover:</p>
+              <ul>
+                <li>📅 Upcoming community events and activities</li>
+                <li>📊 311 service requests and neighborhood data</li>
+                <li>🏘️ Local policies and planning information</li>
+                <li>🗺️ Place-based questions about specific areas</li>
+              </ul>
+              <p>What would you like to know about your community?</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Error Banner -->
+      <div class="error-banner" id="chat-error" hidden role="alert"></div>
+      
+      <!-- Chat Input -->
+      <div class="chat-input-container">
+        <form id="chat-form" class="chat-form">
+          <div class="input-wrapper">
+            <input 
+              type="text" 
+              id="chat-input" 
+              placeholder="Ask about events, safety, services, or neighborhood trends..."
+              autocomplete="off"
+              aria-label="Chat input"
+            >
+            <button type="submit" id="chat-submit" class="btn-send" aria-label="Send message">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          
+          <div class="suggestions" id="suggestions">
+            <button type="button" class="suggestion-chip" data-query="What events are happening this week?">
+              Events this week
+            </button>
+            <button type="button" class="suggestion-chip" data-query="How many 311 requests were filed last month?">
+              311 activity
+            </button>
+            <button type="button" class="suggestion-chip" data-query="What are the main safety concerns in Dorchester?">
+              Safety overview
+            </button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+  
+  <script src="app.js"></script>
+</body>
+</html>

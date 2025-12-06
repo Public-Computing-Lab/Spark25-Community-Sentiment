@@ -1,0 +1,23 @@
+AY Spark! [DS549] Fall 2025 Wrap Up Documentation
+ In the repo, create a folder named dataset-documentation (if it doesn’t already exist) and add a README file following the format found here: Dataset Documentation Guide
+To create the dataset-documentation folder, make a new branch, then create a new folder, and add the contents necessary
+Use this example as a reference.
+💻 GitHub Repository
+ Ensure all code and dashboard files are uploaded to Spark GitHub repo.
+This includes any .twb, .pbix, or other dashboard files.
+Merge all branches into a single dev branch.
+Create a final pull request (PR) and get it approved by the PM or TPM
+Update the dev README file to include:
+ A clear description of the project goals, structure, and outputs.
+A link to the interactive dashboard (if hosted anywhere).
+Handoff notes for the next student team:
+ What you’ve done and what the repo consists of
+The next tasks should be for the next student team that is working on the project
+Any guidance to start efficiently
+this should include guided documentation of where as a team you would start your next set of tasks in order start quickly and efficiently on the remainder of the project
+🔐 Access & File Ownership
+ Make sure buspark@bu.edu has access to all documents, files, dashboards, and code.
+If applicable, transfer file ownership (Google Docs/Slides/etc.):
+Share the file → add buspark@bu.edu as Editor → click “Transfer Ownership.”
+📁 Google Drive Organization
+ Double-check that all project-related files (slides, datasets, presentations, etc.) are stored in the Spark! Google Drive project folder.

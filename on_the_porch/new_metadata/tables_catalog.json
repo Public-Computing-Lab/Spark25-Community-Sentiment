@@ -5,14 +5,9 @@
     "metadata_file": "crime_incident_reports.json"
   },
   {
-    "table": "service_requests_311",
-    "description": "Citywide 311 service requests from Boston Open Data Portal; one row per request with lifecycle fields, request type, status, and location context.",
-    "metadata_file": "service_requests_311.json"
-  },
-  {
-    "table": "shootings",
-    "description": "Shooting incidents from Boston Police Department (victims struck); one row per incident with date, location, and victim details.",
-    "metadata_file": "shootings.json"
+    "table": "bos311_data",
+    "description": "Citywide 311 service requests from Boston Open Data Portal (NEW SYSTEM); one row per request with lifecycle fields, request type, status, and location context. Fields mapped from new API: open_date->open_dt, case_topic->type.",
+    "metadata_file": "bos311_data.json"
   },
   {
     "table": "weekly_events",

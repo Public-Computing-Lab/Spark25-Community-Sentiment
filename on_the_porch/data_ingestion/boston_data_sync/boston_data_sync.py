@@ -443,6 +443,21 @@ class BostonDataSyncer:
             # Normalize column names (MySQL-friendly)
             df.columns = [col.replace(' ', '_').replace('-', '_').lower() for col in df.columns]
             
+            # Apply field mapping if configured (for backward compatibility with API code)
+            field_mapping = dataset_config.get('field_mapping', {})
+            if field_mapping:
+                print(f"   🔄 Applying field mappings: {field_mapping}")
+                # Normalize mapping keys too
+                normalized_mapping = {}
+                for old_name, new_name in field_mapping.items():
+                    old_normalized = old_name.replace(' ', '_').replace('-', '_').lower()
+                    new_normalized = new_name.replace(' ', '_').replace('-', '_').lower()
+                    normalized_mapping[old_normalized] = new_normalized
+                
+                # Rename columns
+                df.rename(columns=normalized_mapping, inplace=True)
+                print(f"   ✅ Field mapping applied")
+            
             # Create table if it doesn't exist
             if primary_key:
                 pk_col = primary_key.replace(' ', '_').replace('-', '_').lower()

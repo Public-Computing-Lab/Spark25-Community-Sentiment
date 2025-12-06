@@ -145,6 +145,15 @@ def process_file_to_documents(
     )
     chunks = text_splitter.split_text(text)
     
+    # Decide doc_type based on folder category (for compatibility with older RAG)
+    fc_lower = folder_category.lower()
+    if fc_lower == 'policy':
+        doc_type = 'policy'
+    elif fc_lower in ('transcript', 'transcripts'):
+        doc_type = 'transcript'
+    else:
+        doc_type = 'client_upload'
+
     # Create documents with metadata
     documents = []
     for i, chunk in enumerate(chunks):
@@ -152,7 +161,7 @@ def process_file_to_documents(
             page_content=chunk,
             metadata={
                 'source': file_metadata.get('name', 'unknown'),
-                'doc_type': 'client_upload',
+                'doc_type': doc_type,
                 'folder_category': folder_category,
                 'chunk_id': i,
                 'drive_file_id': file_metadata.get('id', ''),
@@ -188,6 +197,15 @@ def _process_pdf_page_wise(
         separators=["\n\n", "\n", ". ", " ", ""]
     )
     
+    # Decide doc_type based on folder category (for compatibility with older RAG)
+    fc_lower = folder_category.lower()
+    if fc_lower == 'policy':
+        doc_type = 'policy'
+    elif fc_lower in ('transcript', 'transcripts'):
+        doc_type = 'transcript'
+    else:
+        doc_type = 'client_upload'
+
     documents = []
     chunk_id = 0
     
@@ -207,7 +225,7 @@ def _process_pdf_page_wise(
                 page_content=chunk,
                 metadata={
                     'source': file_metadata.get('name', 'unknown'),
-                    'doc_type': 'client_upload',
+                    'doc_type': doc_type,
                     'folder_category': folder_category,
                     'chunk_id': chunk_id,
                     'page_num': page_num,

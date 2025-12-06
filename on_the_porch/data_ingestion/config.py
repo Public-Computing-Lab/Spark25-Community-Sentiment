@@ -89,10 +89,6 @@ EMAIL_LOOKBACK_DAYS = int(os.getenv("EMAIL_LOOKBACK_DAYS", "7"))
 MAX_FILES_PER_RUN = int(os.getenv("MAX_FILES_PER_RUN", "100"))
 VERBOSE_LOGGING = os.getenv("VERBOSE_LOGGING", "false").lower() in ("true", "1", "yes")
 
-# Article extraction settings
-EXTRACT_ARTICLES = os.getenv("EXTRACT_ARTICLES", "true").lower() in ("true", "1", "yes")
-ARTICLE_MIN_LENGTH = int(os.getenv("ARTICLE_MIN_LENGTH", "50"))
-
 # ============================================================================
 # Sync State Files
 # ============================================================================

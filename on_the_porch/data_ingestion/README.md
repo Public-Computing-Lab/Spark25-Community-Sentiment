@@ -280,7 +280,6 @@ Best for semantic, topic-based queries:
 - "Find information about youth programs"
 
 The RAG system will search through:
-- Newsletter articles
 - Client-uploaded documents
 - Community news and announcements
 
