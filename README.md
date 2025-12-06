@@ -77,6 +77,17 @@ ml-misi-community-sentiment/
    cd api
    python api_v2.py
    ```
+   The API will start on `http://127.0.0.1:8888`
+
+7. **Run the Frontend** (in a separate terminal)
+   ```bash
+   # From project root
+   cd public
+   python -m http.server 8000
+   ```
+   Then open `http://localhost:8000` in your browser
+
+   **Note**: Make sure the backend API is running before starting the frontend. The frontend connects to the API at `http://127.0.0.1:8888` by default.
 
 ## ⚙️ Configuration
 
@@ -166,7 +177,10 @@ This project implements a **hybrid AI system** that combines:
 1. **Start Here**: Review `on_the_porch/unified_chatbot.py` to understand the core routing logic
 2. **Test the API**: Use `api/test_api_v2.py` to test endpoints
 3. **Explore Data**: Check `dataset-documentation/` for available data sources
-4. **Frontend Integration**: See `test_frontend/` for example frontend code and test the api via an interface.
+4. **Frontend Integration**: 
+   - See `public/` for the production frontend (see `public/README.md` for details)
+   - See `test_frontend/` for example frontend code
+   - Both can be used to test the API via a web interface
 
 ### Development Workflow
 
