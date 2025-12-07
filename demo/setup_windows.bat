@@ -3,18 +3,18 @@
 rem Change to project root (this file lives in demo/)
 cd /d "%~dp0.."
 
-rem Create Python 3.11 virtual environment if it does not exist
-if not exist .venv (
+rem Create Python 3.11 virtual environment for the demo if it does not exist
+if not exist .venv_demo (
   where py >nul 2>&1
   if %ERRORLEVEL% EQU 0 (
-    py -3.11 -m venv .venv
+    py -3.11 -m venv .venv_demo
   ) else (
-    python -m venv .venv
+    python -m venv .venv_demo
   )
 )
 
 rem Select venv Python executable
-set PYTHON=.venv\Scripts\python.exe
+set PYTHON=.venv_demo\Scripts\python.exe
 if not exist "%PYTHON%" (
   set PYTHON=python
 )
@@ -36,7 +36,7 @@ if %ERRORLEVEL% EQU 0 (
   docker compose -f demo\docker-compose.demo.yml up -d
 )
 
-rem Activate the virtual environment
-if exist ".venv\Scripts\activate.bat" (
-  call ".venv\Scripts\activate.bat"
+rem Activate the demo virtual environment
+if exist ".venv_demo\Scripts\activate.bat" (
+  call ".venv_demo\Scripts\activate.bat"
 )

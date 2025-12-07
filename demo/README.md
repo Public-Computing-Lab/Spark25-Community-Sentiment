@@ -30,7 +30,7 @@ From the project root:
   ```
 
 This will:
-- Create a `.venv` virtual environment (if missing)
+- Create a `.venv_demo` virtual environment just for the demo
 - Install Python dependencies from the root `requirements.txt`
 - Unzip `demo/vectordb_new.zip` so the vector DB is available
 - Start a MySQL demo database using Docker (`mysql:8` image) and import `mysql_demo_dump.sql`

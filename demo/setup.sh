@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 set -e
 
-# Create a Python 3.11 virtual environment if it does not exist
-if [ ! -d ".venv" ]; then
+# Create a Python 3.11 virtual environment for the demo if it does not exist
+if [ ! -d ".venv_demo" ]; then
   if command -v python3.11 >/dev/null 2>&1; then
-    python3.11 -m venv .venv
+    python3.11 -m venv .venv_demo
   elif command -v python3 >/dev/null 2>&1; then
-    python3 -m venv .venv
+    python3 -m venv .venv_demo
   else
-    python -m venv .venv
+    python -m venv .venv_demo
   fi
 fi
 
 # Select the venv Python executable
-if [ -x ".venv/bin/python" ]; then
-  PYTHON=".venv/bin/python"
-elif [ -x ".venv/Scripts/python.exe" ]; then
-  PYTHON=".venv/Scripts/python.exe"
+if [ -x ".venv_demo/bin/python" ]; then
+  PYTHON=".venv_demo/bin/python"
+elif [ -x ".venv_demo/Scripts/python.exe" ]; then
+  PYTHON=".venv_demo/Scripts/python.exe"
 else
   PYTHON="python"
 fi
@@ -37,9 +37,9 @@ else
   docker compose -f demo/docker-compose.demo.yml up -d
 fi
 
-# Activate the virtual environment for interactive use
-if [ -f ".venv/bin/activate" ]; then
-  . .venv/bin/activate
-elif [ -f ".venv/Scripts/activate" ]; then
-  . .venv/Scripts/activate
+# Activate the demo virtual environment for interactive use
+if [ -f ".venv_demo/bin/activate" ]; then
+  . .venv_demo/bin/activate
+elif [ -f ".venv_demo/Scripts/activate" ]; then
+  . .venv_demo/Scripts/activate
 fi
