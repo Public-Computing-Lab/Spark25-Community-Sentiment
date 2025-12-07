@@ -36,3 +36,10 @@ if command -v docker-compose >/dev/null 2>&1; then
 else
   docker compose -f demo/docker-compose.demo.yml up -d
 fi
+
+# Activate the virtual environment for interactive use
+if [ -f ".venv/bin/activate" ]; then
+  . .venv/bin/activate
+elif [ -f ".venv/Scripts/activate" ]; then
+  . .venv/Scripts/activate
+fi

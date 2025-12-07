@@ -1,5 +1,4 @@
 @echo off
-setlocal ENABLEDELAYEDEXPANSION
 
 rem Change to project root (this file lives in demo/)
 cd /d "%~dp0.."
@@ -37,4 +36,7 @@ if %ERRORLEVEL% EQU 0 (
   docker compose -f demo\docker-compose.demo.yml up -d
 )
 
-endlocal
+rem Activate the virtual environment
+if exist ".venv\Scripts\activate.bat" (
+  call ".venv\Scripts\activate.bat"
+)

@@ -41,26 +41,16 @@ ml-misi-community-sentiment/
 
 For instructors and evaluators, a lightweight demo setup is available in the `demo/` folder. This avoids any client credentials and uses a small demo database snapshot and vector store **without running the data ingestion pipeline**, since ingestion requires additional setup of Google Drive and Gmail credentials.
 
-**Additional prerequisite**:
-- Docker Desktop (or Docker + Docker Compose)
+To keep setup instructions in one place (and avoid the main README getting out of sync with the actual scripts), **all demo-specific setup steps are documented in** `demo/README.md`.  
 
-**Demo flow (from project root)**:
-1. Run one-time setup:
-   - On Mac/Linux (or Windows with WSL / Git Bash):
-     ```bash
-     bash demo/setup.sh
-     ```
-   - On Windows without WSL (Command Prompt / PowerShell):
-     ```bat
-     demo\setup_windows.bat
-     ```
-   This will:
-   - Create a virtualenv `.venv/`
-   - Install Python dependencies
-   - Unzip the demo ChromaDB/vector store
-   - Start a MySQL demo database via Docker and import `demo/mysql_demo_dump.sql`
-2. Copy the appropriate `.env.example` to `.env` (root or `on_the_porch/`) and fill in at least `GEMINI_API_KEY`. Demo database defaults are already set for the Dockerized MySQL instance.
-3. Start the backend and frontend as described below.
+From the project root, see:
+
+- `demo/README.md` – how to:
+  - Run `demo/setup.sh` or `demo/setup_windows.bat`
+  - Bring up the Dockerized MySQL demo database
+  - Configure the minimal `.env` values needed for the demo
+
+Once you’ve followed the steps in `demo/README.md`, you can **skip the Installation section below** and just use the Configuration and Running API/frontend sections as reference.
 
 ### Prerequisites
 
