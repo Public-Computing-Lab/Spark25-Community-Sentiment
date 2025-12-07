@@ -276,9 +276,6 @@ def insert_events_to_db(events: List[Dict]) -> int:
     if not events:
         return 0
     
-    if not config.DATABASE_URL:
-        raise ValueError("DATABASE_URL is not configured")
-    
     conn = app4._get_db_connection()
     inserted_count = 0
     
@@ -361,7 +358,7 @@ def sync_email_newsletters_to_sql() -> dict:
     try:
         # Validate configuration
         errors = config.validate_config()
-        email_errors = [e for e in errors if 'EMAIL' in e.upper() or 'DATABASE' in e]
+        email_errors = [e for e in errors if 'EMAIL' in e.upper()]
         if email_errors:
             for error in email_errors:
                 print(f"✗ Configuration error: {error}")

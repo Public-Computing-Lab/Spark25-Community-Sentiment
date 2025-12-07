@@ -66,12 +66,6 @@ else:
 TEMP_DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # ============================================================================
-# Database Configuration
-# ============================================================================
-DATABASE_URL = os.getenv("DATABASE_URL", "")
-PGSCHEMA = os.getenv("PGSCHEMA", "public")
-
-# ============================================================================
 # Gemini AI Configuration
 # ============================================================================
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
@@ -125,10 +119,6 @@ def validate_config() -> list:
     if not GEMINI_API_KEY:
         errors.append("GEMINI_API_KEY is not set")
     
-    # Check Database config
-    if not DATABASE_URL:
-        errors.append("DATABASE_URL is not set")
-    
     return errors
 
 
@@ -145,7 +135,6 @@ def print_config_summary():
     print(f"IMAP Server: {IMAP_SERVER}:{IMAP_PORT}")
     print(f"Vector DB Directory: {VECTORDB_DIR}")
     print(f"Temp Download Directory: {TEMP_DOWNLOAD_DIR}")
-    print(f"Database: {'Configured' if DATABASE_URL else 'Not configured'}")
     print(f"Gemini Model: {GEMINI_MODEL}")
     print(f"Email Lookback Days: {EMAIL_LOOKBACK_DAYS}")
     print(f"Max Files Per Run: {MAX_FILES_PER_RUN}")

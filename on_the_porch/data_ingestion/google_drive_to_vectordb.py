@@ -516,10 +516,6 @@ def insert_events_to_db(events: List[Dict]) -> int:
     if not events:
         return 0
     
-    if not config.DATABASE_URL:
-        print("  ⚠ DATABASE_URL not configured, skipping SQL insert")
-        return 0
-    
     conn = app4._get_db_connection()
     inserted_count = 0
     

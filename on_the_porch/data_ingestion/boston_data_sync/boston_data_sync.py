@@ -23,7 +23,6 @@ from pymysql.cursors import DictCursor
 
 # Add parent directory to path to import config
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config import DATABASE_URL
 
 # Boston CKAN API base URL
 BOSTON_CKAN_API = "https://data.boston.gov/api/3/action"

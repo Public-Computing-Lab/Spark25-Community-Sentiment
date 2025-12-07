@@ -179,10 +179,9 @@ GMAIL_TOKEN_PATH=gmail_token.json
 VECTORDB_DIR=../vectordb_new
 TEMP_DOWNLOAD_DIR=./temp_downloads
 
-# Database & AI (from existing setup)
-DATABASE_URL=your_database_connection_string
+# AI Configuration
 GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.0-flash-exp
+GEMINI_MODEL=gemini-2.5-flash-exp
 ```
 
 ### 3. Place Credentials File
@@ -382,7 +381,7 @@ This is normal if there haven't been any uploads since last run. The system trac
 
 ### "Database connection error"
 
-**Solution:** Verify `DATABASE_URL` in `.env` is correct and the database is accessible.
+**Solution:** Verify MySQL connection settings (`MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DB`) in `.env` are correct and the database is accessible.
 
 ### High API Costs
 
