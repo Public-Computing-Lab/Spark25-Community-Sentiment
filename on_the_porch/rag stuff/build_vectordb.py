@@ -12,7 +12,10 @@ import google.generativeai as genai  # type: ignore
 
 from retrieval import GeminiEmbeddings
 
-load_dotenv()
+_THIS_FILE = Path(__file__).resolve()
+_RAG_DIR = _THIS_FILE.parent
+_ROOT_DIR = _RAG_DIR.parents[2]
+load_dotenv(_ROOT_DIR / ".env")
 
 # Default input directories (can be overridden by callers)
 DEFAULT_POLICY_DIR = Path("Data/VectorDB_text")

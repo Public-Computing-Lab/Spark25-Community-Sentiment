@@ -24,13 +24,11 @@ from dotenv import load_dotenv
 import mysql.connector
 from mysql.connector.pooling import MySQLConnectionPool
 
-# Load environment variables
-load_dotenv()
-
 # Setup paths to import from on_the_porch
 _THIS_FILE = Path(__file__).resolve()
 _API_DIR = _THIS_FILE.parent
 _ROOT_DIR = _API_DIR.parent
+load_dotenv(_ROOT_DIR / ".env")
 _ON_THE_PORCH_DIR = _ROOT_DIR / "on_the_porch"
 
 # Add on_the_porch to path for imports

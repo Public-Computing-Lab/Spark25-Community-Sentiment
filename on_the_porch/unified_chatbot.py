@@ -7,13 +7,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 
-load_dotenv()
-
 
 # Ensure we can import RAG utilities from the directory with a space in its name
 _THIS_FILE = Path(__file__).resolve()
 _REAL_DIR = _THIS_FILE.parent
 _ROOT_DIR = _REAL_DIR.parent.parent
+load_dotenv(_ROOT_DIR / ".env")
 # RAG utilities live in `on_the_porch/rag stuff`
 _RAG_DIR = _REAL_DIR / "rag stuff"
 if str(_RAG_DIR) not in sys.path:
@@ -35,20 +34,9 @@ GEMINI_SUMMARY_MODEL = os.getenv("GEMINI_SUMMARY_MODEL", GEMINI_MODEL)
 
 
 def _bootstrap_env() -> None:
-    # Load .env in this directory if present
-    env_path = _REAL_DIR / ".env"
-    if not env_path.exists():
-        return
+    """Ensure environment variables are loaded from the repo root .env."""
     try:
-        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            key = key.strip()
-            value = value.strip().strip('"').strip("'")
-            if key and key not in os.environ:
-                os.environ[key] = value
+        load_dotenv(_ROOT_DIR / ".env")
     except Exception:
         pass
 

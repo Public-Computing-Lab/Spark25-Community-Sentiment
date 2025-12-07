@@ -16,7 +16,9 @@ except Exception:
 
 
 def _load_local_env() -> None:
-    env_path = Path(__file__).with_name(".env")
+    """Load environment variables from the repo root .env."""
+    root_dir = Path(__file__).resolve().parents[2]
+    env_path = root_dir / ".env"
     if not env_path.exists():
         return
     try:

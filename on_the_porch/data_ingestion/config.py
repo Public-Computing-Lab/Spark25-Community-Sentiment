@@ -6,17 +6,13 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file in this directory
+# Load environment variables from the repo root .env
 _THIS_DIR = Path(__file__).parent
-_ENV_FILE = _THIS_DIR / ".env"
+_ROOT_DIR = _THIS_DIR.parents[2]
+_ENV_FILE = _ROOT_DIR / ".env"
 
 if _ENV_FILE.exists():
     load_dotenv(_ENV_FILE)
-else:
-    # Try to load from parent directory as fallback
-    _PARENT_ENV = _THIS_DIR.parent / ".env"
-    if _PARENT_ENV.exists():
-        load_dotenv(_PARENT_ENV)
 
 # ============================================================================
 # Google Drive Configuration

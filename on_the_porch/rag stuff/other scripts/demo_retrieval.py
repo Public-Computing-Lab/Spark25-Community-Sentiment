@@ -10,10 +10,14 @@ from retrieval import retrieve, retrieve_transcripts, retrieve_policies, format_
 from dotenv import load_dotenv
 import json
 import os
+from pathlib import Path
 
 import google.generativeai as genai  # type: ignore
 
-load_dotenv()
+_THIS_FILE = Path(__file__).resolve()
+_DEMO_DIR = _THIS_FILE.parent
+_ROOT_DIR = _DEMO_DIR.parents[2]
+load_dotenv(_ROOT_DIR / ".env")
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
