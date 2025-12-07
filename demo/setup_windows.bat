@@ -3,14 +3,9 @@
 rem Change to project root (this file lives in demo/)
 cd /d "%~dp0.."
 
-rem Create Python 3.11 virtual environment for the demo if it does not exist
+rem Create Python virtual environment for the demo if it does not exist
 if not exist .venv_demo (
-  where py >nul 2>&1
-  if %ERRORLEVEL% EQU 0 (
-    py -3.11 -m venv .venv_demo
-  ) else (
-    python -m venv .venv_demo
-  )
+  python -m venv .venv_demo
 )
 
 rem Select venv Python executable
