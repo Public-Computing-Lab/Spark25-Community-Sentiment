@@ -27,7 +27,7 @@ llm_query_log.csv
 logs/
 *.sqlite
 *.db
-*.sql
+
 
 
 # 5️⃣ Flask & Gunicorn Deployment Files
@@ -107,3 +107,4 @@ on_the_porch/data_ingestion/.sync_state.json
 on_the_porch/data_ingestion/ingestion_log.jsonl
 on_the_porch/data_ingestion/ontheporch-ebc5a60fc214.json
 on_the_porch/data_ingestion/temp_downloads
+on_the_porch/data_ingestion/reset_table.sql

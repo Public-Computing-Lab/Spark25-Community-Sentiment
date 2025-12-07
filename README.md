@@ -89,6 +89,28 @@ ml-misi-community-sentiment/
 
    **Note**: Make sure the backend API is running before starting the frontend. The frontend connects to the API at `http://127.0.0.1:8888` by default.
 
+## 🧪 Demo-Friendly Setup (Dockerized MySQL)
+
+For instructors and evaluators, a lightweight demo setup is available in the `demo/` folder. This avoids any client credentials and uses a small demo database snapshot and vector store.
+
+**Additional prerequisite**:
+- Docker Desktop (or Docker + Docker Compose)
+
+**Demo flow (from project root)**:
+1. Run one-time setup:
+   ```bash
+   bash demo/setup.sh
+   ```
+   This will:
+   - Create a virtualenv `.venv/`
+   - Install Python dependencies
+   - Unzip the demo ChromaDB/vector store
+   - Start a MySQL demo database via Docker and import `demo/mysql_demo_dump.sql`
+2. Copy the appropriate `.env.example` to `.env` (root or `on_the_porch/`) and fill in at least `GEMINI_API_KEY`. Demo database defaults are already set for the Dockerized MySQL instance.
+3. Start the backend and frontend as described in the **Quick Start** section above.
+
+See `demo/README.md` for concise demo-specific instructions.
+
 ## ⚙️ Configuration
 
 ### Environment Variables
