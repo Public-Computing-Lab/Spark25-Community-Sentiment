@@ -37,6 +37,31 @@ ml-misi-community-sentiment/
 
 ## 🚀 Quick Start
 
+### Demo-Friendly Setup (Dockerized MySQL, recommended for quick evals)
+
+For instructors and evaluators, a lightweight demo setup is available in the `demo/` folder. This avoids any client credentials and uses a small demo database snapshot and vector store **without running the data ingestion pipeline**, since ingestion requires additional setup of Google Drive and Gmail credentials.
+
+**Additional prerequisite**:
+- Docker Desktop (or Docker + Docker Compose)
+
+**Demo flow (from project root)**:
+1. Run one-time setup:
+   - On Mac/Linux (or Windows with WSL / Git Bash):
+     ```bash
+     bash demo/setup.sh
+     ```
+   - On Windows without WSL (Command Prompt / PowerShell):
+     ```bat
+     demo\setup_windows.bat
+     ```
+   This will:
+   - Create a virtualenv `.venv/`
+   - Install Python dependencies
+   - Unzip the demo ChromaDB/vector store
+   - Start a MySQL demo database via Docker and import `demo/mysql_demo_dump.sql`
+2. Copy the appropriate `.env.example` to `.env` (root or `on_the_porch/`) and fill in at least `GEMINI_API_KEY`. Demo database defaults are already set for the Dockerized MySQL instance.
+3. Start the backend and frontend as described below.
+
 ### Prerequisites
 
 - Python 3.11+
@@ -87,45 +112,26 @@ ml-misi-community-sentiment/
    ```
    Then open `http://localhost:8000` in your browser
 
-   **Note**: Make sure the backend API is running before starting the frontend. The frontend connects to the API at `http://127.0.0.1:8888` by default.
-
-## 🧪 Demo-Friendly Setup (Dockerized MySQL)
-
-For instructors and evaluators, a lightweight demo setup is available in the `demo/` folder. This avoids any client credentials and uses a small demo database snapshot and vector store.
-
-**Additional prerequisite**:
-- Docker Desktop (or Docker + Docker Compose)
-
-**Demo flow (from project root)**:
-1. Run one-time setup:
-   ```bash
-   bash demo/setup.sh
-   ```
-   This will:
-   - Create a virtualenv `.venv/`
-   - Install Python dependencies
-   - Unzip the demo ChromaDB/vector store
-   - Start a MySQL demo database via Docker and import `demo/mysql_demo_dump.sql`
-2. Copy the appropriate `.env.example` to `.env` (root or `on_the_porch/`) and fill in at least `GEMINI_API_KEY`. Demo database defaults are already set for the Dockerized MySQL instance.
-3. Start the backend and frontend as described in the **Quick Start** section above.
-
-See `demo/README.md` for concise demo-specific instructions.
+  **Note**: Make sure the backend API is running before starting the frontend. The frontend connects to the API at `http://127.0.0.1:8888` by default.
 
 ## ⚙️ Configuration
 
 ### Environment Variables
 
-The project uses environment variables for configuration. See `.env.example` files in:
-- `api/.env.example` - API configuration
-- `on_the_porch/.env.example` - Core chatbot configuration
-- `on_the_porch/data_ingestion/.env.example` - Data ingestion configuration
+The project uses a **single `.env` file at the repo root**.
 
-**Key Variables:**
-- `GEMINI_API_KEY` - Google Gemini API key (required)
-- `MYSQL_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DB` - Database connection
-- `RETHINKAI_API_KEYS` - API authentication keys (comma-separated)
-- `GOOGLE_DRIVE_FOLDER_ID` - Google Drive folder for document sync
-- `DATABASE_URL` - PostgreSQL connection string (if using vector DB)
+- Copy `example_env.txt` to `.env`:
+  ```bash
+  cp example_env.txt .env
+  ```
+- Edit `.env` and fill in the values for your environment.
+
+**Key Variables (non-exhaustive):**
+- `GEMINI_API_KEY` – Google Gemini API key (required)
+- `RETHINKAI_API_KEYS` – API authentication keys (comma-separated)
+- `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DB` – MySQL connection
+- `VECTORDB_DIR` – path to the ChromaDB/vector DB directory
+- `GOOGLE_DRIVE_FOLDER_ID` and related `GOOGLE_*/GMAIL_*` settings – data ingestion
 
 ## 📊 Data Sources
 

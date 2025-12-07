@@ -4,11 +4,11 @@ setlocal ENABLEDELAYEDEXPANSION
 rem Change to project root (this file lives in demo/)
 cd /d "%~dp0.."
 
-rem Create Python virtual environment if it does not exist
+rem Create Python 3.11 virtual environment if it does not exist
 if not exist .venv (
   where py >nul 2>&1
   if %ERRORLEVEL% EQU 0 (
-    py -3 -m venv .venv
+    py -3.11 -m venv .venv
   ) else (
     python -m venv .venv
   )
@@ -23,10 +23,6 @@ if not exist "%PYTHON%" (
 rem Install Python requirements
 "%PYTHON%" -m pip install --upgrade pip
 "%PYTHON%" -m pip install -r requirements.txt
-
-if exist on_the_porch\requirements.txt (
-  "%PYTHON%" -m pip install -r on_the_porch\requirements.txt
-)
 
 rem Unzip the ChromaDB/vector store if the archive exists
 if exist demo\vectordb_new.zip (

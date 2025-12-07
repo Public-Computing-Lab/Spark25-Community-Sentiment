@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
-# Create a Python virtual environment if it does not exist
+# Create a Python 3.11 virtual environment if it does not exist
 if [ ! -d ".venv" ]; then
-  if command -v python3 >/dev/null 2>&1; then
+  if command -v python3.11 >/dev/null 2>&1; then
+    python3.11 -m venv .venv
+  elif command -v python3 >/dev/null 2>&1; then
     python3 -m venv .venv
   else
     python -m venv .venv
@@ -22,10 +24,6 @@ fi
 # Install Python requirements
 "$PYTHON" -m pip install --upgrade pip
 "$PYTHON" -m pip install -r requirements.txt
-
-if [ -f "on_the_porch/requirements.txt" ]; then
-  "$PYTHON" -m pip install -r on_the_porch/requirements.txt
-fi
 
 # Unzip the ChromaDB/vector store if the archive exists
 if [ -f "demo/vectordb_new.zip" ]; then

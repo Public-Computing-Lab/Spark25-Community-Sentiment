@@ -31,23 +31,17 @@ From the project root:
 
 This will:
 - Create a `.venv` virtual environment (if missing)
-- Install Python dependencies from `requirements.txt` (and `on_the_porch/requirements.txt` if present)
+- Install Python dependencies from the root `requirements.txt`
 - Unzip `demo/vectordb_new.zip` so the vector DB is available
 - Start a MySQL demo database using Docker (`mysql:8` image) and import `mysql_demo_dump.sql`
 
 ### 2. Environment variables
 
-1. Copy the appropriate example env file to `.env`:
-   - For the unified chatbot in `on_the_porch/`:
-     ```bash
-     cd on_the_porch
-     cp .env.example .env
-     ```
-   - Or, if you are using a root-level `.env.example`, copy that instead:
-     ```bash
-     cp .env.example .env
-     ```
-2. Fill in at least:
+1. From the project root, copy the example env file to `.env`:
+   ```bash
+   cp example_env.txt .env
+   ```
+2. Open `.env` and fill in at least:
    - `GEMINI_API_KEY` (leave blank if you want to run without Gemini-based features)
    - Leave the demo DB values as-is if you are using the Docker demo:
      - `MYSQL_HOST=localhost`
@@ -78,5 +72,5 @@ Then open `http://localhost:8000` in your browser. Make sure the backend is runn
 
 ### Notes
 
-- The demo database and vector store are for evaluation only and use non-sensitive data.
+- The demo database and vector store are for evaluation only and are not up to date.
 - For full production setup and data ingestion, see the main `README.md` and `on_the_porch/data_ingestion/README.md`.

@@ -16,8 +16,6 @@ GEMINI_API_KEY=your-gemini-api-key
 
 GEMINI_MODEL=gemini-2.5-flash-lite
 
-GEMINI_SUMMARY_MODEL=gemini-2.5-flash-lite
-
 
 
 # Embedding model for vector search (RAG)
@@ -44,12 +42,6 @@ FLASK_SESSION_COOKIE_SECURE=false
 
 
 
-# Optional base URL for frontend (used by legacy api.py)
-
-VITE_BASE_URL=http://localhost:4173
-
-
-
 # ============================================================================
 
 # MySQL Database Configuration (311, 911, events)
@@ -66,17 +58,6 @@ MYSQL_PASSWORD=your-mysql-password
 
 MYSQL_DB=rethink_ai_boston
 
-
-
-# Legacy DB config (used only by older api.py)
-
-DB_HOST=127.0.0.1
-
-DB_USER=root
-
-DB_PASSWORD=your-mysql-password
-
-DB_NAME=rethink_ai_boston
 
 
 
@@ -137,28 +118,11 @@ IMAP_SERVER=imap.gmail.com
 IMAP_PORT=993
 
 
-
-DATABASE_URL=postgresql://user:password@localhost:5432/dbname
-
-PGSCHEMA=public
-
-
-
 TEMP_DOWNLOAD_DIR=./temp_downloads
 
 EMAIL_LOOKBACK_DAYS=7
 
 MAX_FILES_PER_RUN=100
 
-VERBOSE_LOGGING=false
-
-
-
-# ============================================================================
-
-# SQL Chat / misc
-
-# ============================================================================
-
-SQL_MAX_RETRIES=2
+VERBOSE_LOGGING=true
 
