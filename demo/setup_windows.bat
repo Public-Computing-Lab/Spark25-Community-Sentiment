@@ -32,6 +32,6 @@ if %ERRORLEVEL% EQU 0 (
 )
 
 rem Activate the demo virtual environment
-if exist ".venv_demo\Scripts\activate.bat" (
-  call ".venv_demo\Scripts\activate.bat"
+if exist ".venv_demo\Scripts\activate" (
+  call ".venv_demo\Scripts\activate"
 )

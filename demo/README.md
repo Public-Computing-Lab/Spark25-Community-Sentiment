@@ -52,6 +52,20 @@ This will:
 
 ### 3. Run backend and frontend
 
+You'll need two terminals for this, activate the venv in both.
+
+On Mac/Linux (or WSL), from the project root:
+
+```bash
+source .venv_demo/bin/activate
+```
+
+On Windows (Command Prompt or PowerShell), from the project root:
+
+```bat
+.\.venv_demo\Scripts\activate
+```
+
 From the project root, in **one terminal**:
 
 ```bash
@@ -74,3 +88,17 @@ Then open `http://localhost:8000` in your browser. Make sure the backend is runn
 
 - The demo database and vector store are for evaluation only and are not up to date.
 - For full production setup and data ingestion, see the main `README.md` and `on_the_porch/data_ingestion/README.md`.
+ 
+### Troubleshooting (Linux)
+
+- **`mysqlclient` build errors during `pip install`**: make sure build tools and MySQL dev headers are installed, then re-run the setup:
+
+  ```bash
+  sudo apt update
+  sudo apt install \
+      build-essential \
+      python3-dev \
+      default-libmysqlclient-dev \
+      pkg-config
+  ```
+
