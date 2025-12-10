@@ -2,6 +2,8 @@
 
 This `demo/` folder contains a minimal, self-contained setup so an evaluator can bring up the project quickly without access to client credentials or infrastructure.
 
+There are some troubleshooting steps at the end of this file incase you face the same issues we faced.
+
 ### Prerequisites
 
 - **Python 3.11+**
@@ -89,16 +91,126 @@ Then open `http://localhost:8000` in your browser. Make sure the backend is runn
 - The demo database and vector store are for evaluation only and are not up to date.
 - For full production setup and data ingestion, see the main `README.md` and `on_the_porch/data_ingestion/README.md`.
  
-### Troubleshooting (Linux)
+### Troubleshooting
 
-- **`mysqlclient` build errors during `pip install`**: make sure build tools and MySQL dev headers are installed, then re-run the setup:
+#### Python Version Issues (macOS)
 
-  ```bash
-  sudo apt update
-  sudo apt install \
-      build-essential \
-      python3-dev \
-      default-libmysqlclient-dev \
-      pkg-config
-  ```
+**Error:** `TypeError: unsupported operand type(s) for |: 'type' and 'NoneType'`
+
+**Cause:** The code requires Python 3.10+ (preferably 3.11+), but your system is using Python 3.9.
+
+**Solution:**
+1. Install Python 3.11:
+   ```bash
+   brew install python@3.11
+   ```
+
+2. Verify installation:
+   ```bash
+   python3.11 --version
+   ```
+
+3. Recreate the virtual environment:
+   ```bash
+   rm -rf .venv_demo
+   bash demo/setup.sh
+   ```
+
+The setup script will automatically detect and use Python 3.11.
+
+#### Port 8888 Already in Use (macOS/Linux)
+
+**Error:** Backend fails to start because port 8888 is already in use.
+
+**Solution (macOS/Linux):**
+1. Find processes using port 8888:
+   ```bash
+   lsof -ti:8888
+   ```
+
+2. Kill the processes (replace with actual PIDs from step 1):
+   ```bash
+   kill -9 58944 93652
+   ```
+
+3. Verify port is free:
+   ```bash
+   lsof -ti:8888
+   ```
+   (Should return nothing)
+
+**Solution (Windows):**
+1. Find processes using port 8888:
+   ```powershell
+   netstat -ano | findstr :8888
+   ```
+
+2. Kill the process (replace PID with actual process ID from step 1):
+   ```powershell
+   taskkill /PID 12345 /F
+   ```
+
+3. Start the backend normally - it will use port 8888 by default.
+
+**Why not change the port?** The frontend is configured to connect to `http://127.0.0.1:8888`. While you can change the backend port with `export API_PORT=8889` (macOS/Linux) or `set API_PORT=8889` (Windows), it's simpler to free up port 8888.
+
+#### MySQL Build Errors During Installation
+
+**Error:** `mysqlclient` build errors during `pip install -r requirements.txt`
+
+##### Linux (Ubuntu/Debian)
+
+Install build tools and MySQL dev headers:
+```bash
+sudo apt update
+sudo apt install \
+    build-essential \
+    python3-dev \
+    default-libmysqlclient-dev \
+    pkg-config
+```
+
+Then re-run the setup:
+```bash
+bash demo/setup.sh
+```
+
+##### macOS
+
+Install Xcode Command Line Tools and MySQL client:
+```bash
+# Install Xcode Command Line Tools
+xcode-select --install
+
+# Install MySQL client via Homebrew
+brew install mysql-client
+
+# Add mysql-client to PATH (add to ~/.zshrc or ~/.bashrc)
+export PATH="/opt/homebrew/opt/mysql-client/bin:$PATH"
+export LDFLAGS="-L/opt/homebrew/opt/mysql-client/lib"
+export CPPFLAGS="-I/opt/homebrew/opt/mysql-client/include"
+```
+
+Then re-run the setup:
+```bash
+bash demo/setup.sh
+```
+
+##### Windows
+
+**Option 1: Use pre-built wheels (Recommended)**
+```powershell
+pip install --only-binary :all: mysqlclient
+```
+
+**Option 2: Install Microsoft C++ Build Tools**
+
+If pre-built wheels are not available:
+1. Download and install [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+2. During installation, select "Desktop development with C++"
+3. Install MySQL Connector/C from [MySQL Downloads](https://dev.mysql.com/downloads/connector/c/)
+4. Re-run the setup:
+   ```bat
+   demo\setup_windows.bat
+   ```
 
