@@ -1,0 +1,37 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Temporary downloads
+temp_downloads/*
+!temp_downloads/.gitkeep
+
+# Sync state files
+.sync_state.json
+.email_sync_state.json
+
+# Log files
+*.log
+ingestion_log.jsonl
+
+# Google credentials
+*.json
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+

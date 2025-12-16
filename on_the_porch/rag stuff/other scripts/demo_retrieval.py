@@ -1,0 +1,457 @@
+"""
+Demo: Two-Step Agentic RAG System
+
+Step 1: LLM decides what to retrieve (doc types, tags, sources)
+Step 2: Execute retrieval based on LLM's decision
+Step 3: LLM generates final answer from context
+"""
+
+from retrieval import retrieve, retrieve_transcripts, retrieve_policies, format_results
+from dotenv import load_dotenv
+import json
+import os
+from pathlib import Path
+
+import google.generativeai as genai  # type: ignore
+
+_THIS_FILE = Path(__file__).resolve()
+_DEMO_DIR = _THIS_FILE.parent
+_ROOT_DIR = _DEMO_DIR.parents[2]
+load_dotenv(_ROOT_DIR / ".env")
+
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+
+
+def _get_gemini_client():
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY not configured")
+    genai.configure(api_key=api_key)
+    return genai, GEMINI_MODEL
+
+
+def plan_vectordb_mixed(query: str) -> dict:
+    """
+    Use Gemini to decide arguments for a single call to retrieval.retrieve().
+    """
+    client, model_name = _get_gemini_client()
+    model = client.GenerativeModel(model_name)
+
+    planning_prompt = f"""
+You are a routing planner for a semantic search system about Boston community data.
+
+Available doc types in the vector database:
+- "transcript": community meeting transcripts with tags like "safety", "youth", "media",
+                "community", "displacement", "government", "structural racism".
+- "policy": city policy documents like "Boston Anti-Displacement Plan Analysis.txt",
+           "Boston Slow Streets Plan Analysis.txt", "Imagine Boston 2030 Analysis.txt".
+- "client_upload": documents uploaded from Google Drive (newsletters, policy, transcripts).
+
+NOTE: Calendar events are stored in SQL (weekly_events table), NOT in vector DB.
+
+User question:
+{query}
+
+Decide what to retrieve for ONE similarity search.
+
+Respond ONLY with valid JSON (no markdown, no code fences):
+
+{{
+  "doc_types": ["transcript", "policy", "client_upload"],
+  "tags": ["safety", "youth"] or null,
+  "source": "Boston Anti-Displacement Plan Analysis.txt" or null,
+  "k": 5
+}}
+
+Rules:
+- Choose the smallest set of doc_types that makes sense (often 1 or 2).
+- Use at most 2 tags when helpful; otherwise set "tags" to null.
+- Only set "source" when the question is clearly about a specific policy document.
+- Keep "k" between 3 and 10.
+"""
+
+    try:
+        resp = model.generate_content(
+            planning_prompt,
+            generation_config={"temperature": 0}
+        )
+        content = (getattr(resp, "text", "") or "").strip()
+        if content.startswith("```"):
+            content = content.strip("`").strip()
+            lines = content.splitlines()
+            if lines and lines[0].strip().lower() in ("json", "javascript", "js"):
+                content = "\n".join(lines[1:]).strip()
+        plan = json.loads(content)
+    except Exception:
+        plan = {
+            "doc_types": ["transcript", "policy"],
+            "tags": None,
+            "source": None,
+            "k": 5,
+        }
+
+    # Normalize doc_types
+    doc_types = plan.get("doc_types") or []
+    if isinstance(doc_types, str):
+        doc_types = [doc_types]
+    plan["doc_types"] = [dt for dt in doc_types if isinstance(dt, str) and dt]
+
+    # Normalize tags
+    tags = plan.get("tags")
+    if not isinstance(tags, list):
+        tags = None
+    plan["tags"] = tags
+
+    # Normalize source
+    source = plan.get("source")
+    if not isinstance(source, str) or not source.strip():
+        source = None
+    plan["source"] = source
+
+    # Normalize k
+    k = plan.get("k", 5)
+    try:
+        k = int(k)
+    except Exception:
+        k = 5
+    plan["k"] = max(1, min(k, 20))
+
+    return plan
+
+
+def plan_retrieval(query):
+    """
+    Step 1: LLM analyzes query and decides what to retrieve.
+
+    Returns a retrieval plan with doc_type, tags, sources, etc.
+    """
+    client, model_name = _get_gemini_client()
+    model = client.GenerativeModel(model_name)
+
+    planning_prompt = f"""You are a retrieval planner for a RAG system about Boston community sentiment and policy.
+
+Available data sources:
+1. TRANSCRIPTS: Community member interviews with tags like:
+   - media, community, safety, violence, policy, youth
+   - displacement, government, structural racism, neighborhood events
+
+2. POLICY DOCS: Boston city policy documents including:
+   - Boston Anti-Displacement Plan Analysis.txt
+   - Boston Slow Streets Plan Analysis.txt
+   - Imagine Boston 2030 Analysis.txt
+
+Your task: Analyze the user's question and decide what data to retrieve.
+
+USER QUESTION: {query}
+
+Respond in JSON format:
+{{
+  "doc_types": ["transcript", "policy", or "both"],
+  "transcript_tags": ["tag1", "tag2"] or null,
+  "policy_sources": ["filename.txt"] or null,
+  "k_results": 5
+}}
+
+Be strategic:
+- Use 1-2 most relevant tags maximum (not all possible tags)
+- Only specify policy sources if question is about a specific plan
+    """
+
+    response = model.generate_content(planning_prompt, generation_config={"temperature": 0})
+
+    # Parse JSON response
+    try:
+        # Extract JSON from response (might be wrapped in markdown)
+        content = (getattr(response, "text", "") or "").strip()
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+
+        plan = json.loads(content)
+        return plan
+    except Exception as e:
+        print(f"Error parsing plan: {e}")
+        print(f"Raw response: {getattr(response, 'text', '')}")
+        # Fallback plan
+        return {
+            "doc_types": ["both"],
+            "transcript_tags": None,
+            "policy_sources": None,
+            "k_results": 5,
+        }
+
+
+def execute_retrieval(query, plan):
+    """
+    Step 2: Execute retrieval based on the LLM's plan.
+    """
+    results = []
+    doc_types = plan.get("doc_types", ["both"])
+    k = plan.get("k_results", 5)
+    
+    # Handle different doc_type strategies
+    if "transcript" in doc_types or "both" in doc_types:
+        # Retrieve transcripts
+        tags = plan.get("transcript_tags")
+        transcript_results = retrieve_transcripts(query, tags=tags, k=k)
+        results.append(transcript_results)
+    
+    if "policy" in doc_types or "both" in doc_types:
+        # Retrieve policies
+        sources = plan.get("policy_sources")
+        
+        if sources:
+            # Retrieve from specific sources
+            for source in sources:
+                policy_results = retrieve_policies(query, k=k, source=source)
+                results.append(policy_results)
+        else:
+            # Retrieve from all policies
+            policy_results = retrieve_policies(query, k=k)
+            results.append(policy_results)
+    
+    # Combine all results
+    combined = {
+        'query': query,
+        'chunks': [],
+        'metadata': [],
+        'scores': None
+    }
+    
+    for result in results:
+        combined['chunks'].extend(result['chunks'])
+        combined['metadata'].extend(result['metadata'])
+    
+    return combined
+
+
+def generate_answer(query, retrieval_result, plan):
+    """
+    Step 3: Generate final answer using retrieved context.
+    """
+    if not retrieval_result['chunks']:
+        return "No relevant information found.", None
+
+    # Build context from retrieved chunks
+    context_parts = []
+    for i, (chunk, meta) in enumerate(zip(retrieval_result['chunks'], retrieval_result['metadata']), 1):
+        source = meta.get('source', 'Unknown')
+        doc_type = meta.get('doc_type', 'unknown')
+        tags = meta.get('tags', [])
+
+        context_parts.append(f"[Source {i}: {source} ({doc_type}){' - Tags: ' + ', '.join(tags) if tags else ''}]")
+        context_parts.append(chunk)
+        context_parts.append("")
+
+    context = "\n".join(context_parts)
+
+    # Create answer prompt
+    answer_prompt = f"""You are a helpful assistant analyzing Boston community data.
+
+Answer the question in 2-3 concise paragraphs. Be conversational and direct.
+- Cite key sources [Source X]
+- Focus on the most important points
+- Keep it brief and clear
+
+SOURCES:
+{context}
+
+QUESTION: {query}
+
+ANSWER (2-3 paragraphs max):"""
+
+    client, model_name = _get_gemini_client()
+    model = client.GenerativeModel(model_name)
+    response = model.generate_content(answer_prompt, generation_config={"temperature": 0.3})
+
+    return (getattr(response, "text", "") or "").strip(), context_parts
+
+
+def two_step_rag(query, verbose=True):
+    """
+    Complete two-step RAG pipeline.
+    
+    Args:
+        query: User's question
+        verbose: Whether to show intermediate steps
+    """
+    print(f"\n{'='*80}")
+    print(f"QUESTION: {query}")
+    print(f"{'='*80}\n")
+    
+    # Step 1: Plan retrieval
+    if verbose:
+        print("🧠 STEP 1: Planning retrieval strategy...")
+    
+    plan = plan_retrieval(query)
+    
+    if verbose:
+        print(f"\nRetrieval Plan:")
+        print(f"  Doc Types: {plan.get('doc_types')}")
+        print(f"  Transcript Tags: {plan.get('transcript_tags')}")
+        print(f"  Policy Sources: {plan.get('policy_sources')}")
+        print(f"  Results to retrieve: {plan.get('k_results')}")
+    
+    # Step 2: Execute retrieval
+    if verbose:
+        print(f"\n🔍 STEP 2: Retrieving relevant documents...")
+    
+    results = execute_retrieval(query, plan)
+    
+    if verbose:
+        print(f"\nRetrieved {len(results['chunks'])} chunks:")
+        for i, meta in enumerate(results['metadata'], 1):
+            doc_type = meta.get('doc_type', 'unknown')
+            source = meta.get('source', 'Unknown')
+            tags = meta.get('tags', '')  # Tags are stored as string
+            print(f"  {i}. [{doc_type}] {source}{' (' + tags + ')' if tags else ''}")
+    
+    # Step 3: Generate answer
+    if verbose:
+        print(f"\n✨ STEP 3: Generating answer...")
+    
+    answer, context = generate_answer(query, results, plan)
+    
+    if verbose:
+        print(f"\n{'='*80}")
+    print(f"\nANSWER:\n{answer}")
+    print(f"\n{'='*80}\n")
+    
+    return {
+        'query': query,
+        'plan': plan,
+        'retrieval': results,
+        'answer': answer
+    }
+
+
+def demo_1():
+    """Demo: Media representation question"""
+    print("\n🎯 DEMO 1: Community Perspectives on Media")
+    print("-" * 80)
+    
+    query = "How do community members describe media representation of their neighborhoods?"
+    two_step_rag(query, verbose=True)
+
+
+def demo_2():
+    """Demo: Policy question"""
+    print("\n🎯 DEMO 2: Housing Policy Strategies")
+    print("-" * 80)
+    
+    query = "What strategies does Boston have for preventing displacement and ensuring affordable housing?"
+    two_step_rag(query, verbose=True)
+
+
+def demo_3():
+    """Demo: Compare policy vs sentiment"""
+    print("\n🎯 DEMO 3: Safety - Policy vs Community Concerns")
+    print("-" * 80)
+    
+    query = "What do community members say about safety, and how do city policies address these concerns?"
+    two_step_rag(query, verbose=True)
+
+
+def demo_4():
+    """Demo: Complex multi-faceted question"""
+    print("\n🎯 DEMO 4: Complex Query - Youth and Violence")
+    print("-" * 80)
+    
+    query = "What are the perspectives on youth involvement in violence, and what solutions do people suggest?"
+    two_step_rag(query, verbose=True)
+
+
+def demo_interactive():
+    """Interactive demo"""
+    print("\n🎯 INTERACTIVE DEMO")
+    print("-" * 80)
+    
+    query = input("\nEnter your question: ").strip()
+    if not query:
+        query = "What do people say about gentrification in Boston?"
+        print(f"Using default: {query}")
+    
+    verbose = input("\nShow detailed steps? (y/n, default=y): ").strip().lower() != 'n'
+    
+    two_step_rag(query, verbose=verbose)
+
+
+def demo_vectordb_mixed():
+    """Single-step demo: Gemini plans → unified vectordb retrieve."""
+    print("\n🎯 MIXED VECTORDb DEMO")
+    print("-" * 80)
+
+    query = input("\nEnter your question: ").strip()
+    if not query:
+        query = "What do people say about safety, and what events are happening this week?"
+        print(f"Using default: {query}")
+
+    plan = plan_vectordb_mixed(query)
+
+    results = retrieve(
+        query,
+        k=plan.get("k", 5),
+        doc_type=plan.get("doc_types"),
+        tags=plan.get("tags"),
+        source=plan.get("source"),
+    )
+
+    print("\nRetrieval plan:")
+    print(json.dumps(plan, indent=2, ensure_ascii=False))
+
+    print("\nRetrieval results (summary):\n")
+    print(format_results(results))
+
+
+def main():
+    """Run demos"""
+    print("\n" + "="*80)
+    print(" TWO-STEP AGENTIC RAG DEMO")
+    print(" Step 1: LLM plans retrieval → Step 2: Execute → Step 3: Generate answer")
+    print("="*80)
+    
+    print("\nDemo scenarios:")
+    print("  1. Media representation (transcripts)")
+    print("  2. Housing policy (policy docs)")
+    print("  3. Safety (mixed)")
+    print("  4. Complex multi-faceted query")
+    print("  5. Interactive - your own question")
+    print("  6. Run all demos")
+    print("  7. Mixed vectordb (Gemini-planned retrieve)")
+    print("\nNOTE: Calendar events are now SQL-only. Use unified_chatbot.py for event queries.")
+    
+    choice = input("\nSelect demo (1-7, default=1): ").strip() or "1"
+    
+    if choice == "1":
+        demo_1()
+    elif choice == "2":
+        demo_2()
+    elif choice == "3":
+        demo_3()
+    elif choice == "4":
+        demo_4()
+    elif choice == "5":
+        demo_interactive()
+    elif choice == "6":
+        demo_1()
+        demo_2()
+        demo_3()
+        
+        more = input("\nContinue with demo 4? (y/n): ").strip().lower()
+        if more == 'y':
+            demo_4()
+        
+        interactive = input("\nTry interactive demo? (y/n): ").strip().lower()
+        if interactive == 'y':
+            demo_interactive()
+    elif choice == "7":
+        demo_vectordb_mixed()
+    
+    print("\n" + "="*80)
+    print("Demo complete! ✨")
+    print("="*80 + "\n")
+
+
+if __name__ == "__main__":
+    main()

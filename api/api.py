@@ -35,10 +35,9 @@ from flask_cors import CORS
 
 from geospatial_context import process_geospatial_message
 
-# Load environment variables
-load_dotenv()
-
 BASE_DIR = Path(__file__).parent
+_ROOT_DIR = BASE_DIR.parent
+load_dotenv(_ROOT_DIR / ".env")
 
 
 # Configuration constants

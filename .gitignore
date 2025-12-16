@@ -12,6 +12,8 @@ env/
 pip-log.txt
 pip-delete-this-directory.txt
 conda
+on_the_porch/rag stuff/rags/*
+on_the_porch/pocEnv/*
 
 # 3️⃣ Environment Variables (SECURITY: Protect API Keys & Secrets)
 .env
@@ -25,8 +27,7 @@ llm_query_log.csv
 logs/
 *.sqlite
 *.db
-*.sqlite3
-*.sql
+
 
 
 # 5️⃣ Flask & Gunicorn Deployment Files
@@ -84,6 +85,7 @@ cookies.txt
 !experiment-PIT/public/data/process_311.ts
 !experiment-PIT/public/data/process_911.ts
 api/datastore/*
+on_the_porch/rag_stuff/data/*
 
 # exception to the rule
 **/cache/.gitkeep
@@ -97,3 +99,12 @@ api/datastore/*
 !api/datastore/Boston Anti-Displacement Plan Analysis.txt
 !api/*.sql
 !setup/*.sql
+/on_the_porch/vectordb_new
+on_the_porch/data_ingestion/gmail_token.json
+on_the_porch/data_ingestion/gmail_credentials.json
+on_the_porch/data_ingestion/.email_sync_state.json
+on_the_porch/data_ingestion/.sync_state.json
+on_the_porch/data_ingestion/ingestion_log.jsonl
+on_the_porch/data_ingestion/ontheporch-ebc5a60fc214.json
+on_the_porch/data_ingestion/temp_downloads
+on_the_porch/data_ingestion/reset_table.sql

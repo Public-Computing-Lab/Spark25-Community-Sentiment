@@ -1,0 +1,128 @@
+# Unified environment configuration for ml-misi-community-sentiment
+
+# Copy these into a .env file at the repo root (./.env)
+
+
+
+# ============================================================================
+
+# Gemini AI Configuration
+
+# ============================================================================
+
+# Get your API key from: https://makersuite.google.com/app/apikey
+
+GEMINI_API_KEY=your-gemini-api-key
+
+GEMINI_MODEL=gemini-2.5-flash-lite
+
+
+
+# Embedding model for vector search (RAG)
+
+GEMINI_EMBED_MODEL=models/text-embedding-004
+
+
+
+# ============================================================================
+
+# API / Flask configuration
+
+# ============================================================================
+
+RETHINKAI_API_KEYS=your-api-key-1,your-api-key-2
+
+API_HOST=127.0.0.1
+
+API_PORT=8888
+
+FLASK_SECRET_KEY=change-me-in-prod
+
+FLASK_SESSION_COOKIE_SECURE=false
+
+
+
+# ============================================================================
+
+# MySQL Database Configuration (311, 911, events)
+
+# ============================================================================
+
+MYSQL_HOST=127.0.0.1
+
+MYSQL_PORT=3306
+
+MYSQL_USER=root
+
+MYSQL_PASSWORD=your-mysql-password
+
+MYSQL_DB=rethink_ai_boston
+
+
+
+
+# ============================================================================
+
+# Vector Database Configuration
+
+# ============================================================================
+
+# Path to ChromaDB vector database directory (used by data_ingestion, relative to on_the_porch/data_ingestion)
+
+VECTORDB_DIR=../vectordb_new
+
+
+
+# ============================================================================
+
+# LangChain / LangSmith Tracing (Optional)
+
+# ============================================================================
+
+LANGCHAIN_TRACING_V2=false
+
+LANGSMITH_TRACING=false
+
+LANGCHAIN_API_KEY=
+
+LANGSMITH_API_KEY=
+
+LANGCHAIN_PROJECT=rethinkai-community-sentiment
+
+LANGSMITH_PROJECT=rethinkai-community-sentiment
+
+
+
+# ============================================================================
+
+# Data Ingestion (Google Drive + Email)
+
+# ============================================================================
+
+GOOGLE_DRIVE_FOLDER_ID=your-google-drive-folder-id
+
+GOOGLE_CREDENTIALS_PATH=service_account_credentials.json
+
+
+
+NEWSLETTER_EMAIL_ADDRESS=your-email@example.com
+
+GMAIL_CREDENTIALS_PATH=gmail_credentials.json
+
+GMAIL_TOKEN_PATH=gmail_token.json
+
+
+
+IMAP_SERVER=imap.gmail.com
+
+IMAP_PORT=993
+
+
+TEMP_DOWNLOAD_DIR=./temp_downloads
+
+EMAIL_LOOKBACK_DAYS=7
+
+MAX_FILES_PER_RUN=100
+
+VERBOSE_LOGGING=true
+

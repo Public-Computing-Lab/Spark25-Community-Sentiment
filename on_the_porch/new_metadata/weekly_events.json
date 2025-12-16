@@ -1,0 +1,64 @@
+{
+  "schema": "mysql",
+  "table": "weekly_events",
+  "description": "Events schedule extracted from PDF calendars; one row per event with event name, original date label, normalized start/end dates, and raw text.",
+  "columns": {
+    "id": {
+      "data_type": "int",
+      "is_numeric": true,
+      "notes": "Auto-increment primary key."
+    },
+    "source_pdf": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "notes": "Original PDF file name or identifier where the event was extracted from."
+    },
+    "page_number": {
+      "data_type": "int",
+      "is_numeric": true,
+      "notes": "1-based page number in the source PDF where this event appears."
+    },
+    "event_name": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "notes": "Short human-readable name or title of the event (e.g., 'Community Meeting', 'Youth Workshop')."
+    },
+    "event_date": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "notes": "Date or date label as written in the PDF (e.g., 'Monday', 'June 3–5, 2025', 'All week'). This is for display and fuzzy text filtering. DO NOT use this column for date comparisons - use start_date or end_date instead."
+    },
+    "start_date": {
+      "data_type": "date",
+      "is_numeric": false,
+      "notes": "Normalized calendar date (YYYY-MM-DD) when the event starts, when it can be inferred from the text. USE THIS for date comparisons and filtering (e.g., BETWEEN, >=, <=)."
+    },
+    "end_date": {
+      "data_type": "date",
+      "is_numeric": false,
+      "notes": "Normalized calendar date (YYYY-MM-DD) when the event ends; may be the same as start_date or null if unknown. USE THIS for date comparisons and filtering (e.g., BETWEEN, >=, <=)."
+    },
+    "start_time": {
+      "data_type": "time",
+      "is_numeric": false,
+      "notes": "24-hour time (HH:MM:SS or HH:MM) when the event starts, if specified."
+    },
+    "end_time": {
+      "data_type": "time",
+      "is_numeric": false,
+      "notes": "24-hour time when the event ends, if specified."
+    },
+    "raw_text": {
+      "data_type": "text",
+      "is_numeric": false,
+      "notes": "Original line or snippet of text from the calendar describing this event."
+    },
+    "created_at": {
+      "data_type": "timestamp",
+      "is_numeric": false,
+      "notes": "Timestamp when this row was inserted."
+    }
+  }
+}
+
+

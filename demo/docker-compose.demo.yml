@@ -1,0 +1,13 @@
+services:
+  mysql_demo:
+    image: mysql:8
+    container_name: mysql_demo
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: sentiment_demo
+      MYSQL_USER: demo_user
+      MYSQL_PASSWORD: demo_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql_demo_dump.sql:/docker-entrypoint-initdb.d/mysql_demo_dump.sql:ro
