@@ -12,7 +12,7 @@ This script follows this structure to find and download the latest PDF.
 import requests
 from bs4 import BeautifulSoup
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, parse_qs, unquote
 import re
 from typing import Optional
 
@@ -118,14 +118,40 @@ def download_latest_pdf(
     
     soup = BeautifulSoup(response.content, 'html.parser')
     
-    # Find the PDF in an <embed> tag
+    # Find the PDF URL - check iframe first (EmbedPress plugin uses iframes)
     pdf_url = None
-    embed_tag = soup.find('embed', src=True)
-    if embed_tag:
-        pdf_url = embed_tag.get('src')
-        if pdf_url:
-            pdf_url = urljoin(latest_issue_url, pdf_url)
-            print(f"Step 6: Found PDF in embed tag: {pdf_url}")
+    
+    # Check for iframe (EmbedPress plugin)
+    iframe_tag = soup.find('iframe', src=True)
+    if iframe_tag:
+        iframe_src = iframe_tag.get('src')
+        if iframe_src:
+            iframe_src = urljoin(latest_issue_url, iframe_src)
+            print(f"Step 6: Found iframe[src]: {iframe_src}")
+            
+            # Check if it's an admin-ajax.php viewer URL - extract the actual PDF URL
+            if 'admin-ajax.php' in iframe_src and 'file=' in iframe_src:
+                parsed = urlparse(iframe_src)
+                params = parse_qs(parsed.query)
+                if 'file' in params:
+                    # The file parameter is URL-encoded, decode it
+                    actual_pdf_url = unquote(params['file'][0])
+                    pdf_url = actual_pdf_url
+                    print(f"  Extracted actual PDF URL from viewer: {pdf_url}")
+                else:
+                    pdf_url = iframe_src
+            else:
+                # Direct iframe to PDF
+                pdf_url = iframe_src
+    
+    # Check for embed tag (fallback)
+    if not pdf_url:
+        embed_tag = soup.find('embed', src=True)
+        if embed_tag:
+            pdf_url = embed_tag.get('src')
+            if pdf_url:
+                pdf_url = urljoin(latest_issue_url, pdf_url)
+                print(f"Step 6: Found PDF in embed tag: {pdf_url}")
     
     # Fallback: Look for PDF in any element's src or data attributes
     if not pdf_url:
@@ -133,7 +159,14 @@ def download_latest_pdf(
             for attr in ['src', 'data-url', 'data-src', 'data-href']:
                 value = elem.get(attr, '')
                 if value and '.pdf' in str(value).lower():
-                    pdf_url = urljoin(latest_issue_url, value)
+                    temp_url = urljoin(latest_issue_url, value)
+                    # Also check if it's an admin-ajax URL and extract the file parameter
+                    if 'admin-ajax.php' in temp_url and 'file=' in temp_url:
+                        parsed = urlparse(temp_url)
+                        params = parse_qs(parsed.query)
+                        if 'file' in params:
+                            temp_url = unquote(params['file'][0])
+                    pdf_url = temp_url
                     print(f"Step 6: Found PDF in {elem.name}[{attr}]: {pdf_url}")
                     break
             if pdf_url:
@@ -149,8 +182,11 @@ def download_latest_pdf(
         pdf_response = requests.get(pdf_url, timeout=60, stream=True)
         pdf_response.raise_for_status()
         
-        # Determine filename
-        # Try to get filename from Content-Disposition header
+        # Verify it's actually a PDF by checking content type
+        content_type = pdf_response.headers.get('Content-Type', '').lower()
+        is_likely_pdf = 'application/pdf' in content_type
+        
+        # Determine filename first (before consuming stream)
         content_disposition = pdf_response.headers.get('Content-Disposition', '')
         if 'filename=' in content_disposition:
             filename = re.findall(r'filename="?([^"]+)"?', content_disposition)[0]
@@ -167,11 +203,30 @@ def download_latest_pdf(
         # Clean filename
         filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
         
-        # Save the PDF
+        # Save the PDF - iterate once and validate first chunk
         output_path = output_dir / filename
+        first_chunk_validated = False
+        
         with open(output_path, 'wb') as f:
             for chunk in pdf_response.iter_content(chunk_size=8192):
-                f.write(chunk)
+                if chunk:  # filter out keep-alive chunks
+                    # Validate first chunk if Content-Type didn't indicate PDF
+                    if not first_chunk_validated and not is_likely_pdf:
+                        if len(chunk) >= 4 and not chunk[:4].startswith(b'%PDF'):
+                            print(f"Error: Downloaded content doesn't appear to be a PDF (Content-Type: {content_type})")
+                            output_path.unlink()  # Delete invalid file
+                            return None
+                        first_chunk_validated = True
+                    
+                    f.write(chunk)
+        
+        # Final verification: check saved file is valid PDF
+        with open(output_path, 'rb') as f:
+            saved_first_bytes = f.read(4)
+            if not saved_first_bytes.startswith(b'%PDF'):
+                print(f"Error: Downloaded file is not a valid PDF")
+                output_path.unlink()  # Delete invalid file
+                return None
         
         print(f"✓ Successfully downloaded: {output_path}")
         print(f"  File size: {output_path.stat().st_size / 1024:.2f} KB")
