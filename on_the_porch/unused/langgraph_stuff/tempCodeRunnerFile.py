@@ -1,1 +1,0 @@
-What are the top 5 request types by count?
