@@ -184,6 +184,10 @@ def ensure_interaction_log_table():
                 client_query TEXT,
                 app_response TEXT,
                 client_response_rating VARCHAR(50),
+                flagged BOOLEAN DEFAULT FALSE,
+                flag_reason VARCHAR(100),
+                flag_details TEXT,
+                flagged_at TIMESTAMP NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
