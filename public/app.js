@@ -146,7 +146,7 @@ async function updateApiStatus() {
 // Chat Functions
 // ============================================================================
 
-function addMessage({ text, type, sources, mode, isTyping }) {
+function addMessage({ text, type, sources, mode, isTyping, logId }) {
   if (!elements.chatMessages) return null;
   
   const messageEl = document.createElement('div');
@@ -219,9 +219,21 @@ function addMessage({ text, type, sources, mode, isTyping }) {
     }
   }
   
+  if (logId) messageEl.dataset.logId = logId;
   messageEl.appendChild(avatar);
   messageEl.appendChild(content);
   elements.chatMessages.appendChild(messageEl);
+
+  if (logId && type === 'assistant') {
+    const flagBtn = document.createElement('button');
+    flagBtn.textContent = '🚩';
+    flagBtn.title = 'Report a Problem';
+    flagBtn.style.cssText = 'background:none;border:none;cursor:pointer;opacity:0.4;font-size:13px;padding:4px;margin-top:4px;transition:opacity 0.2s;';
+    flagBtn.addEventListener('mouseenter', () => flagBtn.style.opacity = '1');
+    flagBtn.addEventListener('mouseleave', () => flagBtn.style.opacity = '0.4');
+    flagBtn.addEventListener('click', () => openFlagModal(logId));
+    content.appendChild(flagBtn);
+  }
   
   // Scroll to bottom
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
@@ -303,6 +315,7 @@ async function handleChatSubmit(e) {
         type: 'assistant',
         sources,
         mode: '', // Don't show mode to users
+        logId: data.log_id, // For feedback/reporting
       });
       
       // NOW add both messages to conversation history after successful response
@@ -509,6 +522,34 @@ function initApp() {
     }
   });
 }
+
+// ============================================================================
+// Flag Modal
+// ============================================================================
+let currentFlagLogId = null;
+
+function openFlagModal(logId) {
+  currentFlagLogId = logId;
+  document.querySelectorAll('input[name="flag-reason"]').forEach(r => r.checked = false);
+  document.getElementById('flag-detail').value = '';
+  document.getElementById('flag-modal').style.display = 'flex';
+}
+
+document.getElementById('flag-cancel').addEventListener('click', () => {
+  document.getElementById('flag-modal').style.display = 'none';
+});
+
+document.getElementById('flag-submit').addEventListener('click', async () => {
+  const reason = document.querySelector('input[name="flag-reason"]:checked')?.value;
+  if (!reason) { alert('Please select a reason.'); return; }
+  const detail = document.getElementById('flag-detail').value.trim();
+
+  await ApiClient.flagInteraction(currentFlagLogId, reason, detail);
+
+  const flagBtn = document.querySelector(`[data-log-id="${currentFlagLogId}"] button`);
+  if (flagBtn) { flagBtn.textContent = '✅'; flagBtn.disabled = true; }
+  document.getElementById('flag-modal').style.display = 'none';
+});
 
 // Start app when DOM is ready
 if (document.readyState === 'loading') {

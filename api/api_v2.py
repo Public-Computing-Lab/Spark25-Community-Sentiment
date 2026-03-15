@@ -296,6 +296,8 @@ def log_interaction(
     mode: str = "",
     log_id: Optional[int] = None,
     rating: str = "",
+    flag_reason: str = "",
+    flag_details: str = "",
 ) -> Optional[int]:
     """Log an interaction to the database."""
     conn = None
@@ -310,10 +312,16 @@ def log_interaction(
             if rating:
                 update_fields.append("client_response_rating = %s")
                 values.append(rating)
+            if flag_reason:
+                update_fields.append("flagged = TRUE")
+                update_fields.append("flag_reason = %s")
+                update_fields.append("flag_details = %s")
+                update_fields.append("flagged_at = NOW()")
+                values.append(flag_reason)
+                values.append(flag_details)
             if app_response:
                 update_fields.append("app_response = %s")
                 values.append(app_response)
-            
             if update_fields:
                 values.append(log_id)
                 query = f"UPDATE interaction_log SET {', '.join(update_fields)} WHERE id = %s"
@@ -506,6 +514,8 @@ def log_endpoint():
     elif request.method == "PUT":
         log_id = data.get("log_id")
         rating = data.get("client_response_rating", "")
+        flag_reason = data.get("flag_reason", "")
+        flag_details = data.get("flag_details", "")
         
         if not log_id:
             return jsonify({"error": "log_id is required"}), 400
@@ -516,6 +526,8 @@ def log_endpoint():
             app_response="",
             log_id=log_id,
             rating=rating,
+            flag_reason=flag_reason,
+            flag_details=flag_details,
         )
         
         if updated_id:

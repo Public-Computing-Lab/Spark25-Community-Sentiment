@@ -131,6 +131,17 @@ async function logInteraction(data) {
   });
 }
 
+async function flagInteraction(logId, flagReason, flagDetails) {
+  return apiRequest('/log', {
+    method: 'PUT',
+    body: JSON.stringify({
+      log_id: logId,
+      flag_reason: flagReason,
+      flag_details: flagDetails,
+    }),
+  });
+}
+
 // Export API client
 window.ApiClient = {
   config: ApiConfig,
@@ -138,4 +149,5 @@ window.ApiClient = {
   sendChatMessage,
   fetchEvents,
   logInteraction,
+  flagInteraction
 };
