@@ -228,64 +228,68 @@ def before_request_handler():
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
+DOC_TYPE_DIRS = {
+    "policy": "Data/VectorDB_text",
+    "transcript": "Data/AI meeting transcripts",
+    "calendar_event": "Data/newsletters",
+}
+
 def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Extract source citations from the result based on mode."""
     sources = []
-    
+
     if mode == "sql":
-        # Extract table name from SQL result
         sql_query = result.get("sql", "")
         if sql_query:
-            # Simple extraction - look for FROM clause
             import re
             match = re.search(r'FROM\s+`?(\w+)`?', sql_query, re.IGNORECASE)
             if match:
                 sources.append({"type": "sql", "table": match.group(1)})
-    
+
     elif mode == "rag":
-        # Extract from RAG metadata
         metadata = result.get("metadata", [])
         seen = set()
-        for meta in metadata[:5]:  # Limit to 5 sources
+        for meta in metadata[:5]:
             source = meta.get("source", "Unknown")
             doc_type = meta.get("doc_type", "unknown")
             key = f"{source}:{doc_type}"
             if key not in seen:
                 seen.add(key)
+                base_dir = DOC_TYPE_DIRS.get(doc_type, "Data")
                 sources.append({
                     "type": "rag",
                     "source": source,
-                    "doc_type": doc_type
+                    "doc_type": doc_type,
+                    "path": str(Path(base_dir) / source),
                 })
-    
+
     elif mode == "hybrid":
-        # Combine SQL and RAG sources
         sql_part = result.get("sql", {})
         rag_part = result.get("rag", {})
-        
-        # SQL source
+
         sql_query = sql_part.get("sql", "") if isinstance(sql_part, dict) else ""
         if sql_query:
             import re
             match = re.search(r'FROM\s+`?(\w+)`?', sql_query, re.IGNORECASE)
             if match:
                 sources.append({"type": "sql", "table": match.group(1)})
-        
-        # RAG sources
+
         rag_metadata = rag_part.get("metadata", []) if isinstance(rag_part, dict) else []
         seen = set()
-        for meta in rag_metadata[:3]:  # Limit to 3 RAG sources in hybrid
+        for meta in rag_metadata[:3]:
             source = meta.get("source", "Unknown")
             doc_type = meta.get("doc_type", "unknown")
             key = f"{source}:{doc_type}"
             if key not in seen:
                 seen.add(key)
+                base_dir = DOC_TYPE_DIRS.get(doc_type, "Data")
                 sources.append({
                     "type": "rag",
                     "source": source,
-                    "doc_type": doc_type
+                    "doc_type": doc_type,
+                    "path": str(Path(base_dir) / source),
                 })
-    
+
     return sources
 
 
