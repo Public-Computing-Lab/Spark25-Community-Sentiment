@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: pocketflow
+Version: 0.0.3
+Summary: Pocket Flow: 100-line LLM framework. Let Agents build Agents!
+Home-page: https://github.com/The-Pocket/PocketFlow
+Author: Zachary Huang
+Author-email: zh2408@columbia.edu
+License-File: LICENSE
+Dynamic: author
+Dynamic: author-email
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: summary
