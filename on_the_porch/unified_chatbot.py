@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 _THIS_FILE = Path(__file__).resolve()
 _REAL_DIR = _THIS_FILE.parent
 _ROOT_DIR = _REAL_DIR.parent.parent
-load_dotenv(_ROOT_DIR / ".env")
+load_dotenv(_REAL_DIR / ".env")
 # RAG utilities live in `on_the_porch/rag stuff`
 _RAG_DIR = _REAL_DIR / "rag stuff"
 if str(_RAG_DIR) not in sys.path:

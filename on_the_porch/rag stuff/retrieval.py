@@ -1,10 +1,10 @@
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from pathlib import Path
 import os
 import google.generativeai as genai  # type: ignore
 
 VECTORDB_DIR = Path("../vectordb_new")
-GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "models/text-embedding-004")
+GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001")
 
 
 def _configure_gemini() -> None:
@@ -24,7 +24,7 @@ class GeminiEmbeddings:
         self.model = model or GEMINI_EMBED_MODEL
 
     def _embed(self, text: str):
-        res = genai.embed_content(model=self.model, content=text)
+        res = genai.embed_content(model=self.model, content=text,output_dimensionality=768)
         return res["embedding"]
 
     def embed_documents(self, texts):
