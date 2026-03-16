@@ -75,38 +75,28 @@ const sourceMapping = {
 function formatSource(source) {
   if (source.type === 'sql' && source.table) {
     const tableName = source.table.toLowerCase();
-    // Check if we have a mapping for this table
     if (sourceMapping[tableName]) {
-      return sourceMapping[tableName];
+      return { label: sourceMapping[tableName], path: null };
     }
-    // Check for partial matches (e.g., table names with prefixes)
     for (const [key, value] of Object.entries(sourceMapping)) {
       if (tableName.includes(key) || key.includes(tableName)) {
-        return value;
+        return { label: value, path: null };
       }
     }
-    // Check for common patterns
     if (tableName.includes('crime') || tableName.includes('911') || tableName.includes('shot')) {
-      return 'Crime data from https://data.boston.gov/';
+      return { label: 'Crime data from https://data.boston.gov/', path: null };
     }
     if (tableName.includes('311') || tableName.includes('service')) {
-      return '311 Service Requests from https://data.boston.gov/';
+      return { label: '311 Service Requests from https://data.boston.gov/', path: null };
     }
     if (tableName.includes('event') || tableName.includes('newsletter') || tableName.includes('weekly')) {
-      return 'Community newsletters';
+      return { label: 'Community newsletters', path: null };
     }
-    // Default fallback for SQL tables
-    return `City data from https://data.boston.gov/`;
+    return { label: 'City data from https://data.boston.gov/', path: null };
   } else if (source.type === 'rag' && source.source) {
-    const sourceName = source.source.toLowerCase();
-    // Check if it's an event-related source
-    if (sourceName.includes('event') || sourceName.includes('newsletter') || sourceName.includes('weekly')) {
-      return 'Community newsletters';
-    }
-    // For other RAG sources, use the source name or a friendly description
-    return source.source || 'Community documents';
+    return { label: source.source, path: source.path || null };
   }
-  return 'Community data';
+  return { label: 'Community data', path: null };
 }
 
 // ============================================================================
@@ -201,24 +191,38 @@ function addMessage({ text, type, sources, mode, isTyping, logId }) {
       meta.appendChild(label);
       
       // Get unique formatted sources
-      const formattedSources = new Set();
+      const formattedSources = [];
+      const seen = new Set();
       sources.forEach(source => {
-        const formatted = formatSource(source);
-        formattedSources.add(formatted);
+          const fmt = formatSource(source);
+          const key = fmt.label;
+          if (!seen.has(key)) {
+              seen.add(key);
+              formattedSources.push(fmt);
+          }
       });
+
+      formattedSources.forEach(fmt => {
+          const pill = document.createElement('span');
+          pill.className = 'meta-pill';
       
-      // Create pills for each unique source
-      formattedSources.forEach(formattedSource => {
-        const pill = document.createElement('span');
-        pill.className = 'meta-pill';
-        pill.textContent = formattedSource;
-        meta.appendChild(pill);
+          if (fmt.path) {
+              const a = document.createElement('a');
+              a.href = `file:///${fmt.path.replace(/\\/g, '/')}`;
+              a.textContent = fmt.label;
+              a.target = '_blank';
+              a.style.cssText = 'color: inherit; text-decoration: underline; text-underline-offset: 2px;';
+              pill.appendChild(a);
+          } else {
+              pill.textContent = fmt.label;
+          }
+      
+          meta.appendChild(pill);
       });
-      
+
       content.appendChild(meta);
     }
   }
-  
   if (logId) messageEl.dataset.logId = logId;
   messageEl.appendChild(avatar);
   messageEl.appendChild(content);
@@ -555,5 +559,4 @@ document.getElementById('flag-submit').addEventListener('click', async () => {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
-  initApp();
-}
+  initApp();}

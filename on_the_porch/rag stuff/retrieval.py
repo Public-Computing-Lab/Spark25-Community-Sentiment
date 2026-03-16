@@ -4,7 +4,7 @@ import os
 import google.generativeai as genai  # type: ignore
 
 VECTORDB_DIR = Path("../vectordb_new")
-GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "models/text-embedding-004")
+GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "models/gemini-embedding-001")
 
 
 def _configure_gemini() -> None:
