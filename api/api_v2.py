@@ -230,11 +230,10 @@ def before_request_handler():
 # =============================================================================
 
 DOC_TYPE_DIRS = {
-    "policy": "http://localhost:8000",
+    "policy": "", 
     "transcript": "Data/AI meeting transcripts",
     "calendar_event": "Data/newsletters",
 }
-
 def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
     sources = []
 
