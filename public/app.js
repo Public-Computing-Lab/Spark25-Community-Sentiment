@@ -62,37 +62,40 @@ function formatTime(timeStr) {
 }
 
 // Map SQL table names to user-friendly source descriptions
+// updated with paths to be hyperlinked 
 const sourceMapping = {
-  'bos311_data': '311 Service Requests from https://data.boston.gov/',
-  'shots_fired_data': 'Crime data from https://data.boston.gov/',
-  'homicide_data': 'Crime data from https://data.boston.gov/',
-  'weekly_events': 'Community newsletters',
-  'events': 'Community newsletters',
-  'crime': 'Crime data from https://data.boston.gov/',
-  'crime_incident': 'Crime data from https://data.boston.gov/',
+  'bos311_data': { label: '311 Service Requests', path: 'https://data.boston.gov/dataset/311-service-requests' },
+  'shots_fired_data': { label: 'Crime data (shots fired)', path: 'https://data.boston.gov/dataset/crime-incident-reports-august-2015-to-date-source-new-system' },
+  'homicide_data': { label: 'Crime data (homicides)', path: 'https://data.boston.gov/dataset/crime-incident-reports-august-2015-to-date-source-new-system' },
+  'weekly_events': { label: 'Community newsletters', path: null },
+  'events': { label: 'Community newsletters', path: null },
+  'crime': { label: 'Crime data', path: 'https://data.boston.gov/dataset/crime-incident-reports-august-2015-to-date-source-new-system' },
+  'crime_incident': { label: 'Crime data', path: 'https://data.boston.gov/dataset/crime-incident-reports-august-2015-to-date-source-new-system' },
 };
 
+//store objects instead of strings 
+// return path for sql sources 
 function formatSource(source) {
   if (source.type === 'sql' && source.table) {
     const tableName = source.table.toLowerCase();
     if (sourceMapping[tableName]) {
-      return { label: sourceMapping[tableName], path: null };
+      return sourceMapping[tableName];
     }
     for (const [key, value] of Object.entries(sourceMapping)) {
       if (tableName.includes(key) || key.includes(tableName)) {
-        return { label: value, path: null };
+        return value;
       }
     }
     if (tableName.includes('crime') || tableName.includes('911') || tableName.includes('shot')) {
-      return { label: 'Crime data from https://data.boston.gov/', path: null };
+      return { label: 'Crime data', path: 'https://data.boston.gov/dataset/crime-incident-reports-august-2015-to-date-source-new-system' };
     }
     if (tableName.includes('311') || tableName.includes('service')) {
-      return { label: '311 Service Requests from https://data.boston.gov/', path: null };
+      return { label: '311 Service Requests', path: 'https://data.boston.gov/dataset/311-service-requests' };
     }
     if (tableName.includes('event') || tableName.includes('newsletter') || tableName.includes('weekly')) {
       return { label: 'Community newsletters', path: null };
     }
-    return { label: 'City data from https://data.boston.gov/', path: null };
+    return { label: 'City data', path: 'https://data.boston.gov' };
   } else if (source.type === 'rag' && source.source) {
     return { label: source.source, path: source.path || null };
   }
@@ -208,7 +211,7 @@ function addMessage({ text, type, sources, mode, isTyping, logId }) {
       
           if (fmt.path) {
               const a = document.createElement('a');
-              a.href = `file:///${fmt.path.replace(/\\/g, '/')}`;
+              a.href = fmt.path.startsWith('http') ? fmt.path : `file:///${fmt.path.replace(/\\/g, '/')}`;
               a.textContent = fmt.label;
               a.target = '_blank';
               a.style.cssText = 'color: inherit; text-decoration: underline; text-underline-offset: 2px;';
