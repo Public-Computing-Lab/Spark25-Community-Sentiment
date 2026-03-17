@@ -1,4 +1,6 @@
 flask
+argon2-cffi
+Authlib
 pymysql
 pocketflow 
 mysql
