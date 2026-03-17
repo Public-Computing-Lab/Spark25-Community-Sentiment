@@ -1,10 +1,22 @@
-from langchain_community.vectorstores import Chroma
-from pathlib import Path
 import os
+import re
+from pathlib import Path
+
+import chromadb
 import google.generativeai as genai  # type: ignore
+
+try:
+    from langchain_chroma import Chroma
+except ImportError:
+    from langchain_community.vectorstores import Chroma
 
 VECTORDB_DIR = Path("../vectordb_new")
 GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "models/gemini-embedding-001")
+_STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "how",
+    "i", "in", "is", "it", "me", "of", "on", "or", "that", "the", "this",
+    "to", "was", "what", "when", "where", "which", "who", "why", "with",
+}
 
 
 def _configure_gemini() -> None:
@@ -42,6 +54,105 @@ def load_vectordb():
         embedding_function=embeddings,
     )
     return vectordb
+
+
+def _normalize_query_terms(text: str) -> list[str]:
+    terms = re.findall(r"[a-z0-9]{3,}", (text or "").lower())
+    return [term for term in terms if term not in _STOPWORDS]
+
+
+def _matches_doc_type(metadata, doc_type) -> bool:
+    if not doc_type:
+        return True
+    current = metadata.get("doc_type")
+    if isinstance(doc_type, (list, tuple)):
+        allowed = {value for value in doc_type if value}
+        return current in allowed if allowed else True
+    return current == doc_type
+
+
+def _matches_source(metadata, source) -> bool:
+    if not source:
+        return True
+    return metadata.get("source") == source
+
+
+def _matches_tags(metadata, tags) -> bool:
+    if not tags:
+        return True
+    raw_tags = metadata.get("tags")
+    if not raw_tags:
+        return False
+    doc_tags = {tag.strip().lower() for tag in raw_tags.split(",") if tag.strip()}
+    requested = {tag.strip().lower() for tag in tags if tag and tag.strip()}
+    return bool(doc_tags & requested) if requested else True
+
+
+def _score_keyword_match(query: str, document: str, metadata) -> float:
+    query_lower = (query or "").lower().strip()
+    if not query_lower:
+        return 0.0
+
+    content_lower = (document or "").lower()
+    source_lower = str(metadata.get("source", "")).lower()
+    folder_lower = str(metadata.get("folder_category", "")).lower()
+    terms = _normalize_query_terms(query_lower)
+
+    score = 0.0
+
+    if query_lower in content_lower:
+        score += 10.0
+    if query_lower in source_lower:
+        score += 8.0
+
+    for term in terms:
+        score += min(content_lower.count(term), 5)
+        if term in source_lower:
+            score += 2.0
+        if term in folder_lower:
+            score += 1.0
+
+    return score
+
+
+def _load_raw_documents():
+    client = chromadb.PersistentClient(path=str(VECTORDB_DIR))
+    collection = client.get_collection("langchain")
+    count = collection.count()
+    if count <= 0:
+        return []
+    rows = collection.get(limit=count, include=["documents", "metadatas"])
+    documents = rows.get("documents") or []
+    metadatas = rows.get("metadatas") or []
+    return list(zip(documents, metadatas))
+
+
+def _keyword_retrieve(query, k=5, doc_type=None, tags=None, source=None):
+    rows = []
+    tag_matched_rows = []
+    for document, metadata in _load_raw_documents():
+        metadata = metadata or {}
+        if not _matches_doc_type(metadata, doc_type):
+            continue
+        if not _matches_source(metadata, source):
+            continue
+        score = _score_keyword_match(query, document, metadata)
+        if score <= 0:
+            continue
+        row = (score, document, metadata)
+        rows.append(row)
+        if _matches_tags(metadata, tags):
+            tag_matched_rows.append(row)
+
+    ranked_rows = tag_matched_rows if tag_matched_rows else rows
+    ranked_rows.sort(key=lambda item: item[0], reverse=True)
+    top_rows = ranked_rows[:k]
+    return {
+        "chunks": [document for _, document, _ in top_rows],
+        "metadata": [metadata for _, _, metadata in top_rows],
+        "scores": [score for score, _, _ in top_rows],
+        "query": query,
+    }
 
 
 def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None, vectordb=None):
@@ -84,9 +195,6 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None, 
     if k <= 0:
         k = 5
 
-    if vectordb is None:
-        vectordb = load_vectordb()
-    
     # Build filter dictionary (Chroma requires $and / $or for combinations)
     filter_dict = None
 
@@ -112,73 +220,68 @@ def retrieve(query, k=5, doc_type=None, tags=None, source=None, min_score=None, 
         filter_dict = doc_filter
     elif source:
         filter_dict = {"source": source}
-    
-    # Note: Tag filtering is more complex in Chroma
-    # For now, we'll filter tags in post-processing if specified
-    # Chroma doesn't support list membership queries directly in filters
-    
-    # Retrieve with or without score threshold
-    if min_score is not None:
-        results_with_scores = vectordb.similarity_search_with_score(
-            query, 
-            k=k * 3 if tags else k,  # Get more if we need to filter tags
-            filter=filter_dict if filter_dict else None
-        )
-        
-        # Post-process tag filtering if needed (soft filter: fall back to unfiltered if no matches)
-        if tags:
-            filtered_results = []
-            for doc, score in results_with_scores:
-                if 'tags' in doc.metadata:
-                    # Tags stored as comma-separated string
-                    doc_tags = [t.strip() for t in doc.metadata['tags'].split(',')]
-                    # Check if ANY requested tag is in document tags (OR logic)
-                    if any(tag in doc_tags for tag in tags):
-                        filtered_results.append((doc, score))
-                        if len(filtered_results) >= k:
-                            break
-            # Only apply tag filter if it yields at least one result
-            if filtered_results:
-                results_with_scores = filtered_results
-        
-        # Apply score threshold
-        filtered_results = [(doc, score) for doc, score in results_with_scores if score <= min_score]
-        
-        return {
-            'chunks': [doc.page_content for doc, _ in filtered_results[:k]],
-            'metadata': [doc.metadata for doc, _ in filtered_results[:k]],
-            'scores': [score for _, score in filtered_results[:k]],
-            'query': query
-        }
-    else:
+
+    try:
+        if vectordb is None:
+            vectordb = load_vectordb()
+
+        # Retrieve with or without score threshold
+        if min_score is not None:
+            results_with_scores = vectordb.similarity_search_with_score(
+                query,
+                k=k * 3 if tags else k,
+                filter=filter_dict if filter_dict else None,
+            )
+
+            # Post-process tag filtering if needed (soft filter: fall back to unfiltered if no matches)
+            if tags:
+                filtered_results = []
+                for doc, score in results_with_scores:
+                    if "tags" in doc.metadata:
+                        doc_tags = [t.strip() for t in doc.metadata["tags"].split(",")]
+                        if any(tag in doc_tags for tag in tags):
+                            filtered_results.append((doc, score))
+                            if len(filtered_results) >= k:
+                                break
+                if filtered_results:
+                    results_with_scores = filtered_results
+
+            filtered_results = [(doc, score) for doc, score in results_with_scores if score <= min_score]
+
+            return {
+                "chunks": [doc.page_content for doc, _ in filtered_results[:k]],
+                "metadata": [doc.metadata for doc, _ in filtered_results[:k]],
+                "scores": [score for _, score in filtered_results[:k]],
+                "query": query,
+            }
+
         results = vectordb.similarity_search(
-            query, 
+            query,
             k=k * 3 if tags else k,
             filter=filter_dict if filter_dict else None
         )
-        
-        # Post-process tag filtering if needed (soft filter: fall back to unfiltered if no matches)
+
         if tags:
             filtered_results = []
             for doc in results:
-                if 'tags' in doc.metadata:
-                    # Tags stored as comma-separated string
-                    doc_tags = [t.strip() for t in doc.metadata['tags'].split(',')]
-                    # Check if ANY requested tag is in document tags (OR logic)
+                if "tags" in doc.metadata:
+                    doc_tags = [t.strip() for t in doc.metadata["tags"].split(",")]
                     if any(tag in doc_tags for tag in tags):
                         filtered_results.append(doc)
                         if len(filtered_results) >= k:
                             break
-            # Only apply tag filter if it yields at least one result
             if filtered_results:
                 results = filtered_results
-        
+
         return {
-            'chunks': [doc.page_content for doc in results[:k]],
-            'metadata': [doc.metadata for doc in results[:k]],
-            'scores': None,
-            'query': query
+            "chunks": [doc.page_content for doc in results[:k]],
+            "metadata": [doc.metadata for doc in results[:k]],
+            "scores": None,
+            "query": query,
         }
+    except Exception as exc:
+        print(f"  ⚠️ Semantic retrieval failed, falling back to keyword search: {exc}")
+        return _keyword_retrieve(query, k=k, doc_type=doc_type, tags=tags, source=source)
 
 
 def retrieve_transcripts(query, tags=None, k=5):
