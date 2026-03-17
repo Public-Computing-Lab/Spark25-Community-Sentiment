@@ -154,7 +154,7 @@ CORS(
     supports_credentials=True,
     expose_headers=["RethinkAI-API-Key"],
     resources={r"/*": {"origins": "*"}},
-    allow_headers=["Content-Type", "RethinkAI-API-Key"],
+    allow_headers=["Content-Type", "RethinkAI-API-Key", "X-Admin-Password"],
 )
 
 
