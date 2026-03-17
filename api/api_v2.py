@@ -154,7 +154,7 @@ CORS(
     supports_credentials=True,
     expose_headers=["RethinkAI-API-Key"],
     resources={r"/*": {"origins": "*"}},
-    allow_headers=["Content-Type", "RethinkAI-API-Key"],
+    allow_headers=["Content-Type", "RethinkAI-API-Key", "X-Admin-Password"],
 )
 
 
@@ -184,6 +184,10 @@ def ensure_interaction_log_table():
                 client_query TEXT,
                 app_response TEXT,
                 client_response_rating VARCHAR(50),
+                flagged BOOLEAN DEFAULT FALSE,
+                flag_reason VARCHAR(100),
+                flag_details TEXT,
+                flagged_at TIMESTAMP NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -224,64 +228,68 @@ def before_request_handler():
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
+DOC_TYPE_DIRS = {
+    "policy": "Data/VectorDB_text",
+    "transcript": "Data/AI meeting transcripts",
+    "calendar_event": "Data/newsletters",
+}
+
 def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Extract source citations from the result based on mode."""
     sources = []
-    
+
     if mode == "sql":
-        # Extract table name from SQL result
         sql_query = result.get("sql", "")
         if sql_query:
-            # Simple extraction - look for FROM clause
             import re
             match = re.search(r'FROM\s+`?(\w+)`?', sql_query, re.IGNORECASE)
             if match:
                 sources.append({"type": "sql", "table": match.group(1)})
-    
+
     elif mode == "rag":
-        # Extract from RAG metadata
         metadata = result.get("metadata", [])
         seen = set()
-        for meta in metadata[:5]:  # Limit to 5 sources
+        for meta in metadata[:5]:
             source = meta.get("source", "Unknown")
             doc_type = meta.get("doc_type", "unknown")
             key = f"{source}:{doc_type}"
             if key not in seen:
                 seen.add(key)
+                base_dir = DOC_TYPE_DIRS.get(doc_type, "Data")
                 sources.append({
                     "type": "rag",
                     "source": source,
-                    "doc_type": doc_type
+                    "doc_type": doc_type,
+                    "path": str(Path(base_dir) / source),
                 })
-    
+
     elif mode == "hybrid":
-        # Combine SQL and RAG sources
         sql_part = result.get("sql", {})
         rag_part = result.get("rag", {})
-        
-        # SQL source
+
         sql_query = sql_part.get("sql", "") if isinstance(sql_part, dict) else ""
         if sql_query:
             import re
             match = re.search(r'FROM\s+`?(\w+)`?', sql_query, re.IGNORECASE)
             if match:
                 sources.append({"type": "sql", "table": match.group(1)})
-        
-        # RAG sources
+
         rag_metadata = rag_part.get("metadata", []) if isinstance(rag_part, dict) else []
         seen = set()
-        for meta in rag_metadata[:3]:  # Limit to 3 RAG sources in hybrid
+        for meta in rag_metadata[:3]:
             source = meta.get("source", "Unknown")
             doc_type = meta.get("doc_type", "unknown")
             key = f"{source}:{doc_type}"
             if key not in seen:
                 seen.add(key)
+                base_dir = DOC_TYPE_DIRS.get(doc_type, "Data")
                 sources.append({
                     "type": "rag",
                     "source": source,
-                    "doc_type": doc_type
+                    "doc_type": doc_type,
+                    "path": str(Path(base_dir) / source),
                 })
-    
+
     return sources
 
 
@@ -292,6 +300,8 @@ def log_interaction(
     mode: str = "",
     log_id: Optional[int] = None,
     rating: str = "",
+    flag_reason: str = "",
+    flag_details: str = "",
 ) -> Optional[int]:
     """Log an interaction to the database."""
     conn = None
@@ -306,10 +316,16 @@ def log_interaction(
             if rating:
                 update_fields.append("client_response_rating = %s")
                 values.append(rating)
+            if flag_reason:
+                update_fields.append("flagged = TRUE")
+                update_fields.append("flag_reason = %s")
+                update_fields.append("flag_details = %s")
+                update_fields.append("flagged_at = NOW()")
+                values.append(flag_reason)
+                values.append(flag_details)
             if app_response:
                 update_fields.append("app_response = %s")
                 values.append(app_response)
-            
             if update_fields:
                 values.append(log_id)
                 query = f"UPDATE interaction_log SET {', '.join(update_fields)} WHERE id = %s"
@@ -502,6 +518,8 @@ def log_endpoint():
     elif request.method == "PUT":
         log_id = data.get("log_id")
         rating = data.get("client_response_rating", "")
+        flag_reason = data.get("flag_reason", "")
+        flag_details = data.get("flag_details", "")
         
         if not log_id:
             return jsonify({"error": "log_id is required"}), 400
@@ -512,6 +530,8 @@ def log_endpoint():
             app_response="",
             log_id=log_id,
             rating=rating,
+            flag_reason=flag_reason,
+            flag_details=flag_details,
         )
         
         if updated_id:
@@ -609,6 +629,168 @@ def health():
         status["status"] = "degraded"
     
     return jsonify(status)
+
+import os as _os
+ 
+ADMIN_PASSWORD = _os.getenv("ADMIN_PASSWORD", "admin2026")
+ 
+ 
+def _admin_auth():
+    pw = request.headers.get("X-Admin-Password", "")
+    return pw == ADMIN_PASSWORD
+ 
+ 
+@app.route("/admin/stats", methods=["GET"])
+def admin_stats():
+    if not _admin_auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+ 
+        cursor.execute("SELECT COUNT(*) as cnt FROM interaction_log")
+        total = cursor.fetchone()["cnt"]
+ 
+        cursor.execute("SELECT COUNT(*) as cnt FROM interaction_log WHERE flagged = TRUE")
+        total_flagged = cursor.fetchone()["cnt"]
+ 
+        cursor.execute("""
+            SELECT COUNT(*) as cnt FROM interaction_log
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        """)
+        this_week = cursor.fetchone()["cnt"]
+ 
+        cursor.execute("""
+            SELECT COUNT(*) as cnt FROM interaction_log
+            WHERE app_response LIKE '%No results found%'
+               OR app_response LIKE '%couldn\\'t find%'
+               OR app_response LIKE '%no data%'
+        """)
+        no_results = cursor.fetchone()["cnt"]
+ 
+        cursor.execute("""
+            SELECT data_selected as mode, COUNT(*) as cnt
+            FROM interaction_log
+            WHERE data_selected IS NOT NULL AND data_selected != ''
+            GROUP BY data_selected ORDER BY cnt DESC
+        """)
+        mode_breakdown = {r["mode"]: r["cnt"] for r in cursor.fetchall()}
+ 
+        cursor.execute("""
+            SELECT flag_reason, COUNT(*) as cnt
+            FROM interaction_log
+            WHERE flagged = TRUE AND flag_reason IS NOT NULL
+            GROUP BY flag_reason ORDER BY cnt DESC
+        """)
+        flag_reasons = {r["flag_reason"]: r["cnt"] for r in cursor.fetchall()}
+ 
+        return jsonify({
+            "total_interactions": total,
+            "total_flagged": total_flagged,
+            "interactions_this_week": this_week,
+            "no_result_count": no_results,
+            "mode_breakdown": mode_breakdown,
+            "flag_reasons": flag_reasons,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+ 
+ 
+@app.route("/admin/flags", methods=["GET"])
+def admin_flags():
+    if not _admin_auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, session_id, client_query, app_response,
+                   data_selected, flag_reason, flag_details, flagged_at, created_at
+            FROM interaction_log
+            WHERE flagged = TRUE
+            ORDER BY flagged_at DESC
+            LIMIT 200
+        """)
+        rows = cursor.fetchall()
+        for row in rows:
+            for key in ("flagged_at", "created_at"):
+                if row.get(key) and hasattr(row[key], "isoformat"):
+                    row[key] = row[key].isoformat()
+        return jsonify({"flags": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+ 
+ 
+@app.route("/admin/interactions", methods=["GET"])
+def admin_interactions():
+    if not _admin_auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, session_id, client_query, app_response,
+                   data_selected, flagged, created_at
+            FROM interaction_log
+            ORDER BY created_at DESC
+            LIMIT 50
+        """)
+        rows = cursor.fetchall()
+        for row in rows:
+            if row.get("created_at") and hasattr(row["created_at"], "isoformat"):
+                row["created_at"] = row["created_at"].isoformat()
+            if row.get("app_response") and len(row["app_response"]) > 200:
+                row["app_response"] = row["app_response"][:200] + "..."
+        return jsonify({"interactions": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+ 
+ 
+@app.route("/admin/no-results", methods=["GET"])
+def admin_no_results():
+    if not _admin_auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, client_query, data_selected, created_at
+            FROM interaction_log
+            WHERE app_response LIKE '%No results found%'
+               OR app_response LIKE '%couldn\\'t find%'
+               OR app_response LIKE '%no data%'
+               OR app_response LIKE '%I couldn\\'t find%'
+            ORDER BY created_at DESC
+            LIMIT 100
+        """)
+        rows = cursor.fetchall()
+        for row in rows:
+            if row.get("created_at") and hasattr(row["created_at"], "isoformat"):
+                row["created_at"] = row["created_at"].isoformat()
+        return jsonify({"no_results": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
 
 
 # =============================================================================

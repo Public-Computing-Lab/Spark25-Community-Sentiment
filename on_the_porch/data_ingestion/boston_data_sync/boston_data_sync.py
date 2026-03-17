@@ -33,7 +33,7 @@ MYSQL_CONFIG = {
     'port': int(os.getenv("MYSQL_PORT", "3306")),
     'user': os.getenv("MYSQL_USER", "root"),
     'password': os.getenv("MYSQL_PASSWORD", ""),
-    'database': os.getenv("MYSQL_DB", "rethink_ai_boston"),
+    'database': os.getenv("MYSQL_DB", "sentiment_demo"),
     'charset': 'utf8mb4',
 }
 

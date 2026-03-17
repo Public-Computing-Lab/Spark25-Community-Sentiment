@@ -138,7 +138,25 @@
       </div>
     </main>
   </div>
-  
+
+  <div id="flag-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+  <div style="background:#1a2a3a; border:1px solid #2a3a4a; border-radius:12px; padding:32px; width:420px; max-width:90vw;">
+    <h3 style="margin:0 0 8px; color:#e2e8f0; font-size:16px;">Report a problem</h3>
+    <p style="margin:0 0 20px; color:#94a3b8; font-size:13px;">What's wrong with this response?</p>
+    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+      <label style="color:#e2e8f0; font-size:14px; cursor:pointer;"><input type="radio" name="flag-reason" value="Factually incorrect" style="margin-right:8px;"> Factually incorrect</label>
+      <label style="color:#e2e8f0; font-size:14px; cursor:pointer;"><input type="radio" name="flag-reason" value="Information is outdated" style="margin-right:8px;"> Information is outdated</label>
+      <label style="color:#e2e8f0; font-size:14px; cursor:pointer;"><input type="radio" name="flag-reason" value="Not relevant to my question" style="margin-right:8px;"> Not relevant to my question</label>
+      <label style="color:#e2e8f0; font-size:14px; cursor:pointer;"><input type="radio" name="flag-reason" value="Other" style="margin-right:8px;"> Other</label>
+    </div>
+    <textarea id="flag-detail" placeholder="Additional details (optional)" style="width:100%; padding:10px; background:#0f1b2d; border:1px solid #2a3a4a; border-radius:8px; color:#e2e8f0; font-size:13px; resize:vertical; min-height:80px; margin-bottom:16px; box-sizing:border-box;"></textarea>
+    <div style="display:flex; gap:10px; justify-content:flex-end;">
+      <button id="flag-cancel" style="padding:8px 16px; background:transparent; border:1px solid #2a3a4a; border-radius:6px; color:#94a3b8; cursor:pointer; font-size:13px;">Cancel</button>
+      <button id="flag-submit" style="padding:8px 16px; background:#ef4444; border:none; border-radius:6px; color:white; cursor:pointer; font-size:13px; font-weight:600;">Submit 🚩</button>
+    </div>
+  </div>
+</div>
+  <script src="api.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

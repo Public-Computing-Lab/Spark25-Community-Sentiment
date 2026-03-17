@@ -62,51 +62,44 @@ function formatTime(timeStr) {
 }
 
 // Map SQL table names to user-friendly source descriptions
+// updated with paths to be hyperlinked 
 const sourceMapping = {
-  'bos311_data': '311 Service Requests from https://data.boston.gov/',
-  'shots_fired_data': 'Crime data from https://data.boston.gov/',
-  'homicide_data': 'Crime data from https://data.boston.gov/',
-  'weekly_events': 'Community newsletters',
-  'events': 'Community newsletters',
-  'crime': 'Crime data from https://data.boston.gov/',
-  'crime_incident': 'Crime data from https://data.boston.gov/',
+  'bos311_data': { label: '311 Service Requests', path: 'https://data.boston.gov/dataset/311-service-requests' },
+  'shots_fired_data': { label: 'Crime data (shots fired)', path: 'https://data.boston.gov/dataset/crime-incident-reports-august-2015-to-date-source-new-system' },
+  'homicide_data': { label: 'Crime data (homicides)', path: 'https://data.boston.gov/dataset/crime-incident-reports-august-2015-to-date-source-new-system' },
+  'weekly_events': { label: 'Community newsletters', path: null },
+  'events': { label: 'Community newsletters', path: null },
+  'crime': { label: 'Crime data', path: 'https://data.boston.gov/dataset/crime-incident-reports-august-2015-to-date-source-new-system' },
+  'crime_incident': { label: 'Crime data', path: 'https://data.boston.gov/dataset/crime-incident-reports-august-2015-to-date-source-new-system' },
 };
 
+//store objects instead of strings 
+// return path for sql sources 
 function formatSource(source) {
   if (source.type === 'sql' && source.table) {
     const tableName = source.table.toLowerCase();
-    // Check if we have a mapping for this table
     if (sourceMapping[tableName]) {
       return sourceMapping[tableName];
     }
-    // Check for partial matches (e.g., table names with prefixes)
     for (const [key, value] of Object.entries(sourceMapping)) {
       if (tableName.includes(key) || key.includes(tableName)) {
         return value;
       }
     }
-    // Check for common patterns
     if (tableName.includes('crime') || tableName.includes('911') || tableName.includes('shot')) {
-      return 'Crime data from https://data.boston.gov/';
+      return { label: 'Crime data', path: 'https://data.boston.gov/dataset/crime-incident-reports-august-2015-to-date-source-new-system' };
     }
     if (tableName.includes('311') || tableName.includes('service')) {
-      return '311 Service Requests from https://data.boston.gov/';
+      return { label: '311 Service Requests', path: 'https://data.boston.gov/dataset/311-service-requests' };
     }
     if (tableName.includes('event') || tableName.includes('newsletter') || tableName.includes('weekly')) {
-      return 'Community newsletters';
+      return { label: 'Community newsletters', path: null };
     }
-    // Default fallback for SQL tables
-    return `City data from https://data.boston.gov/`;
+    return { label: 'City data', path: 'https://data.boston.gov' };
   } else if (source.type === 'rag' && source.source) {
-    const sourceName = source.source.toLowerCase();
-    // Check if it's an event-related source
-    if (sourceName.includes('event') || sourceName.includes('newsletter') || sourceName.includes('weekly')) {
-      return 'Community newsletters';
-    }
-    // For other RAG sources, use the source name or a friendly description
-    return source.source || 'Community documents';
+    return { label: source.source, path: source.path || null };
   }
-  return 'Community data';
+  return { label: 'Community data', path: null };
 }
 
 // ============================================================================
@@ -146,7 +139,7 @@ async function updateApiStatus() {
 // Chat Functions
 // ============================================================================
 
-function addMessage({ text, type, sources, mode, isTyping }) {
+function addMessage({ text, type, sources, mode, isTyping, logId }) {
   if (!elements.chatMessages) return null;
   
   const messageEl = document.createElement('div');
@@ -201,27 +194,53 @@ function addMessage({ text, type, sources, mode, isTyping }) {
       meta.appendChild(label);
       
       // Get unique formatted sources
-      const formattedSources = new Set();
+      const formattedSources = [];
+      const seen = new Set();
       sources.forEach(source => {
-        const formatted = formatSource(source);
-        formattedSources.add(formatted);
+          const fmt = formatSource(source);
+          const key = fmt.label;
+          if (!seen.has(key)) {
+              seen.add(key);
+              formattedSources.push(fmt);
+          }
       });
+
+      formattedSources.forEach(fmt => {
+          const pill = document.createElement('span');
+          pill.className = 'meta-pill';
       
-      // Create pills for each unique source
-      formattedSources.forEach(formattedSource => {
-        const pill = document.createElement('span');
-        pill.className = 'meta-pill';
-        pill.textContent = formattedSource;
-        meta.appendChild(pill);
+          if (fmt.path) {
+              const a = document.createElement('a');
+              a.href = fmt.path.startsWith('http') ? fmt.path : `file:///${fmt.path.replace(/\\/g, '/')}`;
+              a.textContent = fmt.label;
+              a.target = '_blank';
+              a.style.cssText = 'color: inherit; text-decoration: underline; text-underline-offset: 2px;';
+              pill.appendChild(a);
+          } else {
+              pill.textContent = fmt.label;
+          }
+      
+          meta.appendChild(pill);
       });
-      
+
       content.appendChild(meta);
     }
   }
-  
+  if (logId) messageEl.dataset.logId = logId;
   messageEl.appendChild(avatar);
   messageEl.appendChild(content);
   elements.chatMessages.appendChild(messageEl);
+
+  if (logId && type === 'assistant') {
+    const flagBtn = document.createElement('button');
+    flagBtn.textContent = '🚩';
+    flagBtn.title = 'Report a Problem';
+    flagBtn.style.cssText = 'background:none;border:none;cursor:pointer;opacity:0.4;font-size:13px;padding:4px;margin-top:4px;transition:opacity 0.2s;';
+    flagBtn.addEventListener('mouseenter', () => flagBtn.style.opacity = '1');
+    flagBtn.addEventListener('mouseleave', () => flagBtn.style.opacity = '0.4');
+    flagBtn.addEventListener('click', () => openFlagModal(logId));
+    content.appendChild(flagBtn);
+  }
   
   // Scroll to bottom
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
@@ -303,6 +322,7 @@ async function handleChatSubmit(e) {
         type: 'assistant',
         sources,
         mode: '', // Don't show mode to users
+        logId: data.log_id, // For feedback/reporting
       });
       
       // NOW add both messages to conversation history after successful response
@@ -510,9 +530,36 @@ function initApp() {
   });
 }
 
+// ============================================================================
+// Flag Modal
+// ============================================================================
+let currentFlagLogId = null;
+
+function openFlagModal(logId) {
+  currentFlagLogId = logId;
+  document.querySelectorAll('input[name="flag-reason"]').forEach(r => r.checked = false);
+  document.getElementById('flag-detail').value = '';
+  document.getElementById('flag-modal').style.display = 'flex';
+}
+
+document.getElementById('flag-cancel').addEventListener('click', () => {
+  document.getElementById('flag-modal').style.display = 'none';
+});
+
+document.getElementById('flag-submit').addEventListener('click', async () => {
+  const reason = document.querySelector('input[name="flag-reason"]:checked')?.value;
+  if (!reason) { alert('Please select a reason.'); return; }
+  const detail = document.getElementById('flag-detail').value.trim();
+
+  await ApiClient.flagInteraction(currentFlagLogId, reason, detail);
+
+  const flagBtn = document.querySelector(`[data-log-id="${currentFlagLogId}"] button`);
+  if (flagBtn) { flagBtn.textContent = '✅'; flagBtn.disabled = true; }
+  document.getElementById('flag-modal').style.display = 'none';
+});
+
 // Start app when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
-  initApp();
-}
+  initApp();}
