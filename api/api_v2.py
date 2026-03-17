@@ -230,7 +230,7 @@ def before_request_handler():
 # =============================================================================
 
 DOC_TYPE_DIRS = {
-    "policy": "Data/VectorDB_text",
+    "policy": "http://localhost:8000",
     "transcript": "Data/AI meeting transcripts",
     "calendar_event": "Data/newsletters",
 }
@@ -790,7 +790,6 @@ def admin_no_results():
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
-
 
 
 # =============================================================================
