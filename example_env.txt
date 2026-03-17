@@ -20,7 +20,7 @@ GEMINI_MODEL=gemini-2.5-flash-lite
 
 # Embedding model for vector search (RAG)
 
-GEMINI_EMBED_MODEL=models/text-embedding-004
+GEMINI_EMBED_MODEL=models/gemini-embedding-001
 
 
 
@@ -126,3 +126,4 @@ MAX_FILES_PER_RUN=100
 
 VERBOSE_LOGGING=true
 
+ADMIN_PASSWORD=admin2026

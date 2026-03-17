@@ -17,6 +17,7 @@ import uuid
 import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urljoin
 
 from flask import Flask, request, jsonify, g, session
 from flask_cors import CORS
@@ -230,7 +231,7 @@ def before_request_handler():
 # =============================================================================
 
 DOC_TYPE_DIRS = {
-    "policy": "http://localhost:8000",
+    "policy": "http://localhost:8000/Policies/",
     "transcript": "Data/AI meeting transcripts",
     "calendar_event": "Data/newsletters",
 }
@@ -250,17 +251,38 @@ def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
         metadata = result.get("metadata", [])
         seen = set()
         for meta in metadata[:5]:
+            print(meta)
             source = meta.get("source", "Unknown")
+            print(source)
             doc_type = meta.get("doc_type", "unknown")
+            print(doc_type)
             key = f"{source}:{doc_type}"
+            print(key)
             if key not in seen:
                 seen.add(key)
                 base_dir = DOC_TYPE_DIRS.get(doc_type, "Data")
+                print(base_dir)
+                path=""
+                if base_dir.startswith(("http://", "https://")):
+                    print("Inside IF")
+                    print(base_dir)
+                    source = source.replace(" ", "-")
+                    print(source)
+                    if source.endswith(".txt"):
+                        source = source[:-4] + ".html"
+                        print(source)
+                    path = urljoin(base_dir, source)
+                    print(path)
+                    print("IF DONE")
+                else:
+                    path = str(Path(base_dir) / source)
+                print(base_dir)
+                print(str(Path(base_dir) / source))
                 sources.append({
                     "type": "rag",
                     "source": source,
                     "doc_type": doc_type,
-                    "path": str(Path(base_dir) / source),
+                    "path": path,
                 })
 
     elif mode == "hybrid":
@@ -291,6 +313,7 @@ def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
                 })
 
     return sources
+
 
 
 def log_interaction(
