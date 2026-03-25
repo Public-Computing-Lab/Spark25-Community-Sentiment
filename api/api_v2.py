@@ -231,11 +231,7 @@ def before_request_handler():
 # =============================================================================
 
 DOC_TYPE_DIRS = {
-<<<<<<< HEAD
-    "policy": "", 
-=======
     "policy": "http://localhost:8000/Policies/",
->>>>>>> origin/MVP-Demo
     "transcript": "Data/AI meeting transcripts",
     "calendar_event": "Data/newsletters",
 }
@@ -263,24 +259,17 @@ def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
             print(key)
             if key not in seen:
                 seen.add(key)
+                link = meta.get("link", "")  # RSS docs store the real article URL
                 base_dir = DOC_TYPE_DIRS.get(doc_type, "Data")
-                print(base_dir)
-                path=""
-                if base_dir.startswith(("http://", "https://")):
-                    print("Inside IF")
-                    print(base_dir)
-                    source = source.replace(" ", "-")
-                    print(source)
-                    if source.endswith(".txt"):
-                        source = source[:-4] + ".html"
-                        print(source)
-                    path = urljoin(base_dir, source)
-                    print(path)
-                    print("IF DONE")
+                if link:
+                    path = link
+                elif base_dir.startswith(("http://", "https://")):
+                    source_slug = source.replace(" ", "-")
+                    if source_slug.endswith(".txt"):
+                        source_slug = source_slug[:-4] + ".html"
+                    path = urljoin(base_dir, source_slug)
                 else:
                     path = str(Path(base_dir) / source)
-                print(base_dir)
-                print(str(Path(base_dir) / source))
                 sources.append({
                     "type": "rag",
                     "source": source,

@@ -260,6 +260,10 @@ def _route_question(question: str) -> Dict[str, Any]:
         "═══════════════════════════════════════════════════════════════════════════════\n"
         "CRITICAL ROUTING RULES - ABSOLUTE PRIORITY (CHECK IN THIS ORDER):\n"
         "═══════════════════════════════════════════════════════════════════════════════\n\n"
+        "RULE 0: NEIGHBORHOOD NEWS / RSS QUESTIONS → 'rag' or 'hybrid'\n"
+"   - If question uses phrases like 'what's going on in [neighborhood]', 'what's new in', 'lately', 'recent news about', 'updates from [neighborhood]', 'what's happening in [neighborhood]' without asking for specific event schedules\n"
+"   - AND does not mention a specific day/week/date → mode MUST be 'hybrid' (SQL for 311 activity + RAG for RSS news)\n"
+"   - If question explicitly names a feed source (DOT Reporter, CSNDC, etc.) → mode MUST be 'rag'\n\n"
         "RULE 1: CRIME-RELATED QUESTIONS → Route based on question type\n"
         "   - If the question mentions ANY of: crime, crimes, arrest, arrests, offense, offenses, homicide, homicides, shooting, shootings, shots fired, safety incident, safety incidents, criminal activity, violence, violent\n"
         "   - THEN apply these sub-rules:\n"
@@ -419,7 +423,7 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
             tags_str = ", ".join(tags)
         else:
             tags_str = str(tags)
-        context_parts.append(f"[Source {idx}: {source} ({doc_type}){' - Tags: ' + tags_str if tags_str else ''}]")
+        context_parts.append(f"[{source}]")
         context_parts.append(chunk)
         context_parts.append("")
     context = "\n".join(context_parts)
@@ -429,8 +433,8 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
         "This system is configured for DORCHESTER ONLY. All data queries are automatically filtered to Dorchester only.\n"
         "Use clear, everyday language and imagine you are talking to a neighbor, not a technical expert.\n"
         "Use only the provided SOURCES and do not add information that is not supported by the text.\n\n"
-        "When you quote or paraphrase people or documents, briefly explain who or what they are first, "
-        "then include the quote in a natural way. Avoid technical jargon, and do not mention SQL, databases, RAG, "
+        "When you cite sources, use the source name naturally in the sentence (e.g. 'According to CSNDC...'). "
+        "Do not use numbered source citations like (Source 1). Avoid technical jargon, and do not mention SQL, databases, RAG, "
         "retrieval methods, or internal tools.\n"
         "If the question involves numbers, be honest when the sources are limited and avoid inventing precise figures.\n"
         + ("\n\nYou are in a conversation. Use previous messages for context when the current question references earlier topics or asks for follow-ups." if conversation_history else "")
@@ -591,8 +595,15 @@ def _run_rag(question: str, plan: Dict[str, Any], conversation_history: Optional
     combined_chunks: List[str] = []
     combined_meta: List[Dict[str, Any]] = []
 
-    # NOTE: Calendar events are now SQL-only (weekly_events table), not in vector DB.
-    # Event queries should use 'sql' or 'hybrid' mode which handles them via SQL.
+    # RSS feed content (news, updates from community sources)
+    try:
+        rss_res = retrieval.retrieve_rss(question, k=k)
+        rss_chunks = rss_res.get("chunks", [])
+        print(f"  📰 RSS: {len(rss_chunks)} chunks found")
+        combined_chunks.extend(rss_chunks)
+        combined_meta.extend(rss_res.get("metadata", []))
+    except Exception as e:
+        print(f"  ⚠️ RSS retrieval error: {e}")
 
     # transcripts
     try:
