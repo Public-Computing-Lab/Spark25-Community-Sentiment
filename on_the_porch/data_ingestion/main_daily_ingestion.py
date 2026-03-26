@@ -17,6 +17,9 @@ import config
 # Import Boston data sync
 from boston_data_sync.boston_data_sync import BostonDataSyncer
 
+# Import 311 & Crime → RAG ingestion
+from ingest_311_911_to_rag import run_ingestion as sync_311_crime_to_rag
+
 # Import dotnews downloader
 from dotnews_downloader import download_latest_pdf
 
@@ -135,7 +138,7 @@ def sync_dotnews_newsletters() -> dict:
     return stats
 
 
-def log_run_summary(drive_stats: dict, email_stats: dict, boston_stats: dict = None, dotnews_stats: dict = None) -> None:
+def log_run_summary(drive_stats: dict, email_stats: dict, boston_stats: dict = None, dotnews_stats: dict = None, rag_311_crime_stats: dict = None) -> None:
     """Log summary of the ingestion run to a JSONL file."""
     log_file = Path(__file__).parent / "ingestion_log.jsonl"
     
@@ -150,7 +153,10 @@ def log_run_summary(drive_stats: dict, email_stats: dict, boston_stats: dict = N
     
     if dotnews_stats:
         summary["dotnews"] = dotnews_stats
-    
+
+    if rag_311_crime_stats:
+        summary["rag_311_crime"] = rag_311_crime_stats
+
     # Calculate overall success
     errors = (
         len(drive_stats.get('errors', [])) + 
@@ -178,7 +184,7 @@ def print_banner(title: str) -> None:
     print("╚" + "=" * (width - 2) + "╝\n")
 
 
-def print_final_summary(drive_stats: dict, email_stats: dict, boston_stats: dict = None, dotnews_stats: dict = None) -> None:
+def print_final_summary(drive_stats: dict, email_stats: dict, boston_stats: dict = None, dotnews_stats: dict = None, rag_311_crime_stats: dict = None) -> None:
     """Print final summary of the ingestion run."""
     drive_errors = len(drive_stats.get('errors', []))
     email_errors = len(email_stats.get('errors', []))
@@ -220,6 +226,15 @@ def print_final_summary(drive_stats: dict, email_stats: dict, boston_stats: dict
         print(f"║ Dotnews Events Extracted:      {events:>5}                                      ║")
         print(f"║ Dotnews Chunks Added:          {chunks:>5}                                      ║")
     
+    # 311 & Crime → RAG stats
+    if rag_311_crime_stats:
+        s311 = rag_311_crime_stats.get("311") or {}
+        scrime = rag_311_crime_stats.get("crime") or {}
+        docs_311 = s311.get("individual_docs_embedded", 0) + s311.get("aggregate_docs_embedded", 0)
+        docs_crime = scrime.get("individual_docs_embedded", 0) + scrime.get("aggregate_docs_embedded", 0)
+        print(f"║ 311 Docs Embedded (RAG):       {docs_311:>5}                                      ║")
+        print(f"║ Crime Docs Embedded (RAG):      {docs_crime:>5}                                      ║")
+
     # Total errors
     print(f"║ Total Errors:                 {total_errors:>5}                                      ║")
     
@@ -333,7 +348,26 @@ def main():
     
     # Separator
     print("\n" + "-" * 80 + "\n")
-    
+
+    # Run 311 & Crime → RAG embedding
+    print("►" * 40)
+    print("► PHASE 3.5: 311 & Crime Data → RAG Vector DB")
+    print("►" * 40)
+
+    rag_311_crime_stats = None
+    try:
+        rag_311_crime_stats = sync_311_crime_to_rag(days=30, source="both")
+    except Exception as e:
+        print(f"\n✗ FATAL: 311/Crime RAG ingestion failed: {e}")
+        rag_311_crime_stats = {
+            "311": {"records_fetched": 0, "individual_docs_embedded": 0, "aggregate_docs_embedded": 0, "errors": [str(e)]},
+            "crime": {"records_fetched": 0, "individual_docs_embedded": 0, "aggregate_docs_embedded": 0, "errors": [str(e)]},
+            "total_errors": 1,
+        }
+
+    # Separator
+    print("\n" + "-" * 80 + "\n")
+
     # After ingestion, update the unified vector DB from any files present
     # in the placeholder directories. Future steps will copy the right files
     # into these folders before this runs.
@@ -351,17 +385,18 @@ def main():
         print(f"\n⚠️  Vectordb build/update failed: {e}")
     
     # Log summary
-    log_run_summary(drive_stats, email_stats, boston_stats, dotnews_stats)
-    
+    log_run_summary(drive_stats, email_stats, boston_stats, dotnews_stats, rag_311_crime_stats)
+
     # Print final summary
-    print_final_summary(drive_stats, email_stats, boston_stats, dotnews_stats)
-    
+    print_final_summary(drive_stats, email_stats, boston_stats, dotnews_stats, rag_311_crime_stats)
+
     # Exit with error code if there were failures
     drive_errors = len(drive_stats.get('errors', []))
     email_errors = len(email_stats.get('errors', []))
     boston_errors = sum(len(d.get('errors', [])) for d in boston_stats.get('datasets', [])) if boston_stats else 0
     dotnews_errors = len(dotnews_stats.get('errors', [])) if dotnews_stats else 0
-    total_errors = drive_errors + email_errors + boston_errors + dotnews_errors
+    rag_errors = (rag_311_crime_stats or {}).get("total_errors", 0)
+    total_errors = drive_errors + email_errors + boston_errors + dotnews_errors + rag_errors
     
     if total_errors > 0:
         sys.exit(1)
