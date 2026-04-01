@@ -29,7 +29,7 @@ except Exception:  # pragma: no cover
     genai = None  # type: ignore
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
 GEMINI_SUMMARY_MODEL = os.getenv("GEMINI_SUMMARY_MODEL", GEMINI_MODEL)
 
 
@@ -879,4 +879,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

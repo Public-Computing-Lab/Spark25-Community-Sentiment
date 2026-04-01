@@ -5,8 +5,8 @@
 # Gemini AI configuration
 # ============================================================================
 GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-3-flash-preview
-GEMINI_SUMMARY_MODEL=gemini-3-flash-preview
+GEMINI_MODEL=gemini-2.5-pro
+GEMINI_SUMMARY_MODEL=gemini-2.5-pro
 GEMINI_EMBED_MODEL=models/gemini-embedding-001
 
 # ============================================================================
