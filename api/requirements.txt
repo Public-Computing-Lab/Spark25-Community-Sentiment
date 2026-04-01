@@ -12,6 +12,7 @@ dash-bootstrap-components==2.0.2
 dash_dangerously_set_inner_html==0.0.2
 dotenv==0.9.9
 Flask==3.0.3
+feedparser==6.0.11
 google-auth==2.40.1
 google-genai==1.15.0
 h11==0.16.0

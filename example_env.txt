@@ -27,6 +27,7 @@ AUTH_SESSION_SAMESITE=Lax
 AUTH_LOGIN_WINDOW_MINUTES=15
 AUTH_LOGIN_LOCK_THRESHOLD=5
 AUTH_LOGIN_LOCK_MINUTES=15
+AUTH_ADMIN_EMAILS=
 
 # Legacy compatibility only. New browser clients should use user sessions instead of API keys.
 RETHINKAI_API_KEYS=legacy-api-key-1,legacy-api-key-2

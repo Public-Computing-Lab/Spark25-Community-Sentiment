@@ -20,12 +20,16 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 import pymysql
 from pymysql.cursors import DictCursor
+from dotenv import load_dotenv
 
 # Add parent directory to path to import config
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Boston CKAN API base URL
 BOSTON_CKAN_API = "https://data.boston.gov/api/3/action"
+_THIS_FILE = Path(__file__).resolve()
+_ROOT_DIR = _THIS_FILE.parents[3]
+load_dotenv(_ROOT_DIR / ".env")
 
 # Default MySQL connection settings (can be overridden by environment variables)
 MYSQL_CONFIG = {
@@ -81,11 +85,11 @@ class BostonDataSyncer:
                 },
                 {
                     "name": "311_service_requests",
-                    "resource_id": "dff4d804-5031-443a-8409-8344efd0e5c8",
+                    "resource_id": "254adca6-64ab-4c5c-9fc0-a6da622be185",
                     "table_name": "service_requests_311",
-                    "primary_key": "case_enquiry_id",
-                    "date_field": "open_dt",
-                    "description": "311 service requests (2024)",
+                    "primary_key": "case_id",
+                    "date_field": "open_date",
+                    "description": "311 service requests",
                     "enabled": False
                 }
             ],
@@ -1161,4 +1165,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

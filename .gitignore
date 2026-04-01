@@ -9,6 +9,8 @@ __pycache__/
 venv/
 env/
 *.venv
+.venv_demo/
+demo/.venv_demo/
 pip-log.txt
 pip-delete-this-directory.txt
 conda

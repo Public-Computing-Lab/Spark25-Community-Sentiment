@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode, urljoin
 
 from dotenv import load_dotenv
-from flask import Flask, g, jsonify, redirect, request, session
+from flask import Flask, g, has_request_context, jsonify, redirect, request, session
 from flask_cors import CORS
 import mysql.connector
 from mysql.connector.pooling import MySQLConnectionPool
@@ -116,6 +116,8 @@ class Config:
     LOGIN_WINDOW_MINUTES = int(os.getenv("AUTH_LOGIN_WINDOW_MINUTES", "15"))
     LOGIN_LOCK_THRESHOLD = int(os.getenv("AUTH_LOGIN_LOCK_THRESHOLD", "5"))
     LOGIN_LOCK_MINUTES = int(os.getenv("AUTH_LOGIN_LOCK_MINUTES", "15"))
+    _raw_admin_emails = os.getenv("AUTH_ADMIN_EMAILS", "").split(",")
+    AUTH_ADMIN_EMAILS = {normalize_email(email) for email in _raw_admin_emails if normalize_email(email)}
 
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
@@ -183,6 +185,35 @@ def initialize_database() -> None:
 
 
 initialize_database()
+
+
+def _bootstrap_admin_users() -> None:
+    if not Config.AUTH_ADMIN_EMAILS:
+        return
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        placeholders = ", ".join(["%s"] * len(Config.AUTH_ADMIN_EMAILS))
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            UPDATE users
+            SET role = 'admin'
+            WHERE email IN ({placeholders}) AND role <> 'admin'
+            """,
+            tuple(sorted(Config.AUTH_ADMIN_EMAILS)),
+        )
+        conn.commit()
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+_bootstrap_admin_users()
 
 
 def _cleanup_old_legacy_caches() -> None:
@@ -369,6 +400,44 @@ def _create_user(conn, email: str, username: str, *, profile_complete: bool) -> 
     finally:
         cursor.close()
     return _fetch_user_by_id(conn, user_id)
+
+
+def _should_promote_to_admin(email: str) -> bool:
+    return normalize_email(email) in Config.AUTH_ADMIN_EMAILS
+
+
+def _promote_user_to_admin_if_configured(
+    conn,
+    *,
+    user_id: str,
+    email: str,
+    current_role: Optional[str] = None,
+    audit_event: Optional[str] = None,
+) -> bool:
+    if not _should_promote_to_admin(email):
+        return False
+    if current_role == "admin":
+        return False
+
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE users SET role = 'admin' WHERE id = %s AND role <> 'admin'",
+            (user_id,),
+        )
+        updated = cursor.rowcount > 0
+    finally:
+        cursor.close()
+
+    if updated and audit_event and has_request_context():
+        _record_auth_event(
+            conn,
+            audit_event,
+            success=True,
+            user_id=user_id,
+            details={"email": normalize_email(email), "source": "AUTH_ADMIN_EMAILS"},
+        )
+    return updated
 
 
 
@@ -942,13 +1011,17 @@ def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
             if key in seen:
                 continue
             seen.add(key)
+            link = meta.get("link", "")
             base_dir = DOC_TYPE_DIRS.get(doc_type, "Data")
-            if base_dir.startswith(("http://", "https://")):
+            if link:
+                path = link
+                source_label = source
+            elif base_dir.startswith(("http://", "https://")):
                 normalized_source = source.replace(" ", "-")
                 if normalized_source.endswith(".txt"):
                     normalized_source = normalized_source[:-4] + ".html"
                 path = urljoin(base_dir, normalized_source)
-                source_label = normalized_source
+                source_label = source
             else:
                 path = str(Path(base_dir) / source)
                 source_label = source
@@ -977,12 +1050,13 @@ def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
             if key in seen:
                 continue
             seen.add(key)
+            link = meta.get("link", "")
             base_dir = DOC_TYPE_DIRS.get(doc_type, "Data")
             sources.append({
                 "type": "rag",
                 "source": source,
                 "doc_type": doc_type,
-                "path": str(Path(base_dir) / source),
+                "path": link or str(Path(base_dir) / source),
             })
 
     return sources
@@ -1186,8 +1260,17 @@ def before_request_handler():
             return None
 
         providers = _provider_names(conn, session_row["user_id"])
+        promoted = _promote_user_to_admin_if_configured(
+            conn,
+            user_id=session_row["user_id"],
+            email=session_row["email"],
+            current_role=session_row.get("role"),
+            audit_event="admin_role_bootstrap",
+        )
         _touch_session(conn, session_row["session_id"])
         conn.commit()
+        if promoted:
+            session_row = _current_session_row(conn, session_token) or session_row
 
         g.session_row = session_row
         g.current_user_row = session_row
@@ -1260,6 +1343,13 @@ def auth_signup():
             return _json_error("That username is already taken.", 409, "username_exists")
 
         user = _create_user(conn, email, username, profile_complete=True)
+        _promote_user_to_admin_if_configured(
+            conn,
+            user_id=user["id"],
+            email=email,
+            current_role=user.get("role"),
+            audit_event="admin_role_bootstrap",
+        )
         _create_auth_identity(
             conn,
             user_id=user["id"],
@@ -1332,6 +1422,13 @@ def auth_login():
 
         if replacement_hash:
             _update_password_hash(conn, login_row["identity_id"], replacement_hash)
+        _promote_user_to_admin_if_configured(
+            conn,
+            user_id=login_row["id"],
+            email=email,
+            current_role=login_row.get("role"),
+            audit_event="admin_role_bootstrap",
+        )
         _clear_login_attempts(conn, email, ip_address)
         _update_user_login_stamp(conn, login_row["id"])
         _update_identity_last_used(conn, login_row["id"], "password")
@@ -1462,6 +1559,13 @@ def auth_google_callback():
             return response
 
         if google_user:
+            _promote_user_to_admin_if_configured(
+                conn,
+                user_id=google_user["id"],
+                email=email,
+                current_role=google_user.get("role"),
+                audit_event="admin_role_bootstrap",
+            )
             _update_user_login_stamp(conn, google_user["id"])
             _update_identity_last_used(conn, google_user["id"], "google")
             session_info = _create_web_session(conn, google_user["id"])
@@ -1478,6 +1582,13 @@ def auth_google_callback():
 
         temp_username = f"user-{uuid.uuid4().hex[:8]}"
         user_row = _create_user(conn, email, temp_username, profile_complete=False)
+        _promote_user_to_admin_if_configured(
+            conn,
+            user_id=user_row["id"],
+            email=email,
+            current_role=user_row.get("role"),
+            audit_event="admin_role_bootstrap",
+        )
         _create_auth_identity(conn, user_id=user_row["id"], provider="google", provider_subject=subject)
         _update_user_login_stamp(conn, user_row["id"])
         _update_identity_last_used(conn, user_row["id"], "google")
