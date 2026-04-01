@@ -186,6 +186,73 @@ def initialize_database() -> None:
 
 initialize_database()
 
+def ensure_interaction_log_columns():
+    """Add missing columns to interaction log."""
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+                       SELECT COLUMN_NAME
+                       FROM INFORMATION_SCHEMA.COLUMNS
+                       WHERE TABLE_SCHEMA = DATABASE()
+                       AND TABLE_NAME = 'interaction_log'
+                       """)
+        existing = {row["COLUMN_NAME"] for row in cursor.fetchall()}
+        additions = [
+            ("flagged", "ALTER TABLE interaction_log ADD COLUMN flagged BOOLEAN DEFAULT FALSE"),
+            ("flag_reason", "ALTER TABLE interaction_log ADD COLUMN flag_reason VARCHAR(100)"),
+            ("flag_details", "ALTER TABLE interaction_log ADD COLUMN flag_details TEXT"),
+            ("flagged_at", "ALTER TABLE interaction_log ADD COLUMN flagged_at TIMESTAMP NULL"),
+            ("moderator_comment", "ALTER TABLE interaction_log ADD COLUMN moderator_comment TEXT"),
+            ("resolved", "ALTER TABLE interaction_log ADD COLUMN resolved BOOLEAN DEFAULT FALSE"),
+            ("resolved_at", "ALTER TABLE interaction_log ADD COLUMN resolved_at TIMESTAMP NULL"),
+        ]
+        for col, sql in additions:
+            if col not in existing:
+                cursor.execute(sql)
+        conn.commit()
+        print("✓ interaction_log columns ready")
+    except Exception as e:
+        print(f"Warning: Could not update interaction_log columns: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+def ensure_admin_knowledge_table():
+    """Create admin_knowledge table if it doesn't exist."""
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS admin_knowledge (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                content TEXT,
+                category VARCHAR(100) default 'general',
+                expires_at TIMESTAMP NULL,
+                source_flag_id INT,
+                added_by VARCHAR(255),
+                active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        print("✓ admin_knowledge table ready")
+    except Exception as e:
+        print(f"Warning: Could not create admin_knowledge table: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+ensure_interaction_log_columns()
+ensure_admin_knowledge_table()
 
 def _bootstrap_admin_users() -> None:
     if not Config.AUTH_ADMIN_EMAILS:
@@ -2205,7 +2272,8 @@ def admin_flags():
         cursor.execute(
             """
             SELECT id, session_id, user_id, thread_id, client_query, app_response,
-                   data_selected, flag_reason, flag_details, flagged_at, created_at
+                   data_selected, flag_reason, flag_details, flagged_at, created_at, moderator_comment,
+                   resolved, resolved_at
             FROM interaction_log
             WHERE flagged = TRUE
             ORDER BY flagged_at DESC
@@ -2214,7 +2282,7 @@ def admin_flags():
         )
         rows = cursor.fetchall()
         for row in rows:
-            for key in ("flagged_at", "created_at"):
+            for key in ("flagged_at", "created_at", "resolved_at"):
                 if row.get(key) and hasattr(row[key], "isoformat"):
                     row[key] = row[key].isoformat()
         return jsonify({"flags": rows})
@@ -2299,6 +2367,120 @@ def admin_no_results():
             cursor.close()
         if conn:
             conn.close()
+
+@app.route("/admin/knowledge", methods=["GET"])
+def admin_get_knowledge():
+    result = _require_admin()
+    if result:
+        return result
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, content, category, expires_at, added_by, active, created_at
+            FROM admin_knowledge
+            ORDER BY created_at DESC
+        """)
+        rows = cursor.fetchall()
+        for row in rows:
+            for key in ("expires_at", "created_at"):
+                if row.get(key) and hasattr(row[key], "isoformat"):
+                    row[key] = row[key].isoformat()
+        return jsonify({"knowledge": rows})
+    except Exception as e:
+        return _json_error(str(e), 500, "admin_knowledge_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+@app.route("/admin/knowledge", methods=["POST"])
+def admin_add_knowledge():
+    result = _require_admin()
+    if result:
+        return result
+    data = request.get_json() or {}
+    content = data.get("content", "").strip()
+    if not content:
+        return _json_error("content is required", 400, "missing_content")
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            INSERT INTO admin_knowledge (content, category, expires_at, source_flag_id, added_by)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            content,
+            data.get("category", "general"),
+            data.get("expires_at"),
+            data.get("source_flag_id"),
+            g.current_user_row["username"] if g.get("current_user_row") else "admin",
+        ))
+        conn.commit()
+        return jsonify({"id": cursor.lastrowid, "message": "Knowledge entry added"}), 201
+    except Exception as e:
+        return _json_error(str(e), 500, "admin_knowledge_add_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+@app.route("/admin/knowledge/<int:entry_id>", methods=["DELETE"])
+def admin_deactivate_knowledge(entry_id):
+    result = _require_admin()
+    if result:
+        return result
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("UPDATE admin_knowledge SET active = FALSE WHERE id = %s", (entry_id,))
+        conn.commit()
+        return jsonify({"message": "Entry deactivated"})
+    except Exception as e:
+        return _json_error(str(e), 500, "admin_knowledge_deactivate_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+@app.route("/admin/flags/<int:flag_id>/comment", methods=["PUT"])
+def admin_comment_flag(flag_id):
+    result = _require_admin()
+    if result:
+        return result
+    data = request.get_json() or {}
+    comment = data.get("moderator_comment", "").strip()
+    resolved = data.get("resolved", False)
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            UPDATE interaction_log
+            SET moderator_comment = %s,
+                resolved = %s,
+                resolved_at = %s
+            WHERE id = %s
+        """, (
+            comment,
+            resolved,
+            datetime.datetime.utcnow() if resolved else None,
+            flag_id,
+        ))
+        conn.commit()
+        return jsonify({"message": "Flag updated"})
+    except Exception as e:
+        return _json_error(str(e), 500, "admin_flag_comment_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
 
 
 if __name__ == "__main__":
