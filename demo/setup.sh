@@ -37,6 +37,24 @@ else
   docker compose -f demo/docker-compose.demo.yml up -d
 fi
 
+echo "Waiting for MySQL demo database to be ready..."
+for i in $(seq 1 60); do
+  if docker exec mysql_demo mysqladmin ping -h 127.0.0.1 -u root -proot --silent >/dev/null 2>&1; then
+    echo "MySQL is ready."
+    break
+  fi
+  if [ "$i" -eq 60 ]; then
+    echo "MySQL did not become ready in time."
+    exit 1
+  fi
+  sleep 2
+done
+
+if [ "${DEMO_SYNC_LIVE_BOSTON_DATA:-0}" = "1" ]; then
+  echo "Syncing live 311 and crime data into the demo database..."
+  "$PYTHON" demo/sync_boston_data_to_demo.py
+fi
+
 # Activate the demo virtual environment for interactive use
 if [ -f ".venv_demo/bin/activate" ]; then
   . .venv_demo/bin/activate

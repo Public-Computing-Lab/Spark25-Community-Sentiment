@@ -29,7 +29,7 @@ except Exception:  # pragma: no cover
     genai = None  # type: ignore
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
 GEMINI_SUMMARY_MODEL = os.getenv("GEMINI_SUMMARY_MODEL", GEMINI_MODEL)
 
 
@@ -260,6 +260,10 @@ def _route_question(question: str) -> Dict[str, Any]:
         "═══════════════════════════════════════════════════════════════════════════════\n"
         "CRITICAL ROUTING RULES - ABSOLUTE PRIORITY (CHECK IN THIS ORDER):\n"
         "═══════════════════════════════════════════════════════════════════════════════\n\n"
+        "RULE 0: NEIGHBORHOOD NEWS / RSS QUESTIONS → 'rag' or 'hybrid'\n"
+        "   - If the question asks for recent neighborhood updates, what's new, recent news, or updates from a named community feed source\n"
+        "   - AND it does not ask for a specific day/week/date schedule\n"
+        "   - THEN mode MUST be 'hybrid' for general neighborhood updates, or 'rag' if a specific feed source is named\n\n"
         "RULE 1: CRIME-RELATED QUESTIONS → Route based on question type\n"
         "   - If the question mentions ANY of: crime, crimes, arrest, arrests, offense, offenses, homicide, homicides, shooting, shootings, shots fired, safety incident, safety incidents, criminal activity, violence, violent\n"
         "   - THEN apply these sub-rules:\n"
@@ -396,6 +400,14 @@ def _route_question(question: str) -> Dict[str, Any]:
     # Cap k at reasonable maximum (20)
     if k > 20:
         k = 20
+
+    if _looks_like_rss_query(question):
+        if _question_mentions_rss_source(question):
+            mode = "rag"
+        elif mode == "sql":
+            mode = "hybrid"
+        if not folders:
+            folders = ["newsletters"]
 
     return {
         "mode": mode,
@@ -583,16 +595,92 @@ def _is_calendar_question(question: str) -> bool:
     return any(kw in question_lower for kw in calendar_keywords)
 
 
+_RSS_SOURCE_ALIASES = (
+    "dot reporter",
+    "dotnews",
+    "csndc",
+    "codman square neighborhood development corporation",
+    "codman square library",
+    "bpl codman square",
+)
+_RSS_NEWS_HINTS = (
+    "what's new",
+    "whats new",
+    "recent news",
+    "latest news",
+    "news about",
+    "news from",
+    "updates from",
+    "recent updates",
+    "what's going on in",
+    "whats going on in",
+    "what's happening in",
+    "whats happening in",
+    "what is happening in",
+    "what is going on in",
+    "lately in",
+)
+_SCHEDULE_HINTS = (
+    "event",
+    "events",
+    "calendar",
+    "schedule",
+    "meeting",
+    "meetings",
+    "workshop",
+    "workshops",
+    "today",
+    "tomorrow",
+    "this week",
+    "next week",
+    "weekend",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+)
+
+
+def _question_mentions_rss_source(question: str) -> bool:
+    question_lower = (question or "").lower()
+    return any(alias in question_lower for alias in _RSS_SOURCE_ALIASES)
+
+
+def _looks_like_rss_query(question: str) -> bool:
+    question_lower = (question or "").lower()
+    if _question_mentions_rss_source(question):
+        return True
+    if any(hint in question_lower for hint in _RSS_NEWS_HINTS):
+        return not any(schedule_hint in question_lower for schedule_hint in _SCHEDULE_HINTS)
+    return False
+
+
+def _should_include_rss(question: str, folder_categories: Optional[List[str]]) -> bool:
+    normalized = {str(value).strip().lower() for value in (folder_categories or []) if value}
+    return "newsletters" in normalized or _looks_like_rss_query(question)
+
+
 def _run_rag(question: str, plan: Dict[str, Any], conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     k = int(plan.get("k", 5))
     tags = plan.get("transcript_tags")
     sources = plan.get("policy_sources")
+    folders = plan.get("folder_categories") if isinstance(plan.get("folder_categories"), list) else None
 
     combined_chunks: List[str] = []
     combined_meta: List[Dict[str, Any]] = []
 
-    # NOTE: Calendar events are now SQL-only (weekly_events table), not in vector DB.
-    # Event queries should use 'sql' or 'hybrid' mode which handles them via SQL.
+    if _should_include_rss(question, folders):
+        try:
+            rss_res = retrieval.retrieve_rss(question, k=k)
+            rss_chunks = rss_res.get("chunks", [])
+            print(f"  📰 RSS: {len(rss_chunks)} chunks found")
+            combined_chunks.extend(rss_chunks)
+            combined_meta.extend(rss_res.get("metadata", []))
+        except Exception as e:
+            print(f"  ⚠️ RSS retrieval error: {e}")
 
     # transcripts
     try:
@@ -791,5 +879,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

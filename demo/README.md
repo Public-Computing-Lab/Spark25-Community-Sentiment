@@ -35,7 +35,16 @@ This will:
 - Create a `.venv_demo` virtual environment just for the demo
 - Install Python dependencies from the root `requirements.txt`
 - Unzip `demo/vectordb_new.zip` so the vector DB is available
-- Start a MySQL demo database using Docker (`mysql:8` image) and import `mysql_demo_dump.sql`
+- Start a MySQL demo database using Docker (`mysql:8` image) and import `mysql_demo_dump.sql` into a named Docker volume on first boot
+- Wait for MySQL to become reachable before handing control back
+
+Optional:
+
+- To keep the demo dump but also refresh live Boston 311/crime records afterward, run:
+
+  ```bash
+  DEMO_SYNC_LIVE_BOSTON_DATA=1 bash demo/setup.sh
+  ```
 
 ### 2. Environment variables
 
@@ -85,6 +94,35 @@ python -m http.server 8000
 ```
 
 Then open `http://localhost:8000` in your browser. Make sure the backend is running first.
+
+### 4. Keeping your demo data between restarts
+
+The demo MySQL container now uses a named Docker volume: `ml_misi_mysql_demo_data`. That means your accounts, chat threads, and flagged responses will persist across normal container restarts.
+
+Use these commands when you want to pause and resume the demo without losing data:
+
+```bash
+docker compose -f demo/docker-compose.demo.yml stop
+docker compose -f demo/docker-compose.demo.yml start
+```
+
+Or, if you prefer `down` / `up`, this is also safe:
+
+```bash
+docker compose -f demo/docker-compose.demo.yml down
+docker compose -f demo/docker-compose.demo.yml up -d
+```
+
+Do not run `docker compose -f demo/docker-compose.demo.yml down -v` unless you intentionally want a clean reset. `-v` deletes the named volume and forces the demo DB to be recreated from `mysql_demo_dump.sql`.
+
+If you already created the container before this change, do one one-time reset so Docker recreates it with the persistent volume attached:
+
+```bash
+docker compose -f demo/docker-compose.demo.yml down
+docker compose -f demo/docker-compose.demo.yml up -d
+```
+
+After that one reset, future restarts will keep your local accounts and conversations.
 
 ### Notes
 
@@ -213,4 +251,3 @@ If pre-built wheels are not available:
    ```bat
    demo\setup_windows.bat
    ```
-
