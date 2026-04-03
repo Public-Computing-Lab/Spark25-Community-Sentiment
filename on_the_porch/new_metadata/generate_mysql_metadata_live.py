@@ -13,7 +13,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
-
+from dotenv import load_dotenv
 try:
     import pymysql
     from pymysql.cursors import DictCursor
@@ -21,6 +21,11 @@ except ImportError:
     print("ERROR: pymysql not installed. Run: pip install pymysql")
     sys.exit(1)
 
+_THIS_FILE = Path(__file__).resolve()
+_REAL_DIR = _THIS_FILE.parent
+_ROOT_DIR = _REAL_DIR.parent.parent
+print(_ROOT_DIR)
+load_dotenv(_ROOT_DIR / ".env")
 
 # Default MySQL connection settings (can be overridden by environment variables)
 MYSQL_CONFIG = {
