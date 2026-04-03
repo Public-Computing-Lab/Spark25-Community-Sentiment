@@ -304,7 +304,7 @@ def _ensure_dorchester_filter(sql: str, schema: str) -> str:
         else:
             # Can't determine filter, return as-is
             return sql
-    
+
     # Inject the filter into WHERE clause
     where_match = re.search(r'\bWHERE\b', sql, re.IGNORECASE)
     if where_match:
@@ -327,7 +327,7 @@ def _ensure_dorchester_filter(sql: str, schema: str) -> str:
         else:
             # No WHERE, ORDER BY, or LIMIT - add WHERE at the end
             sql = sql.rstrip().rstrip(';') + " WHERE " + dorchester_filter
-    
+
     return sql
 
 
@@ -525,8 +525,10 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
     try:
         content = _call_gemini_with_logging(default_model, full_prompt, temperature=0)
         sql = _extract_sql_from_text(content)
+        print("\n[Generated SQL Before Dorchester Filter]\n" + sql + "\n")
         # Post-process to ensure Dorchester filter is present
         sql = _ensure_dorchester_filter(sql, schema)
+        print("\n[Generated SQL After Dorchester Filter]\n" + sql + "\n")
         return sql
     except Exception as exc:
         raise RuntimeError(f"Gemini error: {exc}")
@@ -607,8 +609,10 @@ def _llm_refine_sql(
     prompt = f"{system_prompt}\n\n{user_prompt}"
     content = _call_gemini_with_logging(default_model, prompt, temperature=0)
     sql = _extract_sql_from_text(content)
+    print("\n[Refined SQL Before Dorchester Filter]\n" + sql + "\n")
     # Post-process to ensure Dorchester filter is present
     sql = _ensure_dorchester_filter(sql, schema)
+    print("\n[Refined SQL After Dorchester Filter]\n" + sql + "\n")
     return sql
 
 
@@ -1143,6 +1147,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
 
