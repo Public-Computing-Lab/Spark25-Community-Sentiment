@@ -9,10 +9,3 @@ services:
       MYSQL_PASSWORD: demo_pass
     ports:
       - "3306:3306"
-    volumes:
-      - mysql_demo_data:/var/lib/mysql
-      - ./mysql_demo_dump.sql:/docker-entrypoint-initdb.d/mysql_demo_dump.sql:ro
-
-volumes:
-  mysql_demo_data:
-    name: ml_misi_mysql_demo_data

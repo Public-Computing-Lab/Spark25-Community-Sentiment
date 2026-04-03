@@ -28,9 +28,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # Boston CKAN API base URL
 BOSTON_CKAN_API = "https://data.boston.gov/api/3/action"
 _THIS_FILE = Path(__file__).resolve()
-_ROOT_DIR = _THIS_FILE.parents[3]
+_REAL_DIR = _THIS_FILE.parent.parent
+_ROOT_DIR = _REAL_DIR.parent.parent
+print(_ROOT_DIR)
 load_dotenv(_ROOT_DIR / ".env")
-
+print(os.getenv("MYSQL_HOST"))
 # Default MySQL connection settings (can be overridden by environment variables)
 MYSQL_CONFIG = {
     'host': os.getenv("MYSQL_HOST", "127.0.0.1"),
@@ -87,9 +89,9 @@ class BostonDataSyncer:
                     "name": "311_service_requests",
                     "resource_id": "254adca6-64ab-4c5c-9fc0-a6da622be185",
                     "table_name": "service_requests_311",
-                    "primary_key": "case_id",
-                    "date_field": "open_date",
-                    "description": "311 service requests",
+                    "primary_key": "CASE_ID",
+                    "date_field": "OPEN_DATE",
+                    "description": "311 service requests (2024)",
                     "enabled": False
                 }
             ],
@@ -296,10 +298,11 @@ class BostonDataSyncer:
             SQL CREATE TABLE statement
         """
         columns = []
-        
+        print(df.describe)
         for col in df.columns:
             col_clean = col.replace(' ', '_').replace('-', '_').lower()
             dtype = df[col].dtype
+            print ("error in col= ",col )
             
             if col_clean == primary_key.lower().replace(' ', '_').replace('-', '_'):
                 col_def = f"`{col_clean}` VARCHAR(255) PRIMARY KEY"
@@ -317,6 +320,9 @@ class BostonDataSyncer:
                 varchar_len = min(max(max_len * 2, 255), 65535)  # Reasonable max
                 col_def = f"`{col_clean}` VARCHAR({varchar_len})"
             
+            if "nan" in col_def:
+                col_def=col_def.replace("nan","255")
+                
             columns.append(col_def)
         
         # Add indexes on common fields
@@ -336,7 +342,7 @@ class BostonDataSyncer:
         sql = f"""CREATE TABLE IF NOT EXISTS `{table_name}` (
     {columns_str}{index_sql}
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"""
-        
+        print(sql)
         return sql
     
     def sync_dataset(self, dataset_config: Dict, incremental: bool = True) -> Dict:
@@ -1165,3 +1171,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
