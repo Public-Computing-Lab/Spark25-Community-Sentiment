@@ -307,13 +307,14 @@ def fetch_crime_records(
     limit: int = 5000,
 ) -> List[Dict[str, Any]]:
     since = datetime.now() - timedelta(days=days)
+    select_sql = ", ".join(f"`{column}`" for column in _COLS_CRIME)
     with conn.cursor() as cursor:
         cursor.execute(
             f"""
-            SELECT {', '.join(_COLS_CRIME)}
-            FROM crime_incident_reports
-            WHERE occurred_on_date >= %s
-            ORDER BY occurred_on_date DESC
+            SELECT {select_sql}
+            FROM `crime_incident_reports`
+            WHERE `occurred_on_date` >= %s
+            ORDER BY `occurred_on_date` DESC
             LIMIT %s
             """,
             (since.strftime("%Y-%m-%d %H:%M:%S"), limit),
