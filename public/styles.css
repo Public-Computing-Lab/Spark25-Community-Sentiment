@@ -554,11 +554,14 @@ a {
 }
 
 .app-container {
-  min-height: 100dvh;
+  height: calc(100dvh - 36px);
+  min-height: calc(100dvh - 36px);
+  max-height: calc(100dvh - 36px);
   display: grid;
   grid-template-columns: 380px minmax(0, 1fr);
   gap: 18px;
   padding: 18px;
+  overflow: hidden;
 }
 
 .sidebar,
@@ -574,12 +577,14 @@ a {
 .sidebar {
   display: flex;
   flex-direction: column;
-  min-height: calc(100dvh - 36px);
+  min-height: 0;
+  height: 100%;
 }
 
 .sidebar-top {
   position: relative;
   z-index: 1;
+  flex-shrink: 0;
 }
 
 .sidebar-header,
@@ -716,12 +721,13 @@ a {
 }
 
 .sidebar-section--threads {
-  flex: 1;
-  min-height: 260px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
 }
 
 .sidebar-section--events {
+  flex: 0 0 auto;
   max-height: 42dvh;
   overflow: auto;
 }
@@ -880,7 +886,8 @@ a {
 .chat-container {
   display: flex;
   flex-direction: column;
-  min-height: calc(100dvh - 36px);
+  min-height: 0;
+  height: 100%;
 }
 
 .chat-header {
@@ -933,6 +940,8 @@ a {
   position: relative;
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   padding: 24px 24px 10px;
   overflow: hidden;
 }
@@ -950,7 +959,8 @@ a {
 .chat-messages {
   position: relative;
   z-index: 1;
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   padding: 14px 18px 26px;
   display: flex;
@@ -1282,12 +1292,17 @@ a {
 
 @media (max-width: 860px) {
   .app-container {
+    height: auto;
+    min-height: 100dvh;
+    max-height: none;
     grid-template-columns: 1fr;
+    overflow: visible;
   }
 
   .sidebar,
   .chat-container {
     min-height: auto;
+    height: auto;
   }
 
   .sidebar-section--events {

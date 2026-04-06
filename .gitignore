@@ -29,7 +29,9 @@ llm_query_log.csv
 logs/
 *.sqlite
 *.db
-
+vectordb_new/
+on_the_porch/vectordb_new/
+on_the_porch/vectordb_new/*.sqlite3
 
 
 # 5️⃣ Flask & Gunicorn Deployment Files

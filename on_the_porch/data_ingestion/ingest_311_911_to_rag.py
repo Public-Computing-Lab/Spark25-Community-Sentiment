@@ -359,15 +359,15 @@ def fetch_crime_records(
     Skips records whose incident_number is already tracked.
     """
     since = datetime.now() - timedelta(days=days)
-    cols = ", ".join(COLS_CRIME)
+    select_sql = ", ".join(f"`{column}`" for column in COLS_CRIME)
 
     with conn.cursor() as cur:
         cur.execute(
             f"""
-            SELECT {cols}
-            FROM crime_incident_reports
-            WHERE occurred_on_date >= %s
-            ORDER BY occurred_on_date DESC
+            SELECT {select_sql}
+            FROM `crime_incident_reports`
+            WHERE `occurred_on_date` >= %s
+            ORDER BY `occurred_on_date` DESC
             LIMIT %s
             """,
             (since.strftime("%Y-%m-%d %H:%M:%S"), limit),
