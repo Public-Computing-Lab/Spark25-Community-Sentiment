@@ -377,192 +377,6 @@
       color: #fecaca;
     }
 
-    .btn-sm { 
-      padding: 6px 12px;
-      font-size: 13px;
-    }
-
-    .btn-danger { 
-      background: rgba(239,68,68,0.1);
-      border-color: rgba(239,68,68,0.35);
-      color: #fca5a5;
-    }
-
-    .btn-success { 
-      background: rgba(22,199,132,0.1);
-      border-color: rgba(22,199,132,0.35);
-      color: var(--accent);
-    }
-
-    .flag-expand-row { 
-      display: none;
-    }
-
-    .flag-expand-row.open { 
-      display: table-row;
-    }
-
-    .flag-expand-inner { 
-      padding: 18px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      background: rgba(7,17,29,0.6);
-    }
-
-    .expand-block label { 
-      display: block;
-      font-family: var(--mono);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }
-
-    .expand-block p { 
-      font-size: 13px;
-      color: var(--text);
-      line-height: 1.6;
-    }
-
-    .comment-box { 
-      width: 100%;
-      min-height: 80px;
-      padding: 10px 12px;
-      background: rgba(20,31,49,0.8);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      color: var(--text);
-      font-size: 13px;
-      resize: vertical;
-    }
-
-    .comment-box:focus { 
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    .flag-action-row { 
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .resolved-badge { 
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: rgba(22,199,132,0.12);
-      border: 1px solid rgba(22,199,132,0.3);
-      color: var(--accent);
-      font-size: 11px;
-      font-family: var(--mono);
-    }
-
-    .knowledge-form {
-      display: grid;
-      gap: 14px;
-      padding: 20px;
-      border-radius: 16px;
-      background: rgba(20,31,49,0.5);
-      border: 1px solid var(--border);
-      margin-bottom: 24px;
-    }
-
-    .knowledge-form textarea { 
-      width: 100%;
-      min-height: 100px;
-      padding: 12px 14px;
-      background: rgba(10,18,31,0.8);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      color: var(--text);
-      font-size: 14px;
-      resize: vertical;
-    }
-
-    .knowledge-form textarea:focus { 
-      outline: none;
-      border-color: var(--accent); 
-    }
-
-    .knowledge-form-row { 
-      display: flex;
-      gap: 12px;
-      align-items: flex-end;
-      flex-wrap: wrap;
-    }
-
-    .knowledge-form select, .knowledge-form input[type="datetime-local"] { 
-      padding: 10px 12px;
-      background: rgba(10,18,31,0.8);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      color: var(--text);
-      font-size: 13px;
-    }
-
-    .knowledge-list { 
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .knowledge-item {
-      padding: 14px 16px;
-      border-radius: 14px;
-      background: var(--panel-alt);
-      border: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 16px;
-    }
-
-    .knowledge-item-body { 
-      flex: 1;
-    }
-
-    .knowledge-item-content { 
-      font-size: 14px;
-      color: var(--text);
-      margin-bottom: 8px;
-      line-height: 1.5;
-    }
-
-    .knowledge-item-meta { 
-      font-size: 12px;
-      color: var(--muted);
-      font-family: var(--mono);
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .cat-badge { 
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: rgba(59,130,246,0.12);
-      color: #93c5fd;
-      font-size: 11px;
-      font-family: var(--mono);
-    }
-
-    .form-success { 
-      padding: 10px 14px;
-      border-radius: 10px;
-      background: rgba(22,199,132,0.1);
-      border: 1px solid rgba(22,199,132,0.3);
-      color: var(--accent);
-      font-size: 13px;
-      display: none;
-    }
-
     @media (max-width: 1100px) {
       .stats-grid,
       .split {
@@ -632,7 +446,6 @@
       <button class="tab" data-tab="flags" type="button">Flags</button>
       <button class="tab" data-tab="interactions" type="button">Interactions</button>
       <button class="tab" data-tab="noresults" type="button">No results</button>
-      <button class="tab" data-tab="knowledge" type="button">Community Notes</button>
     </nav>
 
     <main class="content">
@@ -671,7 +484,7 @@
                 <th>Question</th>
                 <th>Reason</th>
                 <th>Mode</th>
-                <th>Status</th>
+                <th>Thread</th>
                 <th>Flagged at</th>
               </tr>
             </thead>
@@ -718,36 +531,6 @@
           </table>
         </div>
       </section>
-
-      <section class="panel tab-panel" data-panel="knowledge" hidden>
-        <h2>Community Notes</h2>
-        <p class="panel-copy">Add local knowledge the chatbot uses when answering questions. Notes with an expiry automatically stop being used after that date.</p>
-        <div class="knowledge-form">
-          <textarea id="knowledge-content" placeholder="e.g. Talbot Ave near Wales St is icy — advise residents to take care"></textarea>
-          <div class="knowledge-form-row">
-            <div class="form-field">
-              <label style="font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:6px;">Category</label>
-              <select id="knowledge-category">
-                <option value="general">General</option>
-                <option value="safety">Safety</option>
-                <option value="events">Events</option>
-                <option value="infrastructure">Infrastructure</option>
-                <option value="community">Community</option>
-              </select>
-            </div>
-            <div class="form-field">
-              <label style="font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:6px;">Expires (optional)</label>
-              <input type="datetime-local" id="knowledge-expires">
-            </div>
-            <button class="btn btn-sm" id="knowledge-submit" type="button" style="margin-top:auto">Add note</button>
-          </div>
-          <div class="form-success" id="knowledge-success">Note added — the chatbot will use this in future responses.</div>
-        </div>
-        <h3 style="font-size:11px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:14px;">Active notes</h3>
-        <div class="knowledge-list" id="knowledge-list">
-          <div class="empty">Loading…</div>
-        </div>
-      </section>
     </main>
   </div>
 
@@ -761,8 +544,6 @@
       interactions: [],
       noResults: [],
       activeTab: 'overview',
-      knowledge: [],
-      expandedFlagId: null,
     };
 
     const elements = {
@@ -788,12 +569,6 @@
       flagsBody: document.getElementById('flags-body'),
       interactionsBody: document.getElementById('interactions-body'),
       noResultsBody: document.getElementById('noresults-body'),
-      knowledgeList: document.getElementById('knowledge-list'),
-      knowledgeContent: document.getElementById('knowledge-content'),
-      knowledgeCategory: document.getElementById('knowledge-category'),
-      knowledgeExpires: document.getElementById('knowledge-expires'),
-      knowledgeSubmit: document.getElementById('knowledge-submit'),
-      knowledgeSuccess: document.getElementById('knowledge-success'),
     };
 
     function escapeHtml(value) {
@@ -874,92 +649,19 @@
     }
 
     function renderFlags() {
-      const tbody = elements.flagsBody;
-      tbody.innerHTML = '';
-      if (!state.flags.length) {
-        tbody.innerHTML = `<tr><td class="empty" colspan="6">No flagged interactions.</td></tr>`;
-        return;
-      }
-      state.flags.forEach((row) => {
-        const isExpanded = state.expandedFlagId === row.id;
-        const tr = document.createElement('tr');
-        tr.style.cursor = 'pointer';
-        tr.innerHTML = `
-          <td><span class="mono">${escapeHtml(String(row.id))}</span></td>
-          <td>${escapeHtml(row.client_query || '—')}</td>
-          <td>
-            <span class="danger">${escapeHtml(row.flag_reason || '—')}</span>
-            ${row.flag_details ? `<div class="muted" style="font-size:12px;margin-top:2px">${escapeHtml(row.flag_details)}</div>` : ''}
-          </td>
-          <td><span class="mono">${escapeHtml(row.data_selected || '—')}</span></td>
-          <td>${row.resolved ? '<span class="resolved-badge">✓ Resolved</span>' : '<span style="color:var(--warning);font-size:12px;font-family:var(--mono)">Pending</span>'}</td>
-          <td><span class="muted">${escapeHtml(formatDate(row.flagged_at || row.created_at))}</span></td>
-        `;
-        tr.addEventListener('click', () => toggleFlagExpand(row.id));
-        tbody.appendChild(tr);
-
-        const expandTr = document.createElement('tr');
-        expandTr.className = `flag-expand-row${isExpanded ? ' open' : ''}`;
-        expandTr.innerHTML = `
-          <td colspan="6" style="padding:0;border-bottom:1px solid var(--border)">
-            <div class="flag-expand-inner">
-              <div class="expand-block">
-                <label>Full question</label>
-                <p>${escapeHtml(row.client_query || '—')}</p>
-              </div>
-              <div class="expand-block">
-                <label>Bot response</label>
-                <p>${escapeHtml(row.app_response || '—')}</p>
-              </div>
-              <div class="expand-block" style="grid-column:1/-1">
-                <label>Moderator comment</label>
-                <textarea class="comment-box" id="comment-${row.id}" placeholder="What was wrong? What should the correct answer be?">${escapeHtml(row.moderator_comment || '')}</textarea>
-                <div class="flag-action-row">
-                  <button class="btn-ghost btn-sm" type="button" onclick="saveComment(${row.id}, event)">Save comment</button>
-                  <button class="btn-ghost btn-sm btn-success" type="button" onclick="resolveFlag(${row.id}, event)">Mark resolved</button>
-                  <button class="btn-ghost btn-sm" type="button" onclick="pushToKnowledge(${row.id}, event)">Push to knowledge base</button>
-                </div>
-              </div>
-            </div>
-          </td>
-        `;
-        tbody.appendChild(expandTr);
-      });
-    }
-
-    function toggleFlagExpand(flagId) {
-      state.expandedFlagId = state.expandedFlagId === flagId ? null : flagId;
-      renderFlags();
-    }
-
-    async function saveComment(flagId, event) {
-      event.stopPropagation();
-      const comment = document.getElementById(`comment-${flagId}`)?.value || '';
-      const result = await ApiClient.adminCommentFlag(flagId, comment, false);
-      if (!result.success) { alert(result.error); return; }
-      const flag = state.flags.find(f => f.id === flagId);
-      if (flag) flag.moderator_comment = comment;
-      alert('Comment saved.');
-    }
-
-    async function resolveFlag(flagId, event) {
-      event.stopPropagation();
-      const comment = document.getElementById(`comment-${flagId}`)?.value || '';
-      const result = await ApiClient.adminCommentFlag(flagId, comment, true);
-      if (!result.success) { alert(result.error); return; }
-      const flag = state.flags.find(f => f.id === flagId);
-      if (flag) { flag.resolved = true; flag.moderator_comment = comment; }
-      renderFlags();
-    }
-
-    async function pushToKnowledge(flagId, event) {
-      event.stopPropagation();
-      const comment = document.getElementById(`comment-${flagId}`)?.value || '';
-      if (!comment.trim()) { alert('Add a comment first — this is what gets pushed to the knowledge base.'); return; }
-      const result = await ApiClient.adminAddKnowledge({ content: comment, category: 'general', source_flag_id: flagId });
-      if (!result.success) { alert(result.error); return; }
-      alert('Pushed to knowledge base.');
-      if (state.activeTab === 'knowledge') await loadKnowledge();
+      renderTableRows(
+        elements.flagsBody,
+        state.flags,
+        [
+          (row) => `<span class="mono">${escapeHtml(String(row.id))}</span>`,
+          (row) => escapeHtml(row.client_query || '—'),
+          (row) => `<span class="danger">${escapeHtml(row.flag_reason || '—')}</span><div class="muted">${escapeHtml(row.flag_details || '')}</div>`,
+          (row) => `<span class="mono">${escapeHtml(row.data_selected || '—')}</span>`,
+          (row) => `<span class="mono">${escapeHtml(row.thread_id || '—')}</span>`,
+          (row) => `<span class="muted">${escapeHtml(formatDate(row.flagged_at || row.created_at))}</span>`,
+        ],
+        'No flagged interactions.'
+      );
     }
 
     function renderInteractions() {
@@ -993,61 +695,6 @@
       );
     }
 
-    async function loadKnowledge() {
-      const result = await ApiClient.adminGetKnowledge();
-      if (!result.success) return;
-      state.knowledge = result.data.knowledge || [];
-      renderKnowledge();
-    }
-
-    function renderKnowledge() {
-      const list = elements.knowledgeList;
-      list.innerHTML = '';
-      const active = state.knowledge.filter(k => k.active);
-      if (!active.length) { list.innerHTML = `<div class="empty">No active notes yet. Add one above.</div>`; return; }
-      active.forEach((item) => {
-        const div = document.createElement('div');
-        div.className = 'knowledge-item';
-        div.innerHTML = `
-          <div class="knowledge-item-body">
-            <div class="knowledge-item-content">${escapeHtml(item.content)}</div>
-            <div class="knowledge-item-meta">
-              <span class="cat-badge">${escapeHtml(item.category || 'general')}</span>
-              <span>Added by ${escapeHtml(item.added_by || '—')}</span>
-              <span>${escapeHtml(formatDate(item.created_at))}</span>
-              ${item.expires_at ? `<span class="warning">Expires ${escapeHtml(formatDate(item.expires_at))}</span>` : ''}
-              ${item.source_flag_id ? `<span class="muted">From flag #${escapeHtml(String(item.source_flag_id))}</span>` : ''}
-            </div>
-          </div>
-          <button class="btn-ghost btn-sm btn-danger" type="button" onclick="deactivateKnowledge(${item.id})">Remove</button>
-        `;
-        list.appendChild(div);
-      });
-    }
-
-    async function deactivateKnowledge(id) {
-      if (!confirm('Remove this note?')) return;
-      const result = await ApiClient.adminDeleteKnowledge(id);
-      if (!result.success) { alert(result.error); return; }
-      state.knowledge = state.knowledge.map(k => k.id === id ? { ...k, active: false } : k);
-      renderKnowledge();
-    }
-
-    async function submitKnowledge() {
-      const content = elements.knowledgeContent.value.trim();
-      if (!content) { alert('Enter a note first.'); return; }
-      const payload = { content, category: elements.knowledgeCategory.value };
-      const expires = elements.knowledgeExpires.value;
-      if (expires) payload.expires_at = new Date(expires).toISOString();
-      const result = await ApiClient.adminAddKnowledge(payload);
-      if (!result.success) { alert(result.error); return; }
-      elements.knowledgeContent.value = '';
-      elements.knowledgeExpires.value = '';
-      elements.knowledgeSuccess.style.display = 'block';
-      setTimeout(() => { elements.knowledgeSuccess.style.display = 'none'; }, 3500);
-      await loadKnowledge();
-    }
-
     function switchTab(nextTab) {
       state.activeTab = nextTab;
       elements.tabs.forEach((tab) => {
@@ -1059,7 +706,6 @@
           panel.hidden = panel.dataset.panel !== 'overview';
         }
       });
-      if (nextTab === 'knowledge') loadKnowledge();
     }
 
     async function logout() {
@@ -1133,7 +779,6 @@
     elements.refreshButton.addEventListener('click', loadAll);
     elements.logoutButton.addEventListener('click', logout);
     elements.accessLogout.addEventListener('click', logout);
-    elements.knowledgeSubmit.addEventListener('click', submitKnowledge);
 
     bootstrap();
   </script>

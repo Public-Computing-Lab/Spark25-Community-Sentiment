@@ -1,25 +1,17 @@
 #!/usr/bin/env python3
-"""
-Run the existing Boston data syncer against the demo MySQL database
-and sync only the 911/crime + 311 datasets into sentiment_demo.
+"""Sync live Boston 311 and crime data into the demo MySQL database."""
 
-Usage:
-    python3 demo/sync_boston_data_to_demo.py
+from __future__ import annotations
 
-Optional:
-    python3 demo/sync_boston_data_to_demo.py --full
-"""
-
+import argparse
 import os
 import sys
-import argparse
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-# Force the syncer to use the demo DB
-os.environ["MYSQL_HOST"] = "localhost"
+os.environ["MYSQL_HOST"] = "127.0.0.1"
 os.environ["MYSQL_PORT"] = "3306"
 os.environ["MYSQL_USER"] = "demo_user"
 os.environ["MYSQL_PASSWORD"] = "demo_pass"
@@ -27,22 +19,15 @@ os.environ["MYSQL_DB"] = "sentiment_demo"
 
 from on_the_porch.data_ingestion.boston_data_sync.boston_data_sync import BostonDataSyncer
 
-
 TARGET_DATASETS = {
-    "crime_incident_reports",   # 911/crime data
-    "311_service_requests",     # 311 data
+    "crime_incident_reports",
+    "311_service_requests",
 }
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Sync Boston 311 and 911 data into sentiment_demo"
-    )
-    parser.add_argument(
-        "--full",
-        action="store_true",
-        help="Do a full sync instead of incremental sync",
-    )
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Sync Boston 311 and crime data into sentiment_demo")
+    parser.add_argument("--full", action="store_true", help="Run a full sync instead of incremental sync")
     args = parser.parse_args()
 
     print("Using demo DB connection:")
@@ -57,11 +42,9 @@ def main():
             for dataset in syncer.datasets_config["datasets"]
             if dataset.get("name") in TARGET_DATASETS
         ]
-
         if not matched:
             raise RuntimeError(
-                "No matching datasets found in boston_datasets_config.json "
-                "for crime_incident_reports or 311_service_requests."
+                "No matching datasets found in the Boston dataset config for crime_incident_reports or 311_service_requests."
             )
 
         print("\nDatasets to sync:")
