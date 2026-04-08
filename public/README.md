@@ -1,69 +1,67 @@
-# On The Porch - Frontend
+# On The Porch frontend
 
-A simple frontend for the Dorchester Community Assistant chatbot.
+This frontend now uses server-managed user sessions instead of sending a shared API key from the browser.
 
-## Quick Start
+## Local run
 
-1. **Start the backend API:**
+1. Start MySQL.
+2. Start the API from the repo root:
    ```bash
-   cd ml-misi-community-sentiment
-   python api/api_v2.py
+   ./venv/bin/python api/api_v2.py
    ```
-
-2. **Serve the frontend:**
+3. Serve the static frontend:
    ```bash
-   # From project root
    cd public
    python -m http.server 8000
    ```
-
-3. **Open in browser:**
+4. Open:
+   ```text
+   http://127.0.0.1:8000
    ```
-   http://localhost:8000
-   ```
 
-## Configuration
+## Auth flow
 
-### API Connection
+- `index.html` bootstraps by calling `GET /auth/me`.
+- The API sets a readable CSRF cookie and, after login, an `HttpOnly` session cookie.
+- Email/password sign-in and account creation go through `/auth/signup` and `/auth/login`.
+- Google sign-in is available only when the OAuth environment variables are configured.
+- Conversations are loaded from `/conversations` and `/conversations/:id/messages`.
+- The chat UI no longer treats in-browser history as the source of truth.
 
-Edit `app.js` or `api.js` to configure the API connection:
+## Admin access
 
-```javascript
-const API_BASE_URL = 'http://127.0.0.1:8888';
-const API_KEY = 'banana';  // Must match backend RETHINKAI_API_KEYS
-```
+- `admin.html` now relies on the same authenticated session.
+- Only users with `role=admin` can access admin endpoints.
+- There is no client-side admin password anymore.
 
-### API Authentication
+## Runtime configuration
 
-The frontend requires a valid API key. The default is `'banana'` which matches the backend default.
+`api.js` uses this order when choosing the API base URL:
 
-If you've changed the backend keys in `.env`, update the `API_KEY` in both `app.js` and `api.js`.
+1. `window.APP_CONFIG.apiBaseUrl` from `public/config.js`
+2. `window.APP_CONFIG.API_BASE_URL` from `public/config.js`
+3. `http://127.0.0.1:8888` when the frontend is served from port `8000`
+4. same-origin relative requests for production-style deployments
+
+Optional timeout overrides in `public/config.js`:
+
+- `window.APP_CONFIG.requestTimeoutMs`: default timeout for normal API calls
+- `window.APP_CONFIG.chatTimeoutMs`: timeout for `/conversations/:id/messages`
+
+By default, normal API calls time out after 30 seconds, but chat requests do not auto-timeout in the browser.
 
 ## Files
 
-- `index.html` - Main page structure
-- `app.js` - Main application logic
-- `api.js` - API client with error handling
-- `styles.css` - Styling
-
-## Features
-
-- Chat interface with conversation history
-- Upcoming events sidebar
-- Source citations for responses
-- API status indicator
-- Quick suggestion chips
+- `index.html`: auth, profile-completion, chat, and events UI
+- `app.js`: session bootstrap, thread management, and chat behavior
+- `api.js`: cookie-based API client with CSRF header handling
+- `config.js`: optional runtime API-base override
+- `admin.html`: authenticated admin dashboard
+- `styles.css`: shared frontend styling
 
 ## Troubleshooting
 
-**401 Unauthorized:**
-- Check that `API_KEY` matches `RETHINKAI_API_KEYS` in backend `.env`
-
-**Connection errors:**
-- Make sure backend is running on port 8888
-- Check browser console for details
-
-**Events not loading:**
-- Verify MySQL database is running and accessible
-- Check that `weekly_events` table exists
-
+- `401 auth_required`: you are not signed in, or your session expired
+- `403 csrf_failed`: load the app first so `/auth/me` can seed the CSRF cookie, then retry
+- `409 profile_incomplete`: finish choosing a username before using chat
+- `503 google_oauth_disabled`: Google OAuth environment variables are not configured on the API server

@@ -140,19 +140,17 @@ def get_already_ingested_ids(
 def mark_ingested(
     conn: pymysql.connections.Connection,
     source_type: str,
-    records: List[Tuple[str, str]],  # [(record_id, chunk_id), ...]
+    records: List[Tuple[str, str]],  
 ) -> int:
-    """Bulk-insert ingestion tracking rows, ignoring duplicates."""
     if not records:
         return 0
-    with conn.cursor() as cur:
-        cur.executemany(
+    with conn.cursor() as cursor:
+        cursor.executemany(
             f"""
-            INSERT IGNORE INTO {RAG_TRACKING_TABLE}
-                (source_type, record_id, chunk_id)
+            INSERT IGNORE INTO {RAG_TRACKING_TABLE} (source_type, record_id, chunk_id)
             VALUES (%s, %s, %s)
             """,
-            [(source_type, rid, cid) for rid, cid in records],
+            [(source_type, record_id, chunk_id) for record_id, chunk_id in records],
         )
     conn.commit()
     return len(records)
@@ -273,7 +271,6 @@ def build_311_documents(
                 metadata["lng"] = str(float(lng))
             except (ValueError, TypeError):
                 pass
-
         documents.append(Document(page_content=text, metadata=metadata))
         tracking.append((record_id, chunk_id))
 
@@ -458,7 +455,6 @@ def build_crime_documents(
                 metadata["lng"] = str(float(lng))
             except (ValueError, TypeError):
                 pass
-
         documents.append(Document(page_content=text, metadata=metadata))
         tracking.append((record_id, chunk_id))
 
@@ -878,5 +874,4 @@ if __name__ == "__main__":
         include_aggregates=not args.no_aggregates,
         max_individual=args.max_records,
     )
-
     _print_summary(stats)

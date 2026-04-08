@@ -4,67 +4,124 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>On The Porch</title>
-  
-  <!-- Favicon -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏘️</text></svg>">
-  
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
-  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=20260403a">
 </head>
 <body>
-  <!-- Main App Container -->
-  <div class="app-container">
-    <!-- Sidebar (Events Panel) -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <h2>Upcoming Events</h2>
-      </div>
-      
-      <div class="sidebar-filters">
-        <div class="filter-group">
-          <label for="events-days">Time Range</label>
-          <select id="events-days">
-            <option value="7">Next 7 days</option>
-            <option value="14" selected>Next 14 days</option>
-            <option value="30">Next 30 days</option>
-          </select>
+  <div class="auth-shell" id="auth-view">
+    <div class="auth-scene">
+      <section class="auth-story">
+        <div class="story-badge">Dorchester Decoded</div>
+        <h1>Neighborhood answers with receipts.</h1>
+        <p class="story-copy">
+          Search local events, public data, and policy documents in one place, with every conversation tied to your own account.
+        </p>
+        <div class="story-grid">
+          <article class="story-card">
+            <span class="story-index">01</span>
+            <h2>User-scoped threads</h2>
+            <p>Each conversation belongs to one account, so follow-ups and history stay separate.</p>
+          </article>
+          <article class="story-card">
+            <span class="story-index">02</span>
+            <h2>Grounded answers</h2>
+            <p>Chat responses surface source links from community newsletters, policy docs, and city data.</p>
+          </article>
+          <article class="story-card">
+            <span class="story-index">03</span>
+            <h2>Local-first workflow</h2>
+            <p>Events, services, safety, and neighborhood context stay in one interface instead of scattered tools.</p>
+          </article>
         </div>
-        <div class="filter-group">
-          <label for="events-limit">Show</label>
-          <select id="events-limit">
-            <option value="5">5 events</option>
-            <option value="10" selected>10 events</option>
-            <option value="20">20 events</option>
-          </select>
+      </section>
+
+      <section class="auth-card">
+        <div class="brand-mark">🏘️</div>
+        <h2 class="auth-title">On The Porch</h2>
+        <p class="auth-subtitle">Sign in to keep every conversation tied to your account.</p>
+
+        <div class="auth-tabs">
+          <button class="auth-tab active" id="tab-login" type="button">Login</button>
+          <button class="auth-tab" id="tab-signup" type="button">Create account</button>
         </div>
-        <button class="btn-refresh" id="events-refresh" aria-label="Refresh events">↻</button>
-      </div>
-      
-      <div class="sidebar-content">
-        <div class="loading-state" id="events-loading" hidden>
-          <div class="spinner"></div>
-          <p>Loading events...</p>
-        </div>
-        
-        <div class="error-state" id="events-error" hidden role="alert"></div>
-        
-        <div class="events-list" id="events-list"></div>
-        
-        <div class="empty-state" id="events-empty" hidden>
-          <p>No upcoming events found</p>
-        </div>
-      </div>
-    </aside>
-    
-    <!-- Main Chat Area -->
-    <main class="chat-container">
-      <!-- Top Bar -->
-      <header class="chat-header">
-        <div class="header-left">
+
+        <form id="login-form" class="auth-form">
+          <label>
+            <span>Email</span>
+            <input type="email" id="login-email" autocomplete="email" required>
+          </label>
+          <label>
+            <span>Password</span>
+            <input type="password" id="login-password" autocomplete="current-password" required>
+          </label>
+          <button class="btn-primary auth-submit" type="submit">Sign in</button>
+        </form>
+
+        <form id="signup-form" class="auth-form" hidden>
+          <label>
+            <span>Username</span>
+            <input type="text" id="signup-username" autocomplete="username" required>
+          </label>
+          <label>
+            <span>Email</span>
+            <input type="email" id="signup-email" autocomplete="email" required>
+          </label>
+          <label>
+            <span>Password</span>
+            <input type="password" id="signup-password" autocomplete="new-password" required>
+          </label>
+          <button class="btn-primary auth-submit" type="submit">Create account</button>
+        </form>
+
+        <div class="auth-divider"><span>or</span></div>
+
+        <button class="btn-secondary auth-google" id="google-auth-button" type="button">
+          <span class="google-mark" aria-hidden="true">G</span>
+          <span>Continue with Google</span>
+        </button>
+
+        <div class="auth-error" id="auth-error" hidden></div>
+        <p class="auth-note">Local accounts stay isolated by user, and Google sign-in works once OAuth credentials are configured.</p>
+      </section>
+    </div>
+  </div>
+
+  <div class="auth-shell" id="profile-view" hidden>
+    <div class="auth-scene auth-scene--compact">
+      <section class="auth-story auth-story--compact">
+        <div class="story-badge">Final step</div>
+        <h1>Claim your handle.</h1>
+        <p class="story-copy">
+          Pick the username this account will use across saved threads, feedback, and admin-visible interaction logs.
+        </p>
+      </section>
+
+      <section class="auth-card auth-card--compact">
+        <div class="brand-mark">👤</div>
+        <h2 class="auth-title">Finish your profile</h2>
+        <p class="auth-subtitle">Choose a username before you enter the app.</p>
+
+        <form id="profile-form" class="auth-form">
+          <label>
+            <span>Username</span>
+            <input type="text" id="profile-username" autocomplete="username" required>
+          </label>
+          <button class="btn-primary auth-submit" type="submit">Save username</button>
+        </form>
+
+        <button class="btn-secondary" id="profile-logout" type="button">Log out</button>
+        <div class="auth-error" id="profile-error" hidden></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="app-container" id="app-view" hidden>
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-header">
           <div class="logo">
             <div class="logo-icon">🏘️</div>
             <div class="logo-text">
@@ -73,90 +130,160 @@
             </div>
           </div>
         </div>
-        
+
+        <section class="sidebar-section account-section">
+          <div class="account-summary">
+            <div>
+              <div class="account-label">Signed in as</div>
+              <div class="account-name" id="account-username">—</div>
+              <div class="account-email" id="account-email">—</div>
+            </div>
+            <div class="account-providers" id="account-providers"></div>
+          </div>
+          <div class="account-actions">
+            <button class="btn-secondary small" id="google-link-toggle" type="button">Link Google</button>
+            <a class="btn-secondary small hidden" id="admin-link" href="admin.html">Admin</a>
+            <button class="btn-secondary small" id="logout-button" type="button">Log out</button>
+          </div>
+        </section>
+      </div>
+
+      <section class="sidebar-section sidebar-section--threads">
+        <div class="section-heading">
+          <div>
+            <div class="section-kicker">History</div>
+            <h2>Conversations</h2>
+          </div>
+          <button class="btn-icon" id="new-thread-button" type="button" aria-label="Create conversation">＋</button>
+        </div>
+        <div class="thread-list" id="thread-list"></div>
+      </section>
+
+      <section class="sidebar-section sidebar-section--events">
+        <div class="section-heading">
+          <div>
+            <div class="section-kicker">Calendar</div>
+            <h2>Upcoming Events</h2>
+          </div>
+          <button class="btn-icon" id="events-refresh" type="button" aria-label="Refresh events">↻</button>
+        </div>
+        <div class="sidebar-filters">
+          <div class="filter-group">
+            <label for="events-days">Time range</label>
+            <select id="events-days">
+              <option value="7">Next 7 days</option>
+              <option value="14" selected>Next 14 days</option>
+              <option value="30">Next 30 days</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="events-limit">Show</label>
+            <select id="events-limit">
+              <option value="5">5 events</option>
+              <option value="10" selected>10 events</option>
+              <option value="20">20 events</option>
+            </select>
+          </div>
+        </div>
+        <div class="loading-state" id="events-loading" hidden>
+          <div class="spinner"></div>
+          <p>Loading events...</p>
+        </div>
+        <div class="error-state" id="events-error" hidden></div>
+        <div class="events-list" id="events-list"></div>
+        <div class="empty-state" id="events-empty" hidden>
+          <p>No upcoming events found</p>
+        </div>
+      </section>
+    </aside>
+
+    <main class="chat-container">
+      <header class="chat-header">
+        <div class="thread-heading">
+          <div class="thread-heading-label">Current conversation</div>
+          <h2 id="active-thread-title">New conversation</h2>
+        </div>
         <div class="header-right">
+          <button class="btn-secondary small" id="rename-thread-button" type="button">Rename</button>
+          <button class="btn-secondary small danger" id="delete-thread-button" type="button">Delete</button>
           <div class="status-indicator" id="api-status">
             <span class="status-dot"></span>
             <span class="status-text">Checking...</span>
           </div>
         </div>
       </header>
-      
-      <!-- Chat Messages -->
-      <div class="chat-messages" id="chat-messages">
-        <div class="message assistant welcome">
-          <div class="message-avatar">🤖</div>
-          <div class="message-content">
-            <div class="message-text">
-              <p><strong>Welcome to the Dorchester Community Assistant!</strong></p>
-              <p>I'm here to help you discover:</p>
-              <ul>
-                <li>📅 Upcoming community events and activities</li>
-                <li>📊 311 service requests and neighborhood data</li>
-                <li>🏘️ Local policies and planning information</li>
-                <li>🗺️ Place-based questions about specific areas</li>
-              </ul>
-              <p>What would you like to know about your community?</p>
-            </div>
-          </div>
-        </div>
+
+      <div class="chat-stage">
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="error-banner" id="chat-error" hidden></div>
       </div>
-      
-      <!-- Error Banner -->
-      <div class="error-banner" id="chat-error" hidden role="alert"></div>
-      
-      <!-- Chat Input -->
+
       <div class="chat-input-container">
         <form id="chat-form" class="chat-form">
           <div class="input-wrapper">
-            <input 
-              type="text" 
-              id="chat-input" 
-              placeholder="Ask about events, safety, services, or neighborhood trends..."
+            <input
+              type="text"
+              id="chat-input"
+              placeholder="Ask about events, services, safety, or neighborhood trends..."
               autocomplete="off"
               aria-label="Chat input"
             >
-            <button type="submit" id="chat-submit" class="btn-send" aria-label="Send message">
+            <button class="btn-send" id="chat-submit" type="submit" aria-label="Send message">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </button>
           </div>
-          
+
           <div class="suggestions" id="suggestions">
-            <button type="button" class="suggestion-chip" data-query="What events are happening this week?">
-              Events this week
-            </button>
-            <button type="button" class="suggestion-chip" data-query="How many 311 requests were filed last month?">
-              311 activity
-            </button>
-            <button type="button" class="suggestion-chip" data-query="What are the main safety concerns in Dorchester?">
-              Safety overview
-            </button>
+            <button class="suggestion-chip" type="button" data-query="What events are happening this week?">Events this week</button>
+            <button class="suggestion-chip" type="button" data-query="How many 311 requests were filed last month?">311 activity</button>
+            <button class="suggestion-chip" type="button" data-query="What are the main safety concerns in Dorchester?">Safety overview</button>
           </div>
         </form>
       </div>
     </main>
   </div>
 
-  <div id="flag-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
-  <div style="background:#1a2a3a; border:1px solid #2a3a4a; border-radius:12px; padding:32px; width:420px; max-width:90vw;">
-    <h3 style="margin:0 0 8px; color:#e2e8f0; font-size:16px;">Report a problem</h3>
-    <p style="margin:0 0 20px; color:#94a3b8; font-size:13px;">What's wrong with this response?</p>
-    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
-      <label style="color:#e2e8f0; font-size:14px; cursor:pointer;"><input type="radio" name="flag-reason" value="Factually incorrect" style="margin-right:8px;"> Factually incorrect</label>
-      <label style="color:#e2e8f0; font-size:14px; cursor:pointer;"><input type="radio" name="flag-reason" value="Information is outdated" style="margin-right:8px;"> Information is outdated</label>
-      <label style="color:#e2e8f0; font-size:14px; cursor:pointer;"><input type="radio" name="flag-reason" value="Not relevant to my question" style="margin-right:8px;"> Not relevant to my question</label>
-      <label style="color:#e2e8f0; font-size:14px; cursor:pointer;"><input type="radio" name="flag-reason" value="Other" style="margin-right:8px;"> Other</label>
-    </div>
-    <textarea id="flag-detail" placeholder="Additional details (optional)" style="width:100%; padding:10px; background:#0f1b2d; border:1px solid #2a3a4a; border-radius:8px; color:#e2e8f0; font-size:13px; resize:vertical; min-height:80px; margin-bottom:16px; box-sizing:border-box;"></textarea>
-    <div style="display:flex; gap:10px; justify-content:flex-end;">
-      <button id="flag-cancel" style="padding:8px 16px; background:transparent; border:1px solid #2a3a4a; border-radius:6px; color:#94a3b8; cursor:pointer; font-size:13px;">Cancel</button>
-      <button id="flag-submit" style="padding:8px 16px; background:#ef4444; border:none; border-radius:6px; color:white; cursor:pointer; font-size:13px; font-weight:600;">Submit 🚩</button>
+  <div class="modal-backdrop" id="flag-modal" hidden>
+    <div class="modal-card">
+      <h3>Report a problem</h3>
+      <p class="modal-copy">What went wrong with this response?</p>
+      <div class="flag-options">
+        <label><input type="radio" name="flag-reason" value="Factually incorrect"> Factually incorrect</label>
+        <label><input type="radio" name="flag-reason" value="Information is outdated"> Information is outdated</label>
+        <label><input type="radio" name="flag-reason" value="Not relevant to my question"> Not relevant to my question</label>
+        <label><input type="radio" name="flag-reason" value="Other"> Other</label>
+      </div>
+      <textarea id="flag-detail" placeholder="Additional detail (optional)"></textarea>
+      <div class="modal-error" id="flag-error" hidden></div>
+      <div class="modal-actions">
+        <button class="btn-secondary small" id="flag-cancel" type="button">Cancel</button>
+        <button class="btn-primary small" id="flag-submit" type="button">Submit</button>
+      </div>
     </div>
   </div>
-</div>
-  <script src="api.js"></script>
-  <script src="app.js"></script>
+
+  <div class="modal-backdrop" id="thread-modal" hidden>
+    <div class="modal-card">
+      <h3 id="thread-modal-title">Rename conversation</h3>
+      <p class="modal-copy" id="thread-modal-copy">Give this thread a title you can find again later.</p>
+      <label class="modal-field" id="thread-modal-field">
+        <span>Conversation title</span>
+        <input id="thread-modal-input" type="text" maxlength="140" autocomplete="off">
+      </label>
+      <div class="modal-error" id="thread-modal-error" hidden></div>
+      <div class="modal-actions">
+        <button class="btn-secondary small" id="thread-modal-cancel" type="button">Cancel</button>
+        <button class="btn-primary small" id="thread-modal-confirm" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="config.js?v=20260317c"></script>
+  <script src="api.js?v=20260317c"></script>
+  <script src="app.js?v=20260317c"></script>
 </body>
 </html>

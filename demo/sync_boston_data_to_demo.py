@@ -9,7 +9,7 @@ Usage:
 Optional:
     python3 demo/sync_boston_data_to_demo.py --full
 """
-
+from __future__ import annotations
 import os
 import sys
 import argparse

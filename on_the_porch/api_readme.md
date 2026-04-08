@@ -115,7 +115,7 @@ Create a `.env` file in the project root or `on_the_porch/` directory:
 ```env
 # Gemini API (required)
 GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-2.5-flash-lite
+GEMINI_MODEL=gemini-2.5-pro
 
 # MySQL Database (required)
 MYSQL_HOST=127.0.0.1
@@ -813,4 +813,3 @@ For issues or questions:
 2. Review server logs for error details
 3. Ensure all environment variables are set correctly
 4. Verify MySQL and Chroma databases are accessible
-

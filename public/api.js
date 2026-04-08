@@ -1,54 +1,93 @@
-// API Client for Dorchester Community Assistant
-// Handles all API communication with error handling and timeouts
+const runtimeBaseUrl =
+  window.APP_CONFIG?.apiBaseUrl ||
+  window.APP_CONFIG?.API_BASE_URL ||
+  (window.location.port === '8000' ? 'http://127.0.0.1:8888' : '');
+
+function parseTimeoutMs(value, fallback) {
+  if (value === null || value === 'null' || value === 'none' || value === 'off') {
+    return null;
+  }
+  if (value === undefined || value === '') {
+    return fallback;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
 
 const ApiConfig = {
-  baseUrl: 'http://127.0.0.1:8888',
-  timeoutMs: 30000,
-  apiKey: 'banana', // Set your RETHINKAI_API_KEY here
+  baseUrl: runtimeBaseUrl,
+  timeoutMs: parseTimeoutMs(
+    window.APP_CONFIG?.requestTimeoutMs ?? window.APP_CONFIG?.REQUEST_TIMEOUT_MS,
+    30000
+  ),
+  chatTimeoutMs: parseTimeoutMs(
+    window.APP_CONFIG?.chatTimeoutMs ?? window.APP_CONFIG?.CHAT_TIMEOUT_MS,
+    null
+  ),
 };
 
-/**
- * Make an API request with timeout and error handling
- * @param {string} path - API endpoint path
- * @param {Object} options - Fetch options
- * @returns {Promise<{success: boolean, status: number|null, data: any, error: string|null}>}
- */
+function getCookie(name) {
+  const encoded = `${name}=`;
+  const parts = document.cookie.split(';');
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(encoded)) {
+      return decodeURIComponent(trimmed.slice(encoded.length));
+    }
+  }
+  return '';
+}
+
 async function apiRequest(path, options = {}) {
+  const { timeoutMs: requestTimeoutMs, ...fetchOptions } = options;
+  const timeoutMs = requestTimeoutMs === undefined ? ApiConfig.timeoutMs : requestTimeoutMs;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), ApiConfig.timeoutMs);
+  const shouldAbort = Number.isFinite(timeoutMs) && timeoutMs > 0;
+  const timeoutId = shouldAbort ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  const method = (fetchOptions.method || 'GET').toUpperCase();
+  const headers = {
+    ...(fetchOptions.headers || {}),
+  };
+
+  if (!headers['Content-Type'] && !['GET', 'HEAD'].includes(method)) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    const csrfToken = getCookie('otp_csrf');
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+  }
 
   try {
     const response = await fetch(`${ApiConfig.baseUrl}${path}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'RethinkAI-API-Key': ApiConfig.apiKey,
-        ...(options.headers || {}),
-      },
-      credentials: 'include', // Include cookies for session management
-      signal: controller.signal,
-      ...options,
+      credentials: 'include',
+      signal: shouldAbort ? controller.signal : undefined,
+      ...fetchOptions,
+      method,
+      headers,
     });
 
     let payload = null;
-    try {
-      const text = await response.text();
-      if (text) {
+    const text = await response.text();
+    if (text) {
+      try {
         payload = JSON.parse(text);
+      } catch (error) {
+        payload = { raw: text };
       }
-    } catch (e) {
-      // Not JSON or empty response
     }
 
     if (!response.ok) {
-      const message = 
-        (payload && (payload.error || payload.message)) ||
-        `Request failed with status ${response.status}`;
-
       return {
         success: false,
         status: response.status,
         data: payload,
-        error: message,
+        error: (payload && (payload.error || payload.message)) || `Request failed with status ${response.status}`,
       };
     }
 
@@ -59,14 +98,9 @@ async function apiRequest(path, options = {}) {
       error: null,
     };
   } catch (error) {
-    let message = 'Unable to reach the server. Please check your connection.';
-    
-    if (error.name === 'AbortError') {
-      message = 'The request took too long. Please try again.';
-    } else if (error.message) {
-      message = error.message;
-    }
-
+    const message = error.name === 'AbortError'
+      ? 'The request took too long. Please try again.'
+      : (error.message || 'Unable to reach the server.');
     return {
       success: false,
       status: null,
@@ -74,80 +108,54 @@ async function apiRequest(path, options = {}) {
       error: message,
     };
   } finally {
-    clearTimeout(timeoutId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
-/**
- * Check API health status
- * @returns {Promise<{success: boolean, status: number|null, data: any, error: string|null}>}
- */
-async function checkHealth() {
-  return apiRequest('/health', { method: 'GET' });
+function googleAuthUrl(intent = 'login', nextPath = '/') {
+  const params = new URLSearchParams({ intent, next: nextPath });
+  return `${ApiConfig.baseUrl}/auth/google/start?${params.toString()}`;
 }
 
-/**
- * Send a chat message
- * @param {string} message - User message
- * @param {Array} conversationHistory - Previous conversation messages
- * @returns {Promise<{success: boolean, status: number|null, data: any, error: string|null}>}
- */
-async function sendChatMessage(message, conversationHistory = []) {
-  return apiRequest('/chat', {
-    method: 'POST',
-    body: JSON.stringify({
-      message: message.trim(),
-      conversation_history: conversationHistory.slice(-10), // Last 10 messages
-    }),
-  });
-}
-
-/**
- * Fetch upcoming events
- * @param {number} daysAhead - Number of days to look ahead
- * @param {number} limit - Maximum number of events to return
- * @returns {Promise<{success: boolean, status: number|null, data: any, error: string|null}>}
- */
-async function fetchEvents(daysAhead = 14, limit = 10) {
-  const params = new URLSearchParams({
-    days_ahead: String(daysAhead),
-    limit: String(limit),
-  });
-  
-  return apiRequest(`/events?${params.toString()}`, {
-    method: 'GET',
-  });
-}
-
-/**
- * Log an interaction (optional)
- * @param {Object} data - Log data
- * @returns {Promise<{success: boolean, status: number|null, data: any, error: string|null}>}
- */
-async function logInteraction(data) {
-  return apiRequest('/log', {
-    method: 'POST',
-    body: JSON.stringify(data || {}),
-  });
-}
-
-async function flagInteraction(logId, flagReason, flagDetails) {
-  return apiRequest('/log', {
-    method: 'PUT',
-    body: JSON.stringify({
-      log_id: logId,
-      flag_reason: flagReason,
-      flag_details: flagDetails,
-    }),
-  });
-}
-
-// Export API client
 window.ApiClient = {
   config: ApiConfig,
-  checkHealth,
-  sendChatMessage,
-  fetchEvents,
-  logInteraction,
-  flagInteraction
+  request: apiRequest,
+  health: () => apiRequest('/health', { method: 'GET' }),
+  getSession: () => apiRequest('/auth/me', { method: 'GET' }),
+  signup: (payload) => apiRequest('/auth/signup', { method: 'POST', body: JSON.stringify(payload) }),
+  login: (payload) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
+  logout: () => apiRequest('/auth/logout', { method: 'POST', body: JSON.stringify({}) }),
+  googleAuthUrl,
+  completeProfile: (payload) => apiRequest('/auth/complete-profile', { method: 'POST', body: JSON.stringify(payload) }),
+  unlinkGoogle: () => apiRequest('/auth/unlink/google', { method: 'POST', body: JSON.stringify({}) }),
+  fetchThreads: () => apiRequest('/conversations', { method: 'GET' }),
+  createThread: (payload = {}) => apiRequest('/conversations', { method: 'POST', body: JSON.stringify(payload) }),
+  updateThread: (threadId, payload) => apiRequest(`/conversations/${threadId}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  deleteThread: (threadId) => apiRequest(`/conversations/${threadId}`, { method: 'DELETE', body: JSON.stringify({}) }),
+  fetchMessages: (threadId, params = {}) => {
+    const qs = new URLSearchParams();
+    if (params.limit) qs.set('limit', String(params.limit));
+    if (params.before) qs.set('before', params.before);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return apiRequest(`/conversations/${threadId}/messages${suffix}`, { method: 'GET' });
+  },
+  sendMessage: (threadId, payload) => apiRequest(`/conversations/${threadId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    timeoutMs: ApiConfig.chatTimeoutMs,
+  }),
+  fetchEvents: (daysAhead = 14, limit = 10) => {
+    const qs = new URLSearchParams({ days_ahead: String(daysAhead), limit: String(limit) });
+    return apiRequest(`/events?${qs.toString()}`, { method: 'GET' });
+  },
+  flagInteraction: (logId, flagReason, flagDetails) => apiRequest('/log', {
+    method: 'PUT',
+    body: JSON.stringify({ log_id: logId, flag_reason: flagReason, flag_details: flagDetails }),
+  }),
+  adminStats: () => apiRequest('/admin/stats', { method: 'GET' }),
+  adminFlags: () => apiRequest('/admin/flags', { method: 'GET' }),
+  adminInteractions: () => apiRequest('/admin/interactions', { method: 'GET' }),
+  adminNoResults: () => apiRequest('/admin/no-results', { method: 'GET' }),
 };

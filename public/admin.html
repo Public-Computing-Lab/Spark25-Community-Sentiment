@@ -3,454 +3,784 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin — On The Porch</title>
+  <title>Admin | On The Porch</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #080c14;
-      --bg2: #0e1420;
-      --bg3: #151d2e;
-      --bg4: #1c2640;
-      --border: #1e2d45;
-      --border2: #2a3d5a;
-      --accent: #10b981;
-      --accent2: #34d399;
-      --accent-glow: rgba(16,185,129,0.12);
-      --red: #ef4444;
-      --red-glow: rgba(239,68,68,0.12);
-      --yellow: #f59e0b;
-      --blue: #3b82f6;
-      --text: #e2e8f0;
-      --text2: #94a3b8;
-      --text3: #475569;
-      --mono: 'JetBrains Mono', monospace;
+      --bg: #07111d;
+      --panel: rgba(13, 22, 37, 0.96);
+      --panel-alt: rgba(20, 31, 49, 0.98);
+      --panel-soft: #16253b;
+      --border: #28405f;
+      --accent: #16c784;
+      --accent-soft: rgba(22, 199, 132, 0.12);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.38);
       --sans: 'Syne', sans-serif;
+      --mono: 'JetBrains Mono', monospace;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; }
-    body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; }
 
-    #login-screen {
-      display: flex; align-items: center; justify-content: center; min-height: 100vh;
-      background: radial-gradient(ellipse at 20% 50%, rgba(16,185,129,0.08) 0%, transparent 60%), var(--bg);
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
-    .login-card {
-      background: var(--bg2); border: 1px solid var(--border); border-radius: 16px;
-      padding: 48px; width: 380px; text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.6);
-    }
-    .login-badge {
-      display: inline-block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em;
-      text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent);
-      border-radius: 4px; padding: 4px 10px; margin-bottom: 20px;
-    }
-    .login-card h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
-    .login-card p { font-size: 13px; color: var(--text2); margin-bottom: 32px; }
-    .login-card input {
-      width: 100%; padding: 12px 16px; background: var(--bg3); border: 1px solid var(--border);
-      border-radius: 8px; color: var(--text); font-family: var(--mono); font-size: 14px;
-      margin-bottom: 12px; outline: none; transition: border-color 0.2s;
-    }
-    .login-card input:focus { border-color: var(--accent); }
-    .login-card button {
-      width: 100%; padding: 12px; background: var(--accent); border: none; border-radius: 8px;
-      color: #000; font-family: var(--sans); font-size: 14px; font-weight: 700; cursor: pointer;
-      transition: all 0.2s;
-    }
-    .login-card button:hover { background: var(--accent2); transform: translateY(-1px); }
-    .login-error { margin-top: 12px; font-size: 12px; color: var(--red); font-family: var(--mono); display: none; }
 
-    #dashboard { display: none; min-height: 100vh; }
-    .topbar {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 32px; background: var(--bg2); border-bottom: 1px solid var(--border);
-      position: sticky; top: 0; z-index: 50;
+    body {
+      min-height: 100vh;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(22, 199, 132, 0.12), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.12), transparent 30%),
+        linear-gradient(180deg, #07111d 0%, #0c1726 100%);
     }
-    .topbar-left { display: flex; align-items: center; gap: 20px; }
-    .topbar-brand { font-family: var(--mono); font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); }
-    .topbar-sep { width: 1px; height: 16px; background: var(--border2); }
-    .topbar h1 { font-size: 14px; font-weight: 600; }
-    .topbar-actions { display: flex; gap: 8px; }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(circle at center, black 40%, transparent 85%);
+      opacity: 0.18;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+    }
+
+    .card {
+      width: min(520px, 100%);
+      background: linear-gradient(180deg, rgba(13, 22, 37, 0.97), rgba(11, 19, 31, 0.94));
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      padding: 32px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(22, 199, 132, 0.24);
+      color: var(--accent);
+      font-size: 12px;
+      font-family: var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: 30px;
+      margin-bottom: 12px;
+    }
+
+    p {
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+      flex-wrap: wrap;
+    }
+
+    .btn,
+    .btn-ghost,
+    .tab {
+      border-radius: 999px;
+      border: 1px solid transparent;
+      transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
+    }
+
+    .btn {
+      padding: 11px 16px;
+      background: linear-gradient(135deg, #16c784, #34d399);
+      color: #03241a;
+      font-weight: 700;
+    }
+
     .btn-ghost {
-      padding: 6px 14px; background: transparent; border: 1px solid var(--border);
-      border-radius: 6px; color: var(--text2); font-family: var(--sans); font-size: 12px; cursor: pointer; transition: all 0.2s;
+      padding: 11px 16px;
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text);
     }
-    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-    .btn-ghost.danger:hover { border-color: var(--red); color: var(--red); }
 
-    .tabs { display: flex; padding: 0 32px; background: var(--bg2); border-bottom: 1px solid var(--border); gap: 4px; }
-    .tab { padding: 12px 18px; font-size: 13px; font-weight: 600; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; user-select: none; }
-    .tab:hover { color: var(--text2); }
-    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .btn:hover,
+    .btn-ghost:hover,
+    .tab:hover {
+      transform: translateY(-1px);
+    }
 
-    .content { padding: 32px; max-width: 1300px; margin: 0 auto; }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
+    .dashboard {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
 
-    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 28px;
+      background: rgba(10, 18, 31, 0.88);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+
+    .topbar-title h1 {
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+
+    .topbar-title p {
+      font-size: 13px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      padding: 16px 28px 0;
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      padding: 10px 14px;
+      background: var(--panel-soft);
+      border-color: var(--border);
+      color: var(--muted);
+    }
+
+    .tab.active {
+      border-color: rgba(22, 199, 132, 0.36);
+      background: rgba(22, 199, 132, 0.1);
+      color: var(--text);
+    }
+
+    .content {
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 24px 28px 32px;
+      display: grid;
+      gap: 24px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(13, 22, 37, 0.97), rgba(12, 21, 34, 0.93));
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .panel h2 {
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .panel-copy {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 18px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+
     .stat-card {
-      background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
-      padding: 20px 24px; position: relative; overflow: hidden;
+      padding: 18px;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(20, 31, 49, 0.98), rgba(17, 28, 43, 0.94));
+      border: 1px solid var(--border);
     }
-    .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--line, var(--accent)); }
-    .stat-card.red { --line: var(--red); }
-    .stat-card.yellow { --line: var(--yellow); }
-    .stat-card.blue { --line: var(--blue); }
-    .stat-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text3); margin-bottom: 10px; }
-    .stat-value { font-family: var(--mono); font-size: 36px; font-weight: 600; color: var(--text); line-height: 1; margin-bottom: 6px; }
-    .stat-card.red .stat-value { color: var(--red); }
-    .stat-card.yellow .stat-value { color: var(--yellow); }
-    .stat-card.blue .stat-value { color: var(--blue); }
-    .stat-card.green .stat-value { color: var(--accent); }
-    .stat-sub { font-size: 12px; color: var(--text3); }
 
-    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
-    .panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; }
-    .panel-title { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text3); margin-bottom: 16px; }
+    .stat-card label {
+      display: block;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-family: var(--mono);
+    }
 
-    .mode-bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-    .mode-bar-label { font-family: var(--mono); font-size: 11px; color: var(--text2); width: 56px; }
-    .mode-bar-track { flex: 1; height: 6px; background: var(--bg4); border-radius: 3px; overflow: hidden; }
-    .mode-bar-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
-    .mode-bar-count { font-family: var(--mono); font-size: 11px; color: var(--text3); width: 32px; text-align: right; }
+    .stat-card strong {
+      display: block;
+      font-size: 34px;
+      line-height: 1;
+      color: var(--text);
+    }
 
-    .reason-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-    .reason-label { font-size: 13px; color: var(--text2); }
-    .reason-count { font-family: var(--mono); font-size: 11px; padding: 2px 8px; background: var(--red-glow); border: 1px solid rgba(239,68,68,0.3); border-radius: 4px; color: var(--red); }
+    .split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
 
-    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-    .section-title { font-size: 14px; font-weight: 600; }
-    .section-sub { font-size: 12px; color: var(--text3); margin-top: 2px; }
+    .pill-row,
+    .list-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
 
-    .table-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 28px; }
-    .data-table { width: 100%; border-collapse: collapse; }
-    .data-table th { padding: 10px 16px; text-align: left; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); background: var(--bg3); border-bottom: 1px solid var(--border); }
-    .data-table td { padding: 12px 16px; font-size: 13px; color: var(--text2); border-bottom: 1px solid var(--border); vertical-align: top; }
-    .data-table tr:last-child td { border-bottom: none; }
-    .data-table tr:hover td { background: var(--bg3); cursor: pointer; }
-    .truncate { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
-    .mono { font-family: var(--mono); font-size: 11px; }
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+    }
 
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
-    .badge-red { background: var(--red-glow); color: var(--red); border: 1px solid rgba(239,68,68,0.25); }
-    .badge-green { background: var(--accent-glow); color: var(--accent); border: 1px solid rgba(16,185,129,0.25); }
-    .badge-blue { background: rgba(59,130,246,0.1); color: var(--blue); border: 1px solid rgba(59,130,246,0.25); }
-    .badge-gray { background: rgba(148,163,184,0.08); color: var(--text3); border: 1px solid var(--border); }
+    .item-row span:first-child {
+      color: var(--text);
+    }
 
-    .expand-row { display: none; }
-    .expand-row.open { display: table-row; }
-    .expand-cell { padding: 20px 24px; background: var(--bg); border-bottom: 1px solid var(--border); }
-    .expand-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .expand-block label { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
-    .expand-block p { font-size: 13px; color: var(--text2); line-height: 1.6; }
+    .count-badge {
+      min-width: 52px;
+      text-align: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(59, 130, 246, 0.12);
+      color: #93c5fd;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
 
-    .filter-row { display: flex; gap: 8px; margin-bottom: 14px; }
-    .filter-row select { padding: 7px 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; color: var(--text2); font-family: var(--sans); font-size: 12px; outline: none; cursor: pointer; }
-    .filter-row select:focus { border-color: var(--accent); }
+    .table-shell {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(20, 31, 49, 0.98), rgba(16, 27, 42, 0.94));
+    }
 
-    .empty { text-align: center; padding: 48px; color: var(--text3); font-size: 13px; }
-    .empty .icon { font-size: 28px; margin-bottom: 10px; }
-    .loading-text { text-align: center; padding: 40px; color: var(--text3); font-family: var(--mono); font-size: 12px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
 
-    @media (max-width: 900px) {
-      .stats-row { grid-template-columns: repeat(2, 1fr); }
-      .two-col { grid-template-columns: 1fr; }
-      .content { padding: 16px; }
-      .topbar, .tabs { padding-left: 16px; padding-right: 16px; }
+    th,
+    td {
+      padding: 14px 16px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid rgba(40, 64, 95, 0.7);
+      font-size: 14px;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      font-family: var(--mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      background: rgba(12, 21, 34, 0.98);
+    }
+
+    td {
+      color: var(--text);
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .mono {
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .danger {
+      color: #fca5a5;
+    }
+
+    .warning {
+      color: #fcd34d;
+    }
+
+    .status-note {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .empty {
+      padding: 20px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .error-banner {
+      margin-top: 18px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      background: rgba(239, 68, 68, 0.12);
+      color: #fecaca;
+    }
+
+    @media (max-width: 1100px) {
+      .stats-grid,
+      .split {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .shell,
+      .content {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .topbar,
+      .tabs {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .stats-grid,
+      .split {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
 <body>
-
-<div id="login-screen">
-  <div class="login-card">
-    <div class="login-badge">On The Porch</div>
-    <h1>Admin Dashboard</h1>
-    <p>Enter your password to continue</p>
-    <input type="password" id="pw-input" placeholder="Password" />
-    <button onclick="attemptLogin()">Sign In →</button>
-    <div class="login-error" id="login-error">Incorrect password. Try again.</div>
-  </div>
-</div>
-
-<div id="dashboard">
-  <div class="topbar">
-    <div class="topbar-left">
-      <span class="topbar-brand">On The Porch</span>
-      <div class="topbar-sep"></div>
-      <h1>Admin Dashboard</h1>
-    </div>
-    <div class="topbar-actions">
-      <button class="btn-ghost" onclick="loadAll()">↻ Refresh</button>
-      <button class="btn-ghost danger" onclick="logout()">Sign Out</button>
+  <div class="shell" id="loading-view">
+    <div class="card">
+      <div class="badge">Admin dashboard</div>
+      <h1>Checking access</h1>
+      <p>Verifying your signed-in session and loading the admin dashboard.</p>
     </div>
   </div>
 
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('overview')">Overview</div>
-    <div class="tab" onclick="switchTab('flags')">Flagged</div>
-    <div class="tab" onclick="switchTab('interactions')">Interactions</div>
-    <div class="tab" onclick="switchTab('noresults')">No Results</div>
+  <div class="shell" id="access-view" hidden>
+    <div class="card">
+      <div class="badge">Restricted</div>
+      <h1 id="access-title">Sign in required</h1>
+      <p id="access-copy">You need an authenticated account to access the admin dashboard.</p>
+      <div class="actions">
+        <a class="btn" href="index.html">Go to app</a>
+        <button class="btn-ghost" id="access-logout" type="button" hidden>Log out</button>
+      </div>
+      <div class="error-banner" id="access-error" hidden></div>
+    </div>
   </div>
 
-  <div class="content">
+  <div class="dashboard" id="dashboard" hidden>
+    <header class="topbar">
+      <div class="topbar-title">
+        <div class="badge">Operations</div>
+        <h1>On The Porch Admin</h1>
+        <p id="admin-identity">Loading session…</p>
+      </div>
+      <div class="topbar-actions">
+        <span class="status-note" id="refresh-status">Idle</span>
+        <a class="btn-ghost" href="index.html">Back to app</a>
+        <button class="btn-ghost" id="refresh-button" type="button">Refresh</button>
+        <button class="btn-ghost" id="logout-button" type="button">Log out</button>
+      </div>
+    </header>
 
-    <div class="tab-panel active" id="panel-overview">
-      <div class="stats-row">
-        <div class="stat-card green"><div class="stat-label">Total Interactions</div><div class="stat-value" id="s-total">—</div><div class="stat-sub">all time</div></div>
-        <div class="stat-card red"><div class="stat-label">Flagged</div><div class="stat-value" id="s-flagged">—</div><div class="stat-sub">needs review</div></div>
-        <div class="stat-card blue"><div class="stat-label">This Week</div><div class="stat-value" id="s-week">—</div><div class="stat-sub">interactions</div></div>
-        <div class="stat-card yellow"><div class="stat-label">No Results</div><div class="stat-value" id="s-noresults">—</div><div class="stat-sub">empty responses</div></div>
-      </div>
-      <div class="two-col">
-        <div class="panel"><div class="panel-title">Routing Mode Breakdown</div><div id="mode-bars"><div class="loading-text">Loading...</div></div></div>
-        <div class="panel"><div class="panel-title">Top Flag Reasons</div><div id="flag-reasons"><div class="loading-text">Loading...</div></div></div>
-      </div>
-      <div class="section-header"><div><div class="section-title">Recent Flags</div><div class="section-sub">Last 5 flagged responses</div></div></div>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Question</th><th>Reason</th><th>Mode</th><th>Flagged At</th></tr></thead>
-          <tbody id="recent-flags-body"><tr><td colspan="4"><div class="loading-text">Loading...</div></td></tr></tbody>
-        </table>
-      </div>
-    </div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="overview" type="button">Overview</button>
+      <button class="tab" data-tab="flags" type="button">Flags</button>
+      <button class="tab" data-tab="interactions" type="button">Interactions</button>
+      <button class="tab" data-tab="noresults" type="button">No results</button>
+    </nav>
 
-    <div class="tab-panel" id="panel-flags">
-      <div class="section-header"><div><div class="section-title">All Flagged Responses</div><div class="section-sub">Click a row to expand full details</div></div></div>
-      <div class="filter-row">
-        <select id="flag-filter" onchange="filterFlags()">
-          <option value="">All reasons</option>
-          <option value="Factually incorrect">Factually incorrect</option>
-          <option value="Information is outdated">Information is outdated</option>
-          <option value="Not relevant to my question">Not relevant</option>
-          <option value="Other">Other</option>
-        </select>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>ID</th><th>Question</th><th>Reason</th><th>Details</th><th>Mode</th><th>Flagged At</th></tr></thead>
-          <tbody id="flags-body"><tr><td colspan="6"><div class="loading-text">Loading...</div></td></tr></tbody>
-        </table>
-      </div>
-    </div>
+    <main class="content">
+      <section class="panel tab-panel" data-panel="overview">
+        <h2>Overview</h2>
+        <p class="panel-copy">High-level operational metrics for the authenticated production flow.</p>
+        <div class="stats-grid">
+          <div class="stat-card"><label>Total interactions</label><strong id="stat-total">—</strong></div>
+          <div class="stat-card"><label>Flagged</label><strong id="stat-flagged">—</strong></div>
+          <div class="stat-card"><label>This week</label><strong id="stat-week">—</strong></div>
+          <div class="stat-card"><label>No results</label><strong id="stat-noresults">—</strong></div>
+        </div>
+      </section>
 
-    <div class="tab-panel" id="panel-interactions">
-      <div class="section-header"><div><div class="section-title">Recent Interactions</div><div class="section-sub">Latest 50 questions and responses</div></div></div>
-      <div class="filter-row">
-        <select id="mode-filter" onchange="filterInteractions()">
-          <option value="">All modes</option>
-          <option value="sql">SQL</option>
-          <option value="rag">RAG</option>
-          <option value="hybrid">Hybrid</option>
-          <option value="history">History</option>
-        </select>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>ID</th><th>Question</th><th>Response</th><th>Mode</th><th>Flagged</th><th>Created</th></tr></thead>
-          <tbody id="interactions-body"><tr><td colspan="6"><div class="loading-text">Loading...</div></td></tr></tbody>
-        </table>
-      </div>
-    </div>
+      <section class="split tab-panel" data-panel="overview">
+        <div class="panel">
+          <h2>Routing mix</h2>
+          <p class="panel-copy">How the chatbot is routing recent questions.</p>
+          <div class="pill-row" id="mode-breakdown"></div>
+        </div>
+        <div class="panel">
+          <h2>Flag reasons</h2>
+          <p class="panel-copy">Most common reasons users are reporting assistant responses.</p>
+          <div class="pill-row" id="flag-reasons"></div>
+        </div>
+      </section>
 
-    <div class="tab-panel" id="panel-noresults">
-      <div class="section-header"><div><div class="section-title">No-Result Queries</div><div class="section-sub">Questions where the bot returned nothing useful</div></div></div>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>ID</th><th>Question</th><th>Mode</th><th>Date</th></tr></thead>
-          <tbody id="noresults-body"><tr><td colspan="4"><div class="loading-text">Loading...</div></td></tr></tbody>
-        </table>
-      </div>
-    </div>
+      <section class="panel tab-panel" data-panel="flags" hidden>
+        <h2>Flagged interactions</h2>
+        <p class="panel-copy">Recent responses marked by users for review.</p>
+        <div class="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Question</th>
+                <th>Reason</th>
+                <th>Mode</th>
+                <th>Thread</th>
+                <th>Flagged at</th>
+              </tr>
+            </thead>
+            <tbody id="flags-body"></tbody>
+          </table>
+        </div>
+      </section>
 
+      <section class="panel tab-panel" data-panel="interactions" hidden>
+        <h2>Recent interactions</h2>
+        <p class="panel-copy">Latest user questions and assistant responses.</p>
+        <div class="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>User</th>
+                <th>Question</th>
+                <th>Response</th>
+                <th>Mode</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="interactions-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel tab-panel" data-panel="noresults" hidden>
+        <h2>No-result queries</h2>
+        <p class="panel-copy">Questions where the assistant returned no useful answer.</p>
+        <div class="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>User</th>
+                <th>Question</th>
+                <th>Mode</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="noresults-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
   </div>
-</div>
 
-<script>
-  const API = 'http://127.0.0.1:8888';
-  const API_KEY = 'banana';
-  const ADMIN_PASSWORD = 'admin2026'; // update to match ADMIN_PASSWORD in your .env
+  <script src="config.js?v=20260317b"></script>
+  <script src="api.js?v=20260317b"></script>
+  <script>
+    const state = {
+      user: null,
+      stats: null,
+      flags: [],
+      interactions: [],
+      noResults: [],
+      activeTab: 'overview',
+    };
 
-  let allFlags = [];
-  let allInteractions = [];
+    const elements = {
+      loadingView: document.getElementById('loading-view'),
+      accessView: document.getElementById('access-view'),
+      dashboard: document.getElementById('dashboard'),
+      accessTitle: document.getElementById('access-title'),
+      accessCopy: document.getElementById('access-copy'),
+      accessError: document.getElementById('access-error'),
+      accessLogout: document.getElementById('access-logout'),
+      adminIdentity: document.getElementById('admin-identity'),
+      refreshStatus: document.getElementById('refresh-status'),
+      refreshButton: document.getElementById('refresh-button'),
+      logoutButton: document.getElementById('logout-button'),
+      tabs: Array.from(document.querySelectorAll('.tab')),
+      panels: Array.from(document.querySelectorAll('.tab-panel')),
+      statTotal: document.getElementById('stat-total'),
+      statFlagged: document.getElementById('stat-flagged'),
+      statWeek: document.getElementById('stat-week'),
+      statNoResults: document.getElementById('stat-noresults'),
+      modeBreakdown: document.getElementById('mode-breakdown'),
+      flagReasons: document.getElementById('flag-reasons'),
+      flagsBody: document.getElementById('flags-body'),
+      interactionsBody: document.getElementById('interactions-body'),
+      noResultsBody: document.getElementById('noresults-body'),
+    };
 
-  function attemptLogin() {
-    const pw = document.getElementById('pw-input').value;
-    if (pw === ADMIN_PASSWORD) {
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('dashboard').style.display = 'block';
-      loadAll();
-    } else {
-      document.getElementById('login-error').style.display = 'block';
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
-  }
 
-  document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+    function formatDate(value) {
+      if (!value) return '—';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleString();
+    }
 
-  function logout() {
-    document.getElementById('dashboard').style.display = 'none';
-    document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('pw-input').value = '';
-  }
+    function setView(name) {
+      elements.loadingView.hidden = name !== 'loading';
+      elements.accessView.hidden = name !== 'access';
+      elements.dashboard.hidden = name !== 'dashboard';
+    }
 
-  function switchTab(name) {
-    const names = ['overview', 'flags', 'interactions', 'noresults'];
-    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', names[i] === name));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    document.getElementById(`panel-${name}`).classList.add('active');
-  }
+    function setAccess(title, copy, error = '', showLogout = false) {
+      elements.accessTitle.textContent = title;
+      elements.accessCopy.textContent = copy;
+      elements.accessError.hidden = !error;
+      elements.accessError.textContent = error;
+      elements.accessLogout.hidden = !showLogout;
+      setView('access');
+    }
 
-  async function apiFetch(path) {
-    const res = await fetch(`${API}${path}`, {
-      headers: { 'RethinkAI-API-Key': API_KEY, 'X-Admin-Password': ADMIN_PASSWORD }
+    function setRefreshStatus(message) {
+      elements.refreshStatus.textContent = message;
+    }
+
+    function renderKeyValueRows(target, data, emptyMessage) {
+      target.innerHTML = '';
+      const entries = Object.entries(data || {});
+      if (!entries.length) {
+        target.innerHTML = `<div class="empty">${escapeHtml(emptyMessage)}</div>`;
+        return;
+      }
+      entries.forEach(([label, count]) => {
+        const row = document.createElement('div');
+        row.className = 'item-row';
+        row.innerHTML = `
+          <span>${escapeHtml(label)}</span>
+          <span class="count-badge">${escapeHtml(String(count))}</span>
+        `;
+        target.appendChild(row);
+      });
+    }
+
+    function renderTableRows(target, rows, columns, emptyMessage) {
+      target.innerHTML = '';
+      if (!rows.length) {
+        target.innerHTML = `<tr><td class="empty" colspan="${columns.length}">${escapeHtml(emptyMessage)}</td></tr>`;
+        return;
+      }
+
+      rows.forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = columns.map((column) => `<td>${column(row)}</td>`).join('');
+        target.appendChild(tr);
+      });
+    }
+
+    function renderOverview() {
+      const stats = state.stats || {};
+      elements.statTotal.textContent = stats.total_interactions ?? '0';
+      elements.statFlagged.textContent = stats.total_flagged ?? '0';
+      elements.statWeek.textContent = stats.interactions_this_week ?? '0';
+      elements.statNoResults.textContent = stats.no_result_count ?? '0';
+      renderKeyValueRows(elements.modeBreakdown, stats.mode_breakdown, 'No interaction routing data yet.');
+      renderKeyValueRows(elements.flagReasons, stats.flag_reasons, 'No flagged responses yet.');
+    }
+
+    function renderFlags() {
+      renderTableRows(
+        elements.flagsBody,
+        state.flags,
+        [
+          (row) => `<span class="mono">${escapeHtml(String(row.id))}</span>`,
+          (row) => escapeHtml(row.client_query || '—'),
+          (row) => `<span class="danger">${escapeHtml(row.flag_reason || '—')}</span><div class="muted">${escapeHtml(row.flag_details || '')}</div>`,
+          (row) => `<span class="mono">${escapeHtml(row.data_selected || '—')}</span>`,
+          (row) => `<span class="mono">${escapeHtml(row.thread_id || '—')}</span>`,
+          (row) => `<span class="muted">${escapeHtml(formatDate(row.flagged_at || row.created_at))}</span>`,
+        ],
+        'No flagged interactions.'
+      );
+    }
+
+    function renderInteractions() {
+      renderTableRows(
+        elements.interactionsBody,
+        state.interactions,
+        [
+          (row) => `<span class="mono">${escapeHtml(String(row.id))}</span>`,
+          (row) => `<span class="mono">${escapeHtml(row.user_id || 'anonymous')}</span>`,
+          (row) => escapeHtml(row.client_query || '—'),
+          (row) => escapeHtml(row.app_response || '—'),
+          (row) => `<span class="mono">${escapeHtml(row.data_selected || '—')}</span>`,
+          (row) => `<span class="muted">${escapeHtml(formatDate(row.created_at))}</span>`,
+        ],
+        'No interactions yet.'
+      );
+    }
+
+    function renderNoResults() {
+      renderTableRows(
+        elements.noResultsBody,
+        state.noResults,
+        [
+          (row) => `<span class="mono">${escapeHtml(String(row.id))}</span>`,
+          (row) => `<span class="mono">${escapeHtml(row.user_id || 'anonymous')}</span>`,
+          (row) => escapeHtml(row.client_query || '—'),
+          (row) => `<span class="mono">${escapeHtml(row.data_selected || '—')}</span>`,
+          (row) => `<span class="muted">${escapeHtml(formatDate(row.created_at))}</span>`,
+        ],
+        'No empty-result interactions logged.'
+      );
+    }
+
+    function switchTab(nextTab) {
+      state.activeTab = nextTab;
+      elements.tabs.forEach((tab) => {
+        tab.classList.toggle('active', tab.dataset.tab === nextTab);
+      });
+      elements.panels.forEach((panel) => {
+        panel.hidden = panel.dataset.panel !== nextTab && panel.dataset.panel !== 'overview';
+        if (nextTab === 'overview') {
+          panel.hidden = panel.dataset.panel !== 'overview';
+        }
+      });
+    }
+
+    async function logout() {
+      await ApiClient.logout();
+      window.location.href = 'index.html';
+    }
+
+    async function loadAll() {
+      setRefreshStatus('Refreshing…');
+      const [stats, flags, interactions, noResults] = await Promise.all([
+        ApiClient.adminStats(),
+        ApiClient.adminFlags(),
+        ApiClient.adminInteractions(),
+        ApiClient.adminNoResults(),
+      ]);
+
+      const failed = [stats, flags, interactions, noResults].find((result) => !result.success);
+      if (failed) {
+        if (failed.status === 401) {
+          setAccess('Session expired', 'Sign in again to continue using the admin dashboard.', failed.error);
+          return;
+        }
+        if (failed.status === 403) {
+          setAccess('Admin access required', 'Your current account is signed in, but it does not have the admin role.', failed.error, true);
+          return;
+        }
+        setRefreshStatus('Refresh failed');
+        window.alert(failed.error);
+        return;
+      }
+
+      state.stats = stats.data;
+      state.flags = flags.data.flags || [];
+      state.interactions = interactions.data.interactions || [];
+      state.noResults = noResults.data.no_results || [];
+      renderOverview();
+      renderFlags();
+      renderInteractions();
+      renderNoResults();
+      setRefreshStatus(`Updated ${new Date().toLocaleTimeString()}`);
+    }
+
+    async function bootstrap() {
+      setView('loading');
+      const session = await ApiClient.getSession();
+      if (!session.success) {
+        setAccess('Server unavailable', 'The admin dashboard could not reach the API.', session.error);
+        return;
+      }
+
+      if (!session.data.authenticated || !session.data.user) {
+        setAccess('Sign in required', 'Sign in through the main app first, then return here.');
+        return;
+      }
+
+      state.user = session.data.user;
+      if (state.user.role !== 'admin') {
+        setAccess('Admin access required', 'This account is authenticated but does not have the admin role.', '', true);
+        return;
+      }
+
+      elements.adminIdentity.textContent = `${state.user.username} · ${state.user.email}`;
+      setView('dashboard');
+      switchTab(state.activeTab);
+      await loadAll();
+    }
+
+    elements.tabs.forEach((tab) => {
+      tab.addEventListener('click', () => switchTab(tab.dataset.tab));
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  }
+    elements.refreshButton.addEventListener('click', loadAll);
+    elements.logoutButton.addEventListener('click', logout);
+    elements.accessLogout.addEventListener('click', logout);
 
-  async function loadAll() {
-    await Promise.all([loadStats(), loadFlags(), loadInteractions(), loadNoResults()]);
-  }
-
-  async function loadStats() {
-    try {
-      const d = await apiFetch('/admin/stats');
-      document.getElementById('s-total').textContent = d.total_interactions ?? '—';
-      document.getElementById('s-flagged').textContent = d.total_flagged ?? '—';
-      document.getElementById('s-week').textContent = d.interactions_this_week ?? '—';
-      document.getElementById('s-noresults').textContent = d.no_result_count ?? '—';
-
-      const colors = { sql:'#3b82f6', rag:'#10b981', hybrid:'#f59e0b', history:'#8b5cf6' };
-      const modes = d.mode_breakdown || {};
-      const total = Object.values(modes).reduce((a,b)=>a+b,0)||1;
-      document.getElementById('mode-bars').innerHTML = Object.keys(modes).length === 0
-        ? '<div class="empty" style="padding:20px">No data yet</div>'
-        : Object.entries(modes).map(([m,c]) => `
-            <div class="mode-bar-row">
-              <span class="mode-bar-label">${m}</span>
-              <div class="mode-bar-track"><div class="mode-bar-fill" style="width:${(c/total*100).toFixed(1)}%;background:${colors[m]||'#94a3b8'}"></div></div>
-              <span class="mode-bar-count">${c}</span>
-            </div>`).join('');
-
-      const reasons = d.flag_reasons || {};
-      document.getElementById('flag-reasons').innerHTML = Object.keys(reasons).length === 0
-        ? '<div class="empty" style="padding:20px">No flags yet</div>'
-        : Object.entries(reasons).sort((a,b)=>b[1]-a[1]).map(([r,c]) => `
-            <div class="reason-row"><span class="reason-label">${esc(r)}</span><span class="reason-count">${c}</span></div>`).join('');
-    } catch(e) { console.error('Stats error', e); }
-  }
-
-  async function loadFlags() {
-    try {
-      const d = await apiFetch('/admin/flags');
-      allFlags = d.flags || [];
-      renderFlags(allFlags);
-      renderRecentFlags(allFlags.slice(0,5));
-    } catch(e) {
-      document.getElementById('flags-body').innerHTML = '<tr><td colspan="6"><div class="empty">Could not load flags</div></td></tr>';
-    }
-  }
-
-  function renderFlags(flags) {
-    const tbody = document.getElementById('flags-body');
-    if (!flags.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="icon">🎉</div>No flagged responses yet</div></td></tr>'; return; }
-    tbody.innerHTML = flags.map(f => `
-      <tr onclick="toggleExpand(${f.id})">
-        <td class="mono">#${f.id}</td>
-        <td><span class="truncate">${esc(f.client_query)}</span></td>
-        <td><span class="badge badge-red">${esc(f.flag_reason||'—')}</span></td>
-        <td><span class="truncate" style="max-width:160px;color:var(--text3)">${esc(f.flag_details||'—')}</span></td>
-        <td><span class="badge badge-gray">${esc(f.data_selected||'—')}</span></td>
-        <td class="mono" style="white-space:nowrap">${fmtDate(f.flagged_at)}</td>
-      </tr>
-      <tr class="expand-row" id="expand-${f.id}">
-        <td colspan="6" class="expand-cell">
-          <div class="expand-grid">
-            <div class="expand-block"><label>Full Question</label><p>${esc(f.client_query)}</p></div>
-            <div class="expand-block"><label>Bot Response</label><p>${esc(f.app_response||'—')}</p></div>
-            <div class="expand-block"><label>Flag Detail</label><p>${esc(f.flag_details||'No detail provided')}</p></div>
-            <div class="expand-block"><label>Created At</label><p class="mono">${fmtDate(f.created_at)}</p></div>
-          </div>
-        </td>
-      </tr>`).join('');
-  }
-
-  function renderRecentFlags(flags) {
-    const tbody = document.getElementById('recent-flags-body');
-    if (!flags.length) { tbody.innerHTML = '<tr><td colspan="4"><div class="empty">No flags yet</div></td></tr>'; return; }
-    tbody.innerHTML = flags.map(f => `
-      <tr>
-        <td><span class="truncate">${esc(f.client_query)}</span></td>
-        <td><span class="badge badge-red">${esc(f.flag_reason||'—')}</span></td>
-        <td><span class="badge badge-gray">${esc(f.data_selected||'—')}</span></td>
-        <td class="mono" style="white-space:nowrap">${fmtDate(f.flagged_at)}</td>
-      </tr>`).join('');
-  }
-
-  function toggleExpand(id) { document.getElementById(`expand-${id}`)?.classList.toggle('open'); }
-
-  function filterFlags() {
-    const r = document.getElementById('flag-filter').value;
-    renderFlags(r ? allFlags.filter(f=>f.flag_reason===r) : allFlags);
-  }
-
-  async function loadInteractions() {
-    try {
-      const d = await apiFetch('/admin/interactions');
-      allInteractions = d.interactions || [];
-      renderInteractions(allInteractions);
-    } catch(e) {
-      document.getElementById('interactions-body').innerHTML = '<tr><td colspan="6"><div class="empty">Could not load interactions</div></td></tr>';
-    }
-  }
-
-  function renderInteractions(items) {
-    const tbody = document.getElementById('interactions-body');
-    if (!items.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="icon">💬</div>No interactions yet</div></td></tr>'; return; }
-    tbody.innerHTML = items.map(i => `
-      <tr>
-        <td class="mono">#${i.id}</td>
-        <td><span class="truncate">${esc(i.client_query)}</span></td>
-        <td><span class="truncate" style="color:var(--text3)">${esc(i.app_response)}</span></td>
-        <td><span class="badge badge-blue">${esc(i.data_selected||'—')}</span></td>
-        <td>${i.flagged?'<span class="badge badge-red">Yes</span>':'<span class="badge badge-gray">No</span>'}</td>
-        <td class="mono" style="white-space:nowrap">${fmtDate(i.created_at)}</td>
-      </tr>`).join('');
-  }
-
-  function filterInteractions() {
-    const m = document.getElementById('mode-filter').value;
-    renderInteractions(m ? allInteractions.filter(i=>i.data_selected===m) : allInteractions);
-  }
-
-  async function loadNoResults() {
-    try {
-      const d = await apiFetch('/admin/no-results');
-      const items = d.no_results || [];
-      const tbody = document.getElementById('noresults-body');
-      if (!items.length) { tbody.innerHTML = '<tr><td colspan="4"><div class="empty"><div class="icon">✅</div>No empty responses found</div></td></tr>'; return; }
-      tbody.innerHTML = items.map(i => `
-        <tr>
-          <td class="mono">#${i.id}</td>
-          <td><span class="truncate">${esc(i.client_query)}</span></td>
-          <td><span class="badge badge-gray">${esc(i.data_selected||'—')}</span></td>
-          <td class="mono">${fmtDate(i.created_at)}</td>
-        </tr>`).join('');
-    } catch(e) {
-      document.getElementById('noresults-body').innerHTML = '<tr><td colspan="4"><div class="empty">Could not load data</div></td></tr>';
-    }
-  }
-
-  function esc(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  function fmtDate(s) {
-    if (!s) return '—';
-    try { return new Date(s).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }
-    catch { return s; }
-  }
-</script>
+    bootstrap();
+  </script>
 </body>
 </html>

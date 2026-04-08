@@ -7,18 +7,19 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables from the repo root .env
-_THIS_DIR = Path(__file__).parent
-_ROOT_DIR = _THIS_DIR.parents[2]
+_THIS_FILE = Path(__file__).resolve()
+_THIS_DIR = _THIS_FILE.parent
+_ROOT_DIR = _THIS_FILE.parents[2]
 _ENV_FILE = _ROOT_DIR / ".env"
 
 if _ENV_FILE.exists():
-    load_dotenv(_ENV_FILE)
+    load_dotenv(_ENV_FILE, override=True)
 
 # ============================================================================
 # Google Drive Configuration
 # ============================================================================
 GOOGLE_DRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID", "")
-GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH", "service_account_credentials.json")
+GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH", "ontheporch-88aea9a3e181.json")
 
 # Convert to absolute path if relative
 if GOOGLE_CREDENTIALS_PATH and not Path(GOOGLE_CREDENTIALS_PATH).is_absolute():
@@ -153,4 +154,3 @@ def print_config_summary():
 if __name__ == "__main__":
     # When run directly, print configuration summary
     print_config_summary()
-
