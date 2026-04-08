@@ -261,9 +261,9 @@ def _route_question(question: str) -> Dict[str, Any]:
         "CRITICAL ROUTING RULES - ABSOLUTE PRIORITY (CHECK IN THIS ORDER):\n"
         "═══════════════════════════════════════════════════════════════════════════════\n\n"
         "RULE 0: NEIGHBORHOOD NEWS / RSS QUESTIONS → 'rag' or 'hybrid'\n"
-        "   - If the question asks for recent neighborhood updates, what's new, recent news, or updates from a named community feed source\n"
-        "   - AND it does not ask for a specific day/week/date schedule\n"
-        "   - THEN mode MUST be 'hybrid' for general neighborhood updates, or 'rag' if a specific feed source is named\n\n"
+        "   - If question uses phrases like 'what's going on in [neighborhood]', 'what's new in', 'lately', 'recent news about', 'updates from [neighborhood]', 'what's happening in [neighborhood]' without asking for specific event schedules\n"
+        "   - AND does not mention a specific day/week/date → mode MUST be 'hybrid' (SQL for 311 activity + RAG for RSS news)\n"
+        "   - If question explicitly names a feed source (DOT Reporter, CSNDC, etc.) → mode MUST be 'rag'\n\n"
         "RULE 1: CRIME-RELATED QUESTIONS → Route based on question type\n"
         "   - If the question mentions ANY of: crime, crimes, arrest, arrests, offense, offenses, homicide, homicides, shooting, shootings, shots fired, safety incident, safety incidents, criminal activity, violence, violent\n"
         "   - THEN apply these sub-rules:\n"
@@ -431,7 +431,7 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
             tags_str = ", ".join(tags)
         else:
             tags_str = str(tags)
-        context_parts.append(f"[Source {idx}: {source} ({doc_type}){' - Tags: ' + tags_str if tags_str else ''}]")
+        context_parts.append(f"[{source}]")
         context_parts.append(chunk)
         context_parts.append("")
     context = "\n".join(context_parts)
@@ -441,8 +441,8 @@ def _compose_rag_answer(question: str, chunks: List[str], metadatas: List[Dict[s
         "This system is configured for DORCHESTER ONLY. All data queries are automatically filtered to Dorchester only.\n"
         "Use clear, everyday language and imagine you are talking to a neighbor, not a technical expert.\n"
         "Use only the provided SOURCES and do not add information that is not supported by the text.\n\n"
-        "When you quote or paraphrase people or documents, briefly explain who or what they are first, "
-        "then include the quote in a natural way. Avoid technical jargon, and do not mention SQL, databases, RAG, "
+        "When you cite sources, use the source name naturally in the sentence (e.g. 'According to CSNDC...'). "
+        "Do not use numbered source citations like (Source 1). Avoid technical jargon, and do not mention SQL, databases, RAG, "
         "retrieval methods, or internal tools.\n"
         "If the question involves numbers, be honest when the sources are limited and avoid inventing precise figures.\n"
         + ("\n\nYou are in a conversation. Use previous messages for context when the current question references earlier topics or asks for follow-ups." if conversation_history else "")

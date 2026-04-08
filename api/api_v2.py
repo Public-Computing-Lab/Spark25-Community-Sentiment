@@ -251,6 +251,11 @@ def _cleanup_old_legacy_caches() -> None:
 # Utility helpers
 # =============================================================================
 
+DOC_TYPE_DIRS = {
+    "policy": "http://localhost:8000/Policies/",
+    "transcript": "Data/AI meeting transcripts",
+    "calendar_event": "Data/newsletters",
+}
 def _cookie_kwargs(*, httponly: bool, expires: Optional[datetime.datetime] = None) -> Dict[str, Any]:
     kwargs: Dict[str, Any] = {
         "httponly": httponly,
@@ -1008,6 +1013,7 @@ def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
             source = meta.get("source", "Unknown")
             doc_type = meta.get("doc_type", "unknown")
             key = f"{source}:{doc_type}"
+            print(key)
             if key in seen:
                 continue
             seen.add(key)
