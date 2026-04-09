@@ -489,6 +489,10 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
         "- CRITICAL for `weekly_events` table: For date comparisons (e.g., 'this weekend', 'next week', date ranges), ALWAYS use `start_date` or `end_date` (DATE fields), NEVER use `event_date` (which is VARCHAR text like 'Monday' or 'June 3-5'). Use `event_date` only for display, not for filtering by date.\n"
         "- ALWAYS wrap table and column identifiers in backticks (`like_this`).\n"
         "- When using table aliases, always write them as separate backticked identifiers (for example, `T1`.`longitude`), never as a single backticked 'T1.longitude'."
+        "- LOCATION OUTPUT RULE: For 311/911 location questions, prefer street-level fields over area labels.\n"
+        "- For `service_requests_311`, include `street_number` and `street_name` in SELECT, and use them in GROUP BY/ORDER BY for location summaries.\n"
+        "- For `crime_incident_reports`, include `street` in SELECT, and use it in GROUP BY/ORDER BY for location summaries.\n"
+        "- Do NOT use `neighborhood`, `district`, zip, or area labels as the primary location output unless street fields are missing.\n"
     )
 
     if metadata:
@@ -589,6 +593,12 @@ def _llm_refine_sql(
         "- CRITICAL for `weekly_events` table: For date comparisons, ALWAYS use `start_date` or `end_date` (DATE fields), NEVER use `event_date` (VARCHAR). Use `event_date` only for display.\n"
         "- ALWAYS wrap table and column identifiers in backticks.\n"
         "- When using table aliases, always write them as separate backticked identifiers (for example, `T1`.`longitude`), never as a single backticked 'T1.longitude'."
+        "- LOCATION OUTPUT RULE: For 311/911 location questions, prefer street-level fields over area labels.\n"
+        "- For `service_requests_311`, include `street_number` and `street_name` in SELECT, and use them in GROUP BY/ORDER BY for location summaries.\n"
+        "- For `crime_incident_reports`, include `street` in SELECT, and use it in GROUP BY/ORDER BY for location summaries.\n"
+        "- Do NOT use `neighborhood`, `district`, zip, or area labels as the primary location output unless street fields are missing.\n"
+        "When reporting locations, name streets first (e.g., 'Blue Hill Ave', 'Talbot Ave & Washington St'). "
+        "Do not present district/neighborhood/zip as the main location unless no street data exists.\n"
     )
     
     # Build enhanced error analysis
