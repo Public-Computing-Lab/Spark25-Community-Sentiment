@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,7 +62,10 @@ RSS_FEEDS: list[dict] = [
 ]
  
 # ── helpers ───────────────────────────────────────────────────────────────────
- 
+def _strip_html(text: str) -> str:
+    """Strip HTML tags and collapse whitespace."""
+    return re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', text)).strip()
+
 def _stable_id(entry_id: str, source: str) -> str:
     """
     Deterministic short hash used as the ChromaDB document ID.
@@ -88,7 +92,7 @@ def _parse_date(entry) -> Optional[str]:
 def _entry_to_document(entry, feed_meta: dict) -> Document:
     """Convert a single feedparser entry into a LangChain Document."""
     title   = getattr(entry, "title",   "").strip()
-    summary = getattr(entry, "summary", "").strip()
+    summary = _strip_html(getattr(entry, "summary", ""))
     link    = getattr(entry, "link",    "").strip()
  
     # Build a self-contained text blob the LLM can use
