@@ -730,18 +730,27 @@
             <button class="btn btn-sm" id="admin-chat-send" type="button">Send</button>
           </div>
           <div id="admin-note-preview" hidden style="margin-top:12px;padding:14px;border-radius:10px;background:rgba(22,199,132,0.06);border:1px solid rgba(22,199,132,0.25);">
-            <p style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;">Compiled note — confirm to add</p>
-            <div id="admin-note-preview-text" style="font-size:13px;white-space:pre-wrap;line-height:1.6;margin-bottom:12px;"></div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-              <select id="admin-note-category" style="padding:8px 12px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;">
-                <option value="general">General</option>
-                <option value="safety">Safety</option>
-                <option value="events">Events</option>
-                <option value="infrastructure">Infrastructure</option>
-                <option value="community">Community</option>
-              </select>
-              <button class="btn btn-sm" id="admin-note-confirm" type="button">Add to knowledge base</button>
-              <button class="btn-ghost btn-sm" id="admin-note-edit-btn" type="button">Edit</button>
+            <p style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;">Compiled note — edit if needed, then confirm</p>
+            <textarea id="admin-note-preview-text" style="font-size:13px;line-height:1.6;margin-bottom:12px;width:100%;min-height:80px;background:rgba(0,0,0,0.2);border:1px solid rgba(22,199,132,0.2);border-radius:8px;color:var(--text);padding:8px;resize:vertical;font-family:inherit;box-sizing:border-box;" spellcheck="false"></textarea>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+              <label style="display:flex;flex-direction:column;gap:4px;">
+                <span style="font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;">Category</span>
+                <select id="admin-note-category" style="padding:8px 12px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;">
+                  <option value="general">General</option>
+                  <option value="safety">Safety</option>
+                  <option value="events">Events</option>
+                  <option value="infrastructure">Infrastructure</option>
+                  <option value="community">Community</option>
+                </select>
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;">
+                <span style="font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;">Expires (optional)</span>
+                <input type="date" id="admin-note-expires" style="padding:8px 12px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;">
+              </label>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn btn-sm" id="admin-note-confirm" type="button">Add to knowledge base</button>
+                <button class="btn-ghost btn-sm" id="admin-note-edit-btn" type="button">Start over</button>
+              </div>
             </div>
           </div>
           <div class="form-success" id="admin-note-chat-success">Note added — the chatbot will use this in future responses.</div>
@@ -1052,6 +1061,8 @@
       document.getElementById('admin-chat-input').value = '';
       document.getElementById('admin-chat-input-row').hidden = false;
       document.getElementById('admin-note-preview').hidden = true;
+      document.getElementById('admin-note-preview-text').value = '';
+      document.getElementById('admin-note-expires').value = '';
       document.getElementById('admin-note-chat-success').style.display = 'none';
       addAdminChatMsg('assistant', 'What would you like to add to the knowledge base?');
     }
@@ -1086,7 +1097,7 @@
       if (result.data.ready) {
         adminNoteState.compiled = result.data.compiled;
         addAdminChatMsg('assistant', 'Got the details. Review the compiled note below, pick a category, then confirm to add it directly to the knowledge base.');
-        document.getElementById('admin-note-preview-text').textContent = result.data.compiled;
+        document.getElementById('admin-note-preview-text').value = result.data.compiled;
         document.getElementById('admin-note-preview').hidden = false;
         document.getElementById('admin-chat-input-row').hidden = true;
       } else {
@@ -1096,10 +1107,13 @@
     }
 
     async function confirmAdminNote() {
-      const content = adminNoteState.compiled;
+      const content = document.getElementById('admin-note-preview-text').value.trim();
       if (!content) return;
       const category = document.getElementById('admin-note-category').value;
-      const result = await ApiClient.adminAddKnowledge({ content, category });
+      const expiresRaw = document.getElementById('admin-note-expires').value;
+      const payload = { content, category };
+      if (expiresRaw) payload.expires_at = expiresRaw;
+      const result = await ApiClient.adminAddKnowledge(payload);
       if (!result.success) { alert(result.error); return; }
       document.getElementById('admin-note-preview').hidden = true;
       document.getElementById('admin-chat-input-row').hidden = false;
@@ -1108,6 +1122,8 @@
       adminNoteState.messages = [];
       adminNoteState.compiled = null;
       document.getElementById('admin-chat-messages').innerHTML = '';
+      document.getElementById('admin-note-preview-text').value = '';
+      document.getElementById('admin-note-expires').value = '';
       addAdminChatMsg('assistant', 'Note added! Want to add another?');
       await loadKnowledge();
     }
