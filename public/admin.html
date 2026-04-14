@@ -633,6 +633,7 @@
       <button class="tab" data-tab="interactions" type="button">Interactions</button>
       <button class="tab" data-tab="noresults" type="button">No results</button>
       <button class="tab" data-tab="knowledge" type="button">Community Notes</button>
+      <button class="tab" data-tab="pending" type="button">Pending</button>
     </nav>
 
     <main class="content">
@@ -722,29 +723,39 @@
       <section class="panel tab-panel" data-panel="knowledge" hidden>
         <h2>Community Notes</h2>
         <p class="panel-copy">Add local knowledge the chatbot uses when answering questions. Notes with an expiry automatically stop being used after that date.</p>
-        <div class="knowledge-form">
-          <textarea id="knowledge-content" placeholder="e.g. Talbot Ave near Wales St is icy — advise residents to take care"></textarea>
-          <div class="knowledge-form-row">
-            <div class="form-field">
-              <label style="font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:6px;">Category</label>
-              <select id="knowledge-category">
+        <div id="admin-note-chat" style="margin-bottom:24px;padding:20px;border-radius:16px;background:rgba(20,31,49,0.5);border:1px solid var(--border);">
+          <div id="admin-chat-messages" style="display:flex;flex-direction:column;gap:10px;max-height:240px;overflow-y:auto;margin-bottom:14px;padding:12px;background:rgba(0,0,0,0.15);border-radius:10px;border:1px solid var(--border)"></div>
+          <div id="admin-chat-input-row" style="display:flex;gap:8px;">
+            <input type="text" id="admin-chat-input" placeholder="Describe what to add to the knowledge base…" style="flex:1;padding:10px 12px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;" autocomplete="off">
+            <button class="btn btn-sm" id="admin-chat-send" type="button">Send</button>
+          </div>
+          <div id="admin-note-preview" hidden style="margin-top:12px;padding:14px;border-radius:10px;background:rgba(22,199,132,0.06);border:1px solid rgba(22,199,132,0.25);">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;">Compiled note — confirm to add</p>
+            <div id="admin-note-preview-text" style="font-size:13px;white-space:pre-wrap;line-height:1.6;margin-bottom:12px;"></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <select id="admin-note-category" style="padding:8px 12px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;">
                 <option value="general">General</option>
                 <option value="safety">Safety</option>
                 <option value="events">Events</option>
                 <option value="infrastructure">Infrastructure</option>
                 <option value="community">Community</option>
               </select>
+              <button class="btn btn-sm" id="admin-note-confirm" type="button">Add to knowledge base</button>
+              <button class="btn-ghost btn-sm" id="admin-note-edit-btn" type="button">Edit</button>
             </div>
-            <div class="form-field">
-              <label style="font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:6px;">Expires (optional)</label>
-              <input type="datetime-local" id="knowledge-expires">
-            </div>
-            <button class="btn btn-sm" id="knowledge-submit" type="button" style="margin-top:auto">Add note</button>
           </div>
-          <div class="form-success" id="knowledge-success">Note added — the chatbot will use this in future responses.</div>
+          <div class="form-success" id="admin-note-chat-success">Note added — the chatbot will use this in future responses.</div>
         </div>
         <h3 style="font-size:11px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:14px;">Active notes</h3>
         <div class="knowledge-list" id="knowledge-list">
+          <div class="empty">Loading…</div>
+        </div>
+      </section>
+
+      <section class="panel tab-panel" data-panel="pending" hidden>
+        <h2>Pending community notes</h2>
+        <p class="panel-copy">Notes submitted by community members waiting for admin approval.</p>
+        <div class="knowledge-list" id="pending-list">
           <div class="empty">Loading…</div>
         </div>
       </section>
@@ -789,11 +800,6 @@
       interactionsBody: document.getElementById('interactions-body'),
       noResultsBody: document.getElementById('noresults-body'),
       knowledgeList: document.getElementById('knowledge-list'),
-      knowledgeContent: document.getElementById('knowledge-content'),
-      knowledgeCategory: document.getElementById('knowledge-category'),
-      knowledgeExpires: document.getElementById('knowledge-expires'),
-      knowledgeSubmit: document.getElementById('knowledge-submit'),
-      knowledgeSuccess: document.getElementById('knowledge-success'),
     };
 
     function escapeHtml(value) {
@@ -1025,6 +1031,87 @@
       });
     }
 
+    // Admin note chatbot
+    const adminNoteState = { messages: [], waiting: false, compiled: null };
+
+    function addAdminChatMsg(role, content) {
+      const container = document.getElementById('admin-chat-messages');
+      const isUser = role === 'user';
+      const div = document.createElement('div');
+      div.style.cssText = `display:flex;justify-content:${isUser ? 'flex-end' : 'flex-start'}`;
+      div.innerHTML = `<div style="max-width:80%;padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.5;background:${isUser ? 'rgba(22,199,132,0.15)' : 'rgba(255,255,255,0.06)'};border:1px solid ${isUser ? 'rgba(22,199,132,0.3)' : 'rgba(255,255,255,0.1)'}">${escapeHtml(content)}</div>`;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function resetAdminNoteChat() {
+      adminNoteState.messages = [];
+      adminNoteState.waiting = false;
+      adminNoteState.compiled = null;
+      document.getElementById('admin-chat-messages').innerHTML = '';
+      document.getElementById('admin-chat-input').value = '';
+      document.getElementById('admin-chat-input-row').hidden = false;
+      document.getElementById('admin-note-preview').hidden = true;
+      document.getElementById('admin-note-chat-success').style.display = 'none';
+      addAdminChatMsg('assistant', 'What would you like to add to the knowledge base?');
+    }
+
+    async function sendAdminMessage() {
+      if (adminNoteState.waiting) return;
+      const input = document.getElementById('admin-chat-input');
+      const content = input.value.trim();
+      if (!content) return;
+      adminNoteState.messages.push({ role: 'user', content });
+      addAdminChatMsg('user', content);
+      input.value = '';
+      adminNoteState.waiting = true;
+      document.getElementById('admin-chat-send').disabled = true;
+
+      const typing = document.createElement('div');
+      typing.id = 'admin-typing';
+      typing.style.cssText = 'display:flex;justify-content:flex-start';
+      typing.innerHTML = `<div style="padding:8px 12px;border-radius:10px;font-size:13px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#94a3b8">Typing…</div>`;
+      document.getElementById('admin-chat-messages').appendChild(typing);
+
+      const result = await ApiClient.communityNotesChat(adminNoteState.messages);
+      document.getElementById('admin-typing')?.remove();
+      adminNoteState.waiting = false;
+      document.getElementById('admin-chat-send').disabled = false;
+
+      if (!result.success) {
+        addAdminChatMsg('assistant', 'Something went wrong. Please try again.');
+        return;
+      }
+
+      if (result.data.ready) {
+        adminNoteState.compiled = result.data.compiled;
+        addAdminChatMsg('assistant', 'Got the details. Review the compiled note below, pick a category, then confirm to add it directly to the knowledge base.');
+        document.getElementById('admin-note-preview-text').textContent = result.data.compiled;
+        document.getElementById('admin-note-preview').hidden = false;
+        document.getElementById('admin-chat-input-row').hidden = true;
+      } else {
+        adminNoteState.messages.push({ role: 'assistant', content: result.data.reply });
+        addAdminChatMsg('assistant', result.data.reply);
+      }
+    }
+
+    async function confirmAdminNote() {
+      const content = adminNoteState.compiled;
+      if (!content) return;
+      const category = document.getElementById('admin-note-category').value;
+      const result = await ApiClient.adminAddKnowledge({ content, category });
+      if (!result.success) { alert(result.error); return; }
+      document.getElementById('admin-note-preview').hidden = true;
+      document.getElementById('admin-chat-input-row').hidden = false;
+      document.getElementById('admin-note-chat-success').style.display = 'block';
+      setTimeout(() => { document.getElementById('admin-note-chat-success').style.display = 'none'; }, 3500);
+      adminNoteState.messages = [];
+      adminNoteState.compiled = null;
+      document.getElementById('admin-chat-messages').innerHTML = '';
+      addAdminChatMsg('assistant', 'Note added! Want to add another?');
+      await loadKnowledge();
+    }
+
     async function deactivateKnowledge(id) {
       if (!confirm('Remove this note?')) return;
       const result = await ApiClient.adminDeleteKnowledge(id);
@@ -1033,18 +1120,40 @@
       renderKnowledge();
     }
 
-    async function submitKnowledge() {
-      const content = elements.knowledgeContent.value.trim();
-      if (!content) { alert('Enter a note first.'); return; }
-      const payload = { content, category: elements.knowledgeCategory.value };
-      const expires = elements.knowledgeExpires.value;
-      if (expires) payload.expires_at = new Date(expires).toISOString();
-      const result = await ApiClient.adminAddKnowledge(payload);
+
+    async function loadPending() {
+      const result = await ApiClient.adminGetPending();
+      if (!result.success) return;
+      renderPending(result.data.pending || []);
+    }
+
+    function renderPending(items) {
+      const list = document.getElementById('pending-list');
+      list.innerHTML = '';
+      if (!items.length) { list.innerHTML = `<div class="empty">No pending notes.</div>`; return; }
+      items.forEach((item) => {
+        const div = document.createElement('div');
+        div.className = 'knowledge-item';
+        div.innerHTML = `
+          <div class="knowledge-item-body">
+            <div class="knowledge-item-content">${escapeHtml(item.content)}</div>
+            <div class="knowledge-item-meta">
+              <span class="cat-badge">${escapeHtml(item.category || 'community')}</span>
+              <span>Submitted by ${escapeHtml(item.added_by || 'anonymous')}</span>
+              <span>${escapeHtml(formatDate(item.created_at))}</span>
+            </div>
+          </div>
+          <button class="btn-ghost btn-sm btn-success" type="button" onclick="approveNote(${item.id})">Approve</button>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    async function approveNote(id) {
+      const result = await ApiClient.adminApproveNote(id);
       if (!result.success) { alert(result.error); return; }
-      elements.knowledgeContent.value = '';
-      elements.knowledgeExpires.value = '';
-      elements.knowledgeSuccess.style.display = 'block';
-      setTimeout(() => { elements.knowledgeSuccess.style.display = 'none'; }, 3500);
+      showToast('Note approved — chatbot will now use it.', 'success');
+      await loadPending();
       await loadKnowledge();
     }
 
@@ -1059,7 +1168,8 @@
           panel.hidden = panel.dataset.panel !== 'overview';
         }
       });
-      if (nextTab === 'knowledge') loadKnowledge();
+      if (nextTab === 'knowledge') { loadKnowledge(); resetAdminNoteChat(); }
+      if (nextTab === 'pending') loadPending();
     }
 
     async function logout() {
@@ -1133,7 +1243,14 @@
     elements.refreshButton.addEventListener('click', loadAll);
     elements.logoutButton.addEventListener('click', logout);
     elements.accessLogout.addEventListener('click', logout);
-    elements.knowledgeSubmit.addEventListener('click', submitKnowledge);
+    document.getElementById('admin-chat-send').addEventListener('click', sendAdminMessage);
+    document.getElementById('admin-chat-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendAdminMessage(); } });
+    document.getElementById('admin-note-confirm').addEventListener('click', confirmAdminNote);
+    document.getElementById('admin-note-edit-btn').addEventListener('click', () => {
+      document.getElementById('admin-note-preview').hidden = true;
+      document.getElementById('admin-chat-input-row').hidden = false;
+      adminNoteState.compiled = null;
+    });
 
     bootstrap();
   </script>

@@ -67,6 +67,7 @@ from unified_chatbot import (  # noqa: E402
     _bootstrap_env,
     _check_if_needs_new_data,
     _fix_retrieval_vectordb_path,
+    _get_llm_client,
     _route_question,
     _run_hybrid,
     _run_rag,
@@ -2478,6 +2479,135 @@ def admin_comment_flag(flag_id):
         return jsonify({"message": "Flag updated"})
     except Exception as e:
         return _json_error(str(e), 500, "admin_flag_comment_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+@app.route("/community/notes/chat", methods=["POST"])
+def community_notes_chat():
+    result = _require_api_key_or_user()
+    if result:
+        return result
+    data = request.get_json() or {}
+    messages = data.get("messages", [])
+    if not messages:
+        return _json_error("messages required", 400, "missing_messages")
+    try:
+        client = _get_llm_client()
+        model = client.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"))
+        system = (
+            "You are helping a Dorchester community member report a local issue or share "
+            "neighborhood information for a community chatbot.\n\n"
+            "Ask short friendly follow-up questions ONE AT A TIME to gather useful details. "
+            "Focus on: exact location (street, intersection, landmark), time/date, severity, "
+            "who is affected, and any safety considerations.\n\n"
+            "After 3-5 exchanges when you have enough detail, respond with EXACTLY this format "
+            "and nothing else:\n"
+            "READY:\n"
+            "What: <one sentence describing the issue>\n"
+            "Where: <specific location>\n"
+            "When: <time or date>\n"
+            "Details: <any extra context>\n\n"
+            "Do not ask more than 5 questions. Keep questions short and friendly. "
+            "Never mention AI, databases, or that you are compiling a note."
+        )
+        history = "\n".join([
+            f"{'Community member' if m['role'] == 'user' else 'Assistant'}: {m['content']}"
+            for m in messages
+        ])
+        resp = model.generate_content(
+            system + "\n\nConversation:\n" + history + "\n\nAssistant:",
+            generation_config={"temperature": 0.4}
+        )
+        try:
+            text = (resp.text or "").strip()
+        except (ValueError, AttributeError):
+            # gemini-2.5-pro returns thinking parts alongside the text part;
+            # resp.text raises ValueError when multiple parts exist.
+            parts = resp.candidates[0].content.parts
+            text_parts = [p.text for p in parts if getattr(p, "text", None)]
+            text = (text_parts[-1] if text_parts else "").strip()
+        is_ready = text.startswith("READY:")
+        compiled = text[6:].strip() if is_ready else None
+        return jsonify({"reply": text if not is_ready else None, "compiled": compiled, "ready": is_ready})
+    except Exception as e:
+        return _json_error(str(e), 500, "community_chat_failed")
+
+
+@app.route("/community/notes", methods=["POST"])
+def community_add_note():
+    result = _require_api_key_or_user()
+    if result:
+        return result
+    data = request.get_json() or {}
+    content = data.get("content", "").strip()
+    if not content:
+        return _json_error("content is required", 400, "missing_content")
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            INSERT INTO admin_knowledge (content, category, added_by, active)
+            VALUES (%s, %s, %s, FALSE)
+        """, (
+            content,
+            data.get("category", "community"),
+            g.current_user_row["username"] if g.get("current_user_row") else "anonymous",
+        ))
+        conn.commit()
+        return jsonify({"message": "Note submitted for review"}), 201
+    except Exception as e:
+        return _json_error(str(e), 500, "community_note_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+@app.route("/admin/knowledge/pending", methods=["GET"])
+def admin_get_pending():
+    result = _require_admin()
+    if result:
+        return result
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, content, category, added_by, created_at
+            FROM admin_knowledge
+            WHERE active = FALSE
+            ORDER BY created_at DESC
+        """)
+        rows = cursor.fetchall()
+        for row in rows:
+            if row.get("created_at") and hasattr(row["created_at"], "isoformat"):
+                row["created_at"] = row["created_at"].isoformat()
+        return jsonify({"pending": rows})
+    except Exception as e:
+        return _json_error(str(e), 500, "pending_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+@app.route("/admin/knowledge/<int:entry_id>/approve", methods=["PUT"])
+def admin_approve_note(entry_id):
+    result = _require_admin()
+    if result:
+        return result
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("UPDATE admin_knowledge SET active = TRUE WHERE id = %s", (entry_id,))
+        conn.commit()
+        return jsonify({"message": "Note approved"})
+    except Exception as e:
+        return _json_error(str(e), 500, "approve_failed")
     finally:
         if cursor: cursor.close()
         if conn: conn.close()

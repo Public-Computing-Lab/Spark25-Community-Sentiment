@@ -172,4 +172,14 @@ window.ApiClient = {
     method: 'POST',
     body: JSON.stringify({ content, category }),
   }),
+  communityNotesChat: (messages) => apiRequest('/community/notes/chat', {
+    method: 'POST',
+    body: JSON.stringify({ messages }),
+    timeoutMs: null,
+  }),
+adminGetPending: () => apiRequest('/admin/knowledge/pending', { method: 'GET' }),
+adminApproveNote: (id) => apiRequest(`/admin/knowledge/${id}/approve`, {
+  method: 'PUT',
+  body: JSON.stringify({}),
+}),
 };
