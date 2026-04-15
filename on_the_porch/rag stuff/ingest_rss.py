@@ -45,19 +45,24 @@ from retrieval import GeminiEmbeddings  # noqa: E402  (same embeddings as the re
 DEFAULT_VECTORDB_DIR = Path("../vectordb_new")
 RSS_FEEDS: list[dict] = [
     {
-        "url":    "https://www.dotnews.com/rss/",
-        "source": "DOT Reporter",
+        "url":    "https://www.dotnews.com/feed/",         
+        "source": "Dorchester Reporter",
         "tag":    "dorchester,news",
-    },
-    {
-        "url":    "https://www.bpl.org/codman-square/feed/",
-        "source": "Codman Square Library",
-        "tag":    "codman square,library",
     },
     {
         "url":    "https://www.csndc.com/feed/",
         "source": "Codman Square Neighborhood Development Corporation",
         "tag":    "codman square,development",
+    },
+    {
+        "url":    "https://www.codman.org/feed/",          
+        "source": "Codman Square Health Center",
+        "tag":    "codman square,health",
+    },
+    {
+        "url":    "https://codmansquarecouncil.org/feed/",  
+        "source": "Codman Square Neighborhood Council",
+        "tag":    "codman square,civic",
     },
 ]
  

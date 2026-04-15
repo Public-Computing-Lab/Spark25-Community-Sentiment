@@ -602,7 +602,12 @@ _RSS_SOURCE_ALIASES = (
     "codman square neighborhood development corporation",
     "codman square library",
     "bpl codman square",
+    "codman square health center",   
+    "codman.org",                   
+    "codman square neighborhood council", 
+    "codman council",                
 )
+
 _RSS_NEWS_HINTS = (
     "what's new",
     "whats new",
