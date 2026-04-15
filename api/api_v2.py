@@ -67,6 +67,7 @@ from unified_chatbot import (  # noqa: E402
     _bootstrap_env,
     _check_if_needs_new_data,
     _fix_retrieval_vectordb_path,
+    _get_llm_client,
     _route_question,
     _run_hybrid,
     _run_rag,
@@ -186,6 +187,73 @@ def initialize_database() -> None:
 
 initialize_database()
 
+def ensure_interaction_log_columns():
+    """Add missing columns to interaction log."""
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+                       SELECT COLUMN_NAME
+                       FROM INFORMATION_SCHEMA.COLUMNS
+                       WHERE TABLE_SCHEMA = DATABASE()
+                       AND TABLE_NAME = 'interaction_log'
+                       """)
+        existing = {row["COLUMN_NAME"] for row in cursor.fetchall()}
+        additions = [
+            ("flagged", "ALTER TABLE interaction_log ADD COLUMN flagged BOOLEAN DEFAULT FALSE"),
+            ("flag_reason", "ALTER TABLE interaction_log ADD COLUMN flag_reason VARCHAR(100)"),
+            ("flag_details", "ALTER TABLE interaction_log ADD COLUMN flag_details TEXT"),
+            ("flagged_at", "ALTER TABLE interaction_log ADD COLUMN flagged_at TIMESTAMP NULL"),
+            ("moderator_comment", "ALTER TABLE interaction_log ADD COLUMN moderator_comment TEXT"),
+            ("resolved", "ALTER TABLE interaction_log ADD COLUMN resolved BOOLEAN DEFAULT FALSE"),
+            ("resolved_at", "ALTER TABLE interaction_log ADD COLUMN resolved_at TIMESTAMP NULL"),
+        ]
+        for col, sql in additions:
+            if col not in existing:
+                cursor.execute(sql)
+        conn.commit()
+        print("✓ interaction_log columns ready")
+    except Exception as e:
+        print(f"Warning: Could not update interaction_log columns: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+def ensure_admin_knowledge_table():
+    """Create admin_knowledge table if it doesn't exist."""
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS admin_knowledge (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                content TEXT,
+                category VARCHAR(100) default 'general',
+                expires_at TIMESTAMP NULL,
+                source_flag_id INT,
+                added_by VARCHAR(255),
+                active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        print("✓ admin_knowledge table ready")
+    except Exception as e:
+        print(f"Warning: Could not create admin_knowledge table: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+ensure_interaction_log_columns()
+ensure_admin_knowledge_table()
 
 def _bootstrap_admin_users() -> None:
     if not Config.AUTH_ADMIN_EMAILS:
@@ -251,11 +319,6 @@ def _cleanup_old_legacy_caches() -> None:
 # Utility helpers
 # =============================================================================
 
-DOC_TYPE_DIRS = {
-    "policy": "http://localhost:8000/Policies/",
-    "transcript": "Data/AI meeting transcripts",
-    "calendar_event": "Data/newsletters",
-}
 def _cookie_kwargs(*, httponly: bool, expires: Optional[datetime.datetime] = None) -> Dict[str, Any]:
     kwargs: Dict[str, Any] = {
         "httponly": httponly,
@@ -1013,7 +1076,6 @@ def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
             source = meta.get("source", "Unknown")
             doc_type = meta.get("doc_type", "unknown")
             key = f"{source}:{doc_type}"
-            print(key)
             if key in seen:
                 continue
             seen.add(key)
@@ -2211,7 +2273,8 @@ def admin_flags():
         cursor.execute(
             """
             SELECT id, session_id, user_id, thread_id, client_query, app_response,
-                   data_selected, flag_reason, flag_details, flagged_at, created_at
+                   data_selected, flag_reason, flag_details, flagged_at, created_at, moderator_comment,
+                   resolved, resolved_at
             FROM interaction_log
             WHERE flagged = TRUE
             ORDER BY flagged_at DESC
@@ -2220,7 +2283,7 @@ def admin_flags():
         )
         rows = cursor.fetchall()
         for row in rows:
-            for key in ("flagged_at", "created_at"):
+            for key in ("flagged_at", "created_at", "resolved_at"):
                 if row.get(key) and hasattr(row[key], "isoformat"):
                     row[key] = row[key].isoformat()
         return jsonify({"flags": rows})
@@ -2305,6 +2368,249 @@ def admin_no_results():
             cursor.close()
         if conn:
             conn.close()
+
+@app.route("/admin/knowledge", methods=["GET"])
+def admin_get_knowledge():
+    result = _require_admin()
+    if result:
+        return result
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, content, category, expires_at, added_by, active, created_at
+            FROM admin_knowledge
+            ORDER BY created_at DESC
+        """)
+        rows = cursor.fetchall()
+        for row in rows:
+            for key in ("expires_at", "created_at"):
+                if row.get(key) and hasattr(row[key], "isoformat"):
+                    row[key] = row[key].isoformat()
+        return jsonify({"knowledge": rows})
+    except Exception as e:
+        return _json_error(str(e), 500, "admin_knowledge_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+@app.route("/admin/knowledge", methods=["POST"])
+def admin_add_knowledge():
+    result = _require_admin()
+    if result:
+        return result
+    data = request.get_json() or {}
+    content = data.get("content", "").strip()
+    if not content:
+        return _json_error("content is required", 400, "missing_content")
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            INSERT INTO admin_knowledge (content, category, expires_at, source_flag_id, added_by)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            content,
+            data.get("category", "general"),
+            data.get("expires_at"),
+            data.get("source_flag_id"),
+            g.current_user_row["username"] if g.get("current_user_row") else "admin",
+        ))
+        conn.commit()
+        return jsonify({"id": cursor.lastrowid, "message": "Knowledge entry added"}), 201
+    except Exception as e:
+        return _json_error(str(e), 500, "admin_knowledge_add_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+@app.route("/admin/knowledge/<int:entry_id>", methods=["DELETE"])
+def admin_deactivate_knowledge(entry_id):
+    result = _require_admin()
+    if result:
+        return result
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("UPDATE admin_knowledge SET active = FALSE WHERE id = %s", (entry_id,))
+        conn.commit()
+        return jsonify({"message": "Entry deactivated"})
+    except Exception as e:
+        return _json_error(str(e), 500, "admin_knowledge_deactivate_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+@app.route("/admin/flags/<int:flag_id>/comment", methods=["PUT"])
+def admin_comment_flag(flag_id):
+    result = _require_admin()
+    if result:
+        return result
+    data = request.get_json() or {}
+    comment = data.get("moderator_comment", "").strip()
+    resolved = data.get("resolved", False)
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            UPDATE interaction_log
+            SET moderator_comment = %s,
+                resolved = %s,
+                resolved_at = %s
+            WHERE id = %s
+        """, (
+            comment,
+            resolved,
+            datetime.datetime.utcnow() if resolved else None,
+            flag_id,
+        ))
+        conn.commit()
+        return jsonify({"message": "Flag updated"})
+    except Exception as e:
+        return _json_error(str(e), 500, "admin_flag_comment_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+@app.route("/community/notes/chat", methods=["POST"])
+def community_notes_chat():
+    result = _require_api_key_or_user()
+    if result:
+        return result
+    data = request.get_json() or {}
+    messages = data.get("messages", [])
+    if not messages:
+        return _json_error("messages required", 400, "missing_messages")
+    try:
+        client = _get_llm_client()
+        model = client.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"))
+        system = (
+            "You are helping a Dorchester community member report a local issue or share "
+            "neighborhood information for a community chatbot.\n\n"
+            "Ask short friendly follow-up questions ONE AT A TIME to gather useful details. "
+            "Focus on: exact location (street, intersection, landmark), time/date, severity, "
+            "who is affected, and any safety considerations.\n\n"
+            "After 3-5 exchanges when you have enough detail, respond with EXACTLY this format "
+            "and nothing else:\n"
+            "READY:\n"
+            "What: <one sentence describing the issue>\n"
+            "Where: <specific location>\n"
+            "When: <time or date>\n"
+            "Details: <any extra context>\n\n"
+            "Do not ask more than 5 questions. Keep questions short and friendly. "
+            "Never mention AI, databases, or that you are compiling a note."
+        )
+        history = "\n".join([
+            f"{'Community member' if m['role'] == 'user' else 'Assistant'}: {m['content']}"
+            for m in messages
+        ])
+        resp = model.generate_content(
+            system + "\n\nConversation:\n" + history + "\n\nAssistant:",
+            generation_config={"temperature": 0.4}
+        )
+        try:
+            text = (resp.text or "").strip()
+        except (ValueError, AttributeError):
+            # gemini-2.5-pro returns thinking parts alongside the text part;
+            # resp.text raises ValueError when multiple parts exist.
+            parts = resp.candidates[0].content.parts
+            text_parts = [p.text for p in parts if getattr(p, "text", None)]
+            text = (text_parts[-1] if text_parts else "").strip()
+        is_ready = text.startswith("READY:")
+        compiled = text[6:].strip() if is_ready else None
+        return jsonify({"reply": text if not is_ready else None, "compiled": compiled, "ready": is_ready})
+    except Exception as e:
+        return _json_error(str(e), 500, "community_chat_failed")
+
+
+@app.route("/community/notes", methods=["POST"])
+def community_add_note():
+    result = _require_api_key_or_user()
+    if result:
+        return result
+    data = request.get_json() or {}
+    content = data.get("content", "").strip()
+    if not content:
+        return _json_error("content is required", 400, "missing_content")
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            INSERT INTO admin_knowledge (content, category, added_by, active)
+            VALUES (%s, %s, %s, FALSE)
+        """, (
+            content,
+            data.get("category", "community"),
+            g.current_user_row["username"] if g.get("current_user_row") else "anonymous",
+        ))
+        conn.commit()
+        return jsonify({"message": "Note submitted for review"}), 201
+    except Exception as e:
+        return _json_error(str(e), 500, "community_note_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+@app.route("/admin/knowledge/pending", methods=["GET"])
+def admin_get_pending():
+    result = _require_admin()
+    if result:
+        return result
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, content, category, added_by, created_at
+            FROM admin_knowledge
+            WHERE active = FALSE
+            ORDER BY created_at DESC
+        """)
+        rows = cursor.fetchall()
+        for row in rows:
+            if row.get("created_at") and hasattr(row["created_at"], "isoformat"):
+                row["created_at"] = row["created_at"].isoformat()
+        return jsonify({"pending": rows})
+    except Exception as e:
+        return _json_error(str(e), 500, "pending_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+@app.route("/admin/knowledge/<int:entry_id>/approve", methods=["PUT"])
+def admin_approve_note(entry_id):
+    result = _require_admin()
+    if result:
+        return result
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("UPDATE admin_knowledge SET active = TRUE WHERE id = %s", (entry_id,))
+        conn.commit()
+        return jsonify({"message": "Note approved"})
+    except Exception as e:
+        return _json_error(str(e), 500, "approve_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
 
 
 if __name__ == "__main__":

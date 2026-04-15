@@ -377,6 +377,192 @@
       color: #fecaca;
     }
 
+    .btn-sm { 
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+
+    .btn-danger { 
+      background: rgba(239,68,68,0.1);
+      border-color: rgba(239,68,68,0.35);
+      color: #fca5a5;
+    }
+
+    .btn-success { 
+      background: rgba(22,199,132,0.1);
+      border-color: rgba(22,199,132,0.35);
+      color: var(--accent);
+    }
+
+    .flag-expand-row { 
+      display: none;
+    }
+
+    .flag-expand-row.open { 
+      display: table-row;
+    }
+
+    .flag-expand-inner { 
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      background: rgba(7,17,29,0.6);
+    }
+
+    .expand-block label { 
+      display: block;
+      font-family: var(--mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .expand-block p { 
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .comment-box { 
+      width: 100%;
+      min-height: 80px;
+      padding: 10px 12px;
+      background: rgba(20,31,49,0.8);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 13px;
+      resize: vertical;
+    }
+
+    .comment-box:focus { 
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .flag-action-row { 
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .resolved-badge { 
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(22,199,132,0.12);
+      border: 1px solid rgba(22,199,132,0.3);
+      color: var(--accent);
+      font-size: 11px;
+      font-family: var(--mono);
+    }
+
+    .knowledge-form {
+      display: grid;
+      gap: 14px;
+      padding: 20px;
+      border-radius: 16px;
+      background: rgba(20,31,49,0.5);
+      border: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .knowledge-form textarea { 
+      width: 100%;
+      min-height: 100px;
+      padding: 12px 14px;
+      background: rgba(10,18,31,0.8);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-size: 14px;
+      resize: vertical;
+    }
+
+    .knowledge-form textarea:focus { 
+      outline: none;
+      border-color: var(--accent); 
+    }
+
+    .knowledge-form-row { 
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .knowledge-form select, .knowledge-form input[type="datetime-local"] { 
+      padding: 10px 12px;
+      background: rgba(10,18,31,0.8);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .knowledge-list { 
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .knowledge-item {
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .knowledge-item-body { 
+      flex: 1;
+    }
+
+    .knowledge-item-content { 
+      font-size: 14px;
+      color: var(--text);
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+
+    .knowledge-item-meta { 
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono);
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .cat-badge { 
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(59,130,246,0.12);
+      color: #93c5fd;
+      font-size: 11px;
+      font-family: var(--mono);
+    }
+
+    .form-success { 
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: rgba(22,199,132,0.1);
+      border: 1px solid rgba(22,199,132,0.3);
+      color: var(--accent);
+      font-size: 13px;
+      display: none;
+    }
+
     @media (max-width: 1100px) {
       .stats-grid,
       .split {
@@ -446,6 +632,8 @@
       <button class="tab" data-tab="flags" type="button">Flags</button>
       <button class="tab" data-tab="interactions" type="button">Interactions</button>
       <button class="tab" data-tab="noresults" type="button">No results</button>
+      <button class="tab" data-tab="knowledge" type="button">Community Notes</button>
+      <button class="tab" data-tab="pending" type="button">Pending</button>
     </nav>
 
     <main class="content">
@@ -484,7 +672,7 @@
                 <th>Question</th>
                 <th>Reason</th>
                 <th>Mode</th>
-                <th>Thread</th>
+                <th>Status</th>
                 <th>Flagged at</th>
               </tr>
             </thead>
@@ -531,6 +719,55 @@
           </table>
         </div>
       </section>
+
+      <section class="panel tab-panel" data-panel="knowledge" hidden>
+        <h2>Community Notes</h2>
+        <p class="panel-copy">Add local knowledge the chatbot uses when answering questions. Notes with an expiry automatically stop being used after that date.</p>
+        <div id="admin-note-chat" style="margin-bottom:24px;padding:20px;border-radius:16px;background:rgba(20,31,49,0.5);border:1px solid var(--border);">
+          <div id="admin-chat-messages" style="display:flex;flex-direction:column;gap:10px;max-height:240px;overflow-y:auto;margin-bottom:14px;padding:12px;background:rgba(0,0,0,0.15);border-radius:10px;border:1px solid var(--border)"></div>
+          <div id="admin-chat-input-row" style="display:flex;gap:8px;">
+            <input type="text" id="admin-chat-input" placeholder="Describe what to add to the knowledge base…" style="flex:1;padding:10px 12px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;" autocomplete="off">
+            <button class="btn btn-sm" id="admin-chat-send" type="button">Send</button>
+          </div>
+          <div id="admin-note-preview" hidden style="margin-top:12px;padding:14px;border-radius:10px;background:rgba(22,199,132,0.06);border:1px solid rgba(22,199,132,0.25);">
+            <p style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;">Compiled note — edit if needed, then confirm</p>
+            <textarea id="admin-note-preview-text" style="font-size:13px;line-height:1.6;margin-bottom:12px;width:100%;min-height:80px;background:rgba(0,0,0,0.2);border:1px solid rgba(22,199,132,0.2);border-radius:8px;color:var(--text);padding:8px;resize:vertical;font-family:inherit;box-sizing:border-box;" spellcheck="false"></textarea>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+              <label style="display:flex;flex-direction:column;gap:4px;">
+                <span style="font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;">Category</span>
+                <select id="admin-note-category" style="padding:8px 12px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;">
+                  <option value="general">General</option>
+                  <option value="safety">Safety</option>
+                  <option value="events">Events</option>
+                  <option value="infrastructure">Infrastructure</option>
+                  <option value="community">Community</option>
+                </select>
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;">
+                <span style="font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;">Expires (optional)</span>
+                <input type="date" id="admin-note-expires" style="padding:8px 12px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;">
+              </label>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn btn-sm" id="admin-note-confirm" type="button">Add to knowledge base</button>
+                <button class="btn-ghost btn-sm" id="admin-note-edit-btn" type="button">Start over</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-success" id="admin-note-chat-success">Note added — the chatbot will use this in future responses.</div>
+        </div>
+        <h3 style="font-size:11px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:14px;">Active notes</h3>
+        <div class="knowledge-list" id="knowledge-list">
+          <div class="empty">Loading…</div>
+        </div>
+      </section>
+
+      <section class="panel tab-panel" data-panel="pending" hidden>
+        <h2>Pending community notes</h2>
+        <p class="panel-copy">Notes submitted by community members waiting for admin approval.</p>
+        <div class="knowledge-list" id="pending-list">
+          <div class="empty">Loading…</div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -544,6 +781,8 @@
       interactions: [],
       noResults: [],
       activeTab: 'overview',
+      knowledge: [],
+      expandedFlagId: null,
     };
 
     const elements = {
@@ -569,6 +808,7 @@
       flagsBody: document.getElementById('flags-body'),
       interactionsBody: document.getElementById('interactions-body'),
       noResultsBody: document.getElementById('noresults-body'),
+      knowledgeList: document.getElementById('knowledge-list'),
     };
 
     function escapeHtml(value) {
@@ -649,19 +889,92 @@
     }
 
     function renderFlags() {
-      renderTableRows(
-        elements.flagsBody,
-        state.flags,
-        [
-          (row) => `<span class="mono">${escapeHtml(String(row.id))}</span>`,
-          (row) => escapeHtml(row.client_query || '—'),
-          (row) => `<span class="danger">${escapeHtml(row.flag_reason || '—')}</span><div class="muted">${escapeHtml(row.flag_details || '')}</div>`,
-          (row) => `<span class="mono">${escapeHtml(row.data_selected || '—')}</span>`,
-          (row) => `<span class="mono">${escapeHtml(row.thread_id || '—')}</span>`,
-          (row) => `<span class="muted">${escapeHtml(formatDate(row.flagged_at || row.created_at))}</span>`,
-        ],
-        'No flagged interactions.'
-      );
+      const tbody = elements.flagsBody;
+      tbody.innerHTML = '';
+      if (!state.flags.length) {
+        tbody.innerHTML = `<tr><td class="empty" colspan="6">No flagged interactions.</td></tr>`;
+        return;
+      }
+      state.flags.forEach((row) => {
+        const isExpanded = state.expandedFlagId === row.id;
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.innerHTML = `
+          <td><span class="mono">${escapeHtml(String(row.id))}</span></td>
+          <td>${escapeHtml(row.client_query || '—')}</td>
+          <td>
+            <span class="danger">${escapeHtml(row.flag_reason || '—')}</span>
+            ${row.flag_details ? `<div class="muted" style="font-size:12px;margin-top:2px">${escapeHtml(row.flag_details)}</div>` : ''}
+          </td>
+          <td><span class="mono">${escapeHtml(row.data_selected || '—')}</span></td>
+          <td>${row.resolved ? '<span class="resolved-badge">✓ Resolved</span>' : '<span style="color:var(--warning);font-size:12px;font-family:var(--mono)">Pending</span>'}</td>
+          <td><span class="muted">${escapeHtml(formatDate(row.flagged_at || row.created_at))}</span></td>
+        `;
+        tr.addEventListener('click', () => toggleFlagExpand(row.id));
+        tbody.appendChild(tr);
+
+        const expandTr = document.createElement('tr');
+        expandTr.className = `flag-expand-row${isExpanded ? ' open' : ''}`;
+        expandTr.innerHTML = `
+          <td colspan="6" style="padding:0;border-bottom:1px solid var(--border)">
+            <div class="flag-expand-inner">
+              <div class="expand-block">
+                <label>Full question</label>
+                <p>${escapeHtml(row.client_query || '—')}</p>
+              </div>
+              <div class="expand-block">
+                <label>Bot response</label>
+                <p>${escapeHtml(row.app_response || '—')}</p>
+              </div>
+              <div class="expand-block" style="grid-column:1/-1">
+                <label>Moderator comment</label>
+                <textarea class="comment-box" id="comment-${row.id}" placeholder="What was wrong? What should the correct answer be?">${escapeHtml(row.moderator_comment || '')}</textarea>
+                <div class="flag-action-row">
+                  <button class="btn-ghost btn-sm" type="button" onclick="saveComment(${row.id}, event)">Save comment</button>
+                  <button class="btn-ghost btn-sm btn-success" type="button" onclick="resolveFlag(${row.id}, event)">Mark resolved</button>
+                  <button class="btn-ghost btn-sm" type="button" onclick="pushToKnowledge(${row.id}, event)">Push to knowledge base</button>
+                </div>
+              </div>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(expandTr);
+      });
+    }
+
+    function toggleFlagExpand(flagId) {
+      state.expandedFlagId = state.expandedFlagId === flagId ? null : flagId;
+      renderFlags();
+    }
+
+    async function saveComment(flagId, event) {
+      event.stopPropagation();
+      const comment = document.getElementById(`comment-${flagId}`)?.value || '';
+      const result = await ApiClient.adminCommentFlag(flagId, comment, false);
+      if (!result.success) { alert(result.error); return; }
+      const flag = state.flags.find(f => f.id === flagId);
+      if (flag) flag.moderator_comment = comment;
+      alert('Comment saved.');
+    }
+
+    async function resolveFlag(flagId, event) {
+      event.stopPropagation();
+      const comment = document.getElementById(`comment-${flagId}`)?.value || '';
+      const result = await ApiClient.adminCommentFlag(flagId, comment, true);
+      if (!result.success) { alert(result.error); return; }
+      const flag = state.flags.find(f => f.id === flagId);
+      if (flag) { flag.resolved = true; flag.moderator_comment = comment; }
+      renderFlags();
+    }
+
+    async function pushToKnowledge(flagId, event) {
+      event.stopPropagation();
+      const comment = document.getElementById(`comment-${flagId}`)?.value || '';
+      if (!comment.trim()) { alert('Add a comment first — this is what gets pushed to the knowledge base.'); return; }
+      const result = await ApiClient.adminAddKnowledge({ content: comment, category: 'general', source_flag_id: flagId });
+      if (!result.success) { alert(result.error); return; }
+      alert('Pushed to knowledge base.');
+      if (state.activeTab === 'knowledge') await loadKnowledge();
     }
 
     function renderInteractions() {
@@ -695,6 +1008,171 @@
       );
     }
 
+    async function loadKnowledge() {
+      const result = await ApiClient.adminGetKnowledge();
+      if (!result.success) return;
+      state.knowledge = result.data.knowledge || [];
+      renderKnowledge();
+    }
+
+    function renderKnowledge() {
+      const list = elements.knowledgeList;
+      list.innerHTML = '';
+      const active = state.knowledge.filter(k => k.active);
+      if (!active.length) { list.innerHTML = `<div class="empty">No active notes yet. Add one above.</div>`; return; }
+      active.forEach((item) => {
+        const div = document.createElement('div');
+        div.className = 'knowledge-item';
+        div.innerHTML = `
+          <div class="knowledge-item-body">
+            <div class="knowledge-item-content">${escapeHtml(item.content)}</div>
+            <div class="knowledge-item-meta">
+              <span class="cat-badge">${escapeHtml(item.category || 'general')}</span>
+              <span>Added by ${escapeHtml(item.added_by || '—')}</span>
+              <span>${escapeHtml(formatDate(item.created_at))}</span>
+              ${item.expires_at ? `<span class="warning">Expires ${escapeHtml(formatDate(item.expires_at))}</span>` : ''}
+              ${item.source_flag_id ? `<span class="muted">From flag #${escapeHtml(String(item.source_flag_id))}</span>` : ''}
+            </div>
+          </div>
+          <button class="btn-ghost btn-sm btn-danger" type="button" onclick="deactivateKnowledge(${item.id})">Remove</button>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    // Admin note chatbot
+    const adminNoteState = { messages: [], waiting: false, compiled: null };
+
+    function addAdminChatMsg(role, content) {
+      const container = document.getElementById('admin-chat-messages');
+      const isUser = role === 'user';
+      const div = document.createElement('div');
+      div.style.cssText = `display:flex;justify-content:${isUser ? 'flex-end' : 'flex-start'}`;
+      div.innerHTML = `<div style="max-width:80%;padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.5;background:${isUser ? 'rgba(22,199,132,0.15)' : 'rgba(255,255,255,0.06)'};border:1px solid ${isUser ? 'rgba(22,199,132,0.3)' : 'rgba(255,255,255,0.1)'}">${escapeHtml(content)}</div>`;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function resetAdminNoteChat() {
+      adminNoteState.messages = [];
+      adminNoteState.waiting = false;
+      adminNoteState.compiled = null;
+      document.getElementById('admin-chat-messages').innerHTML = '';
+      document.getElementById('admin-chat-input').value = '';
+      document.getElementById('admin-chat-input-row').hidden = false;
+      document.getElementById('admin-note-preview').hidden = true;
+      document.getElementById('admin-note-preview-text').value = '';
+      document.getElementById('admin-note-expires').value = '';
+      document.getElementById('admin-note-chat-success').style.display = 'none';
+      addAdminChatMsg('assistant', 'What would you like to add to the knowledge base?');
+    }
+
+    async function sendAdminMessage() {
+      if (adminNoteState.waiting) return;
+      const input = document.getElementById('admin-chat-input');
+      const content = input.value.trim();
+      if (!content) return;
+      adminNoteState.messages.push({ role: 'user', content });
+      addAdminChatMsg('user', content);
+      input.value = '';
+      adminNoteState.waiting = true;
+      document.getElementById('admin-chat-send').disabled = true;
+
+      const typing = document.createElement('div');
+      typing.id = 'admin-typing';
+      typing.style.cssText = 'display:flex;justify-content:flex-start';
+      typing.innerHTML = `<div style="padding:8px 12px;border-radius:10px;font-size:13px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#94a3b8">Typing…</div>`;
+      document.getElementById('admin-chat-messages').appendChild(typing);
+
+      const result = await ApiClient.communityNotesChat(adminNoteState.messages);
+      document.getElementById('admin-typing')?.remove();
+      adminNoteState.waiting = false;
+      document.getElementById('admin-chat-send').disabled = false;
+
+      if (!result.success) {
+        addAdminChatMsg('assistant', 'Something went wrong. Please try again.');
+        return;
+      }
+
+      if (result.data.ready) {
+        adminNoteState.compiled = result.data.compiled;
+        addAdminChatMsg('assistant', 'Got the details. Review the compiled note below, pick a category, then confirm to add it directly to the knowledge base.');
+        document.getElementById('admin-note-preview-text').value = result.data.compiled;
+        document.getElementById('admin-note-preview').hidden = false;
+        document.getElementById('admin-chat-input-row').hidden = true;
+      } else {
+        adminNoteState.messages.push({ role: 'assistant', content: result.data.reply });
+        addAdminChatMsg('assistant', result.data.reply);
+      }
+    }
+
+    async function confirmAdminNote() {
+      const content = document.getElementById('admin-note-preview-text').value.trim();
+      if (!content) return;
+      const category = document.getElementById('admin-note-category').value;
+      const expiresRaw = document.getElementById('admin-note-expires').value;
+      const payload = { content, category };
+      if (expiresRaw) payload.expires_at = expiresRaw;
+      const result = await ApiClient.adminAddKnowledge(payload);
+      if (!result.success) { alert(result.error); return; }
+      document.getElementById('admin-note-preview').hidden = true;
+      document.getElementById('admin-chat-input-row').hidden = false;
+      document.getElementById('admin-note-chat-success').style.display = 'block';
+      setTimeout(() => { document.getElementById('admin-note-chat-success').style.display = 'none'; }, 3500);
+      adminNoteState.messages = [];
+      adminNoteState.compiled = null;
+      document.getElementById('admin-chat-messages').innerHTML = '';
+      document.getElementById('admin-note-preview-text').value = '';
+      document.getElementById('admin-note-expires').value = '';
+      addAdminChatMsg('assistant', 'Note added! Want to add another?');
+      await loadKnowledge();
+    }
+
+    async function deactivateKnowledge(id) {
+      if (!confirm('Remove this note?')) return;
+      const result = await ApiClient.adminDeleteKnowledge(id);
+      if (!result.success) { alert(result.error); return; }
+      state.knowledge = state.knowledge.map(k => k.id === id ? { ...k, active: false } : k);
+      renderKnowledge();
+    }
+
+
+    async function loadPending() {
+      const result = await ApiClient.adminGetPending();
+      if (!result.success) return;
+      renderPending(result.data.pending || []);
+    }
+
+    function renderPending(items) {
+      const list = document.getElementById('pending-list');
+      list.innerHTML = '';
+      if (!items.length) { list.innerHTML = `<div class="empty">No pending notes.</div>`; return; }
+      items.forEach((item) => {
+        const div = document.createElement('div');
+        div.className = 'knowledge-item';
+        div.innerHTML = `
+          <div class="knowledge-item-body">
+            <div class="knowledge-item-content">${escapeHtml(item.content)}</div>
+            <div class="knowledge-item-meta">
+              <span class="cat-badge">${escapeHtml(item.category || 'community')}</span>
+              <span>Submitted by ${escapeHtml(item.added_by || 'anonymous')}</span>
+              <span>${escapeHtml(formatDate(item.created_at))}</span>
+            </div>
+          </div>
+          <button class="btn-ghost btn-sm btn-success" type="button" onclick="approveNote(${item.id})">Approve</button>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    async function approveNote(id) {
+      const result = await ApiClient.adminApproveNote(id);
+      if (!result.success) { alert(result.error); return; }
+      showToast('Note approved — chatbot will now use it.', 'success');
+      await loadPending();
+      await loadKnowledge();
+    }
+
     function switchTab(nextTab) {
       state.activeTab = nextTab;
       elements.tabs.forEach((tab) => {
@@ -706,6 +1184,8 @@
           panel.hidden = panel.dataset.panel !== 'overview';
         }
       });
+      if (nextTab === 'knowledge') { loadKnowledge(); resetAdminNoteChat(); }
+      if (nextTab === 'pending') loadPending();
     }
 
     async function logout() {
@@ -779,6 +1259,14 @@
     elements.refreshButton.addEventListener('click', loadAll);
     elements.logoutButton.addEventListener('click', logout);
     elements.accessLogout.addEventListener('click', logout);
+    document.getElementById('admin-chat-send').addEventListener('click', sendAdminMessage);
+    document.getElementById('admin-chat-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendAdminMessage(); } });
+    document.getElementById('admin-note-confirm').addEventListener('click', confirmAdminNote);
+    document.getElementById('admin-note-edit-btn').addEventListener('click', () => {
+      document.getElementById('admin-note-preview').hidden = true;
+      document.getElementById('admin-chat-input-row').hidden = false;
+      adminNoteState.compiled = null;
+    });
 
     bootstrap();
   </script>

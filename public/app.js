@@ -952,6 +952,7 @@ function handleThreadListClick(event) {
   loadMessages(threadId);
 }
 
+
 function initEventListeners() {
   elements.tabLogin.addEventListener('click', () => setAuthMode('login'));
   elements.tabSignup.addEventListener('click', () => setAuthMode('signup'));
@@ -996,6 +997,8 @@ function initEventListeners() {
     elements.chatInput.value = button.dataset.query || '';
     elements.chatInput.focus();
   });
+
+
 }
 
 async function initApp() {

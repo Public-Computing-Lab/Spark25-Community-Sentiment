@@ -158,4 +158,28 @@ window.ApiClient = {
   adminFlags: () => apiRequest('/admin/flags', { method: 'GET' }),
   adminInteractions: () => apiRequest('/admin/interactions', { method: 'GET' }),
   adminNoResults: () => apiRequest('/admin/no-results', { method: 'GET' }),
+  adminCommentFlag: (flagId, comment, resolved) => apiRequest(`/admin/flags/${flagId}/comment`, {
+    method: 'PUT',
+    body: JSON.stringify({ moderator_comment: comment, resolved }),
+  }),
+  adminAddKnowledge: (payload) => apiRequest('/admin/knowledge', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
+  adminGetKnowledge: () => apiRequest('/admin/knowledge', { method: 'GET' }),
+  adminDeleteKnowledge: (id) => apiRequest(`/admin/knowledge/${id}`, { method: 'DELETE' }),
+  submitCommunityNote: (content, category) => apiRequest('/community/notes', {
+    method: 'POST',
+    body: JSON.stringify({ content, category }),
+  }),
+  communityNotesChat: (messages) => apiRequest('/community/notes/chat', {
+    method: 'POST',
+    body: JSON.stringify({ messages }),
+    timeoutMs: null,
+  }),
+adminGetPending: () => apiRequest('/admin/knowledge/pending', { method: 'GET' }),
+adminApproveNote: (id) => apiRequest(`/admin/knowledge/${id}/approve`, {
+  method: 'PUT',
+  body: JSON.stringify({}),
+}),
 };

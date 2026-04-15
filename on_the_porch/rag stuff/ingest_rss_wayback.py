@@ -71,7 +71,7 @@ def get_snapshots(feed_url: str, from_date: str = "", to_date: str = "", limit: 
         params["limit"] = limit
 
     try:
-        resp = requests.get(CDX_API, params=params, timeout=15)
+        resp = requests.get(CDX_API, params=params, timeout=30)
         resp.raise_for_status()
         rows = resp.json()
     except Exception as e:
@@ -90,7 +90,7 @@ def fetch_wayback_feed(feed_url: str, timestamp: str, feed_meta: dict) -> list[t
     """
     url = f"{WAYBACK_BASE}/{timestamp}/{feed_url}"
     try:
-        resp = requests.get(url, timeout=20)
+        resp = requests.get(url, timeout=40)
         resp.raise_for_status()
     except Exception as e:
         print(f"      Snapshot {timestamp} fetch failed: {e}")
