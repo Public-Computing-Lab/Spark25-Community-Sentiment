@@ -619,6 +619,13 @@ _RSS_NEWS_HINTS = (
     "what is happening in",
     "what is going on in",
     "lately in",
+    "dorchester",
+    "codman square",
+    "csndc",
+    "tell me about",
+    "what has",
+    "who is",
+    "what is",
 )
 _SCHEDULE_HINTS = (
     "event",
