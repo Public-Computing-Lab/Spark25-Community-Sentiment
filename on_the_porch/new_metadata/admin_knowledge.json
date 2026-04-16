@@ -1,0 +1,50 @@
+{
+  "schema": "mysql",
+  "table": "admin_knowledge",
+  "columns": {
+    "id": {
+      "data_type": "int",
+      "is_numeric": true
+    },
+    "content": {
+      "data_type": "text",
+      "is_numeric": false,
+      "unique_values": [
+        "What: A resident is reporting excessive snow covering the entire street.\nWhere: Along Washington Street in Dorchester.\nWhen: Now.\nDetails: The user could not provide a specific cross-street, stating the issue affects the \"whole street.\""
+      ]
+    },
+    "category": {
+      "data_type": "varchar(100)",
+      "is_numeric": false,
+      "unique_values": [
+        "general"
+      ]
+    },
+    "expires_at": {
+      "data_type": "timestamp",
+      "is_numeric": false
+    },
+    "source_flag_id": {
+      "data_type": "int",
+      "is_numeric": true
+    },
+    "added_by": {
+      "data_type": "varchar(255)",
+      "is_numeric": false,
+      "unique_values": [
+        "Atharv1"
+      ]
+    },
+    "active": {
+      "data_type": "tinyint(1)",
+      "is_numeric": true
+    },
+    "created_at": {
+      "data_type": "timestamp",
+      "is_numeric": false,
+      "unique_values": [
+        "2026-04-15 04:49:06"
+      ]
+    }
+  }
+}
