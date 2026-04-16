@@ -210,6 +210,67 @@ def _get_unique_values(table_name: str, column_name: str, schema: str = "public"
         conn.close()
 
 
+def _fetch_active_admin_knowledge(limit: int = 10) -> List[Dict[str, Any]]:
+    """Fetch recent active admin/community notes for answer-time context."""
+    conn = _get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT `id`, `content`, `category`, `created_at`
+                FROM `admin_knowledge`
+                WHERE `active` = TRUE
+                  AND `content` IS NOT NULL
+                  AND TRIM(`content`) <> ''
+                ORDER BY `created_at` DESC, `id` DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            rows = cur.fetchall()
+            print([
+                {
+                    "id": row[0],
+                    "content": row[1],
+                    "category": row[2],
+                    "created_at": row[3],
+                }
+                for row in rows
+            ])
+            return [
+                {
+                    "id": row[0],
+                    "content": row[1],
+                    "category": row[2],
+                    "created_at": row[3],
+                }
+                for row in rows
+            ]
+    except Exception as exc:
+        print(f"[Warning] Could not fetch admin knowledge: {exc}", file=sys.stderr)
+        return []
+    finally:
+        conn.close()
+
+
+def _format_admin_knowledge_context(notes: List[Dict[str, Any]], max_notes: int = 8) -> str:
+    """Format admin/community notes for prompt context."""
+    if not notes:
+        return "(No active community notes available)"
+
+    lines: List[str] = []
+    for note in notes[:max_notes]:
+        note_id = note.get("id", "")
+        category = note.get("category", "general")
+        created_at = note.get("created_at", "")
+        content = str(note.get("content", "")).strip()
+        lines.append(
+            f"- Note #{note_id} | category: {category} | created_at: {created_at}\n"
+            f"  Content: {content}"
+        )
+    return "\n".join(lines)
+
+
 def _get_table_columns_from_sql(sql: str, schema_snapshot: str) -> Dict[str, List[str]]:
     """Extract table and column names from SQL query to identify which columns to get unique values from."""
     import re
@@ -873,6 +934,9 @@ def _execute_with_retries(
 
 @traceable(name="summarize_answer")
 def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], default_model: str, conversation_history: List[Dict[str, str]] | None = None) -> str:
+    admin_notes = _fetch_active_admin_knowledge(limit=10)
+    admin_notes_context = _format_admin_knowledge_context(admin_notes)
+
     # If SQL failed, provide a graceful explanation instead of crashing
     error_text = result.get("error")
     if error_text:
@@ -885,6 +949,36 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
     cols = result.get("columns", [])
     rows = result.get("rows", [])
     if not rows:
+        if admin_notes:
+            system_prompt = (
+                "You are a friendly, non-technical assistant helping people understand Dorchester community information.\n"
+                "This system is configured for DORCHESTER ONLY.\n"
+                "Before answering, review the active community notes. "
+                "If they are relevant to the user's question, use them in your answer.\n"
+                "Do not mention SQL, databases, or internal tools.\n"
+                "If the community notes do not answer the question, briefly say that no matching structured data was found."
+                + ("\n\nYou are in a conversation. Reference previous questions naturally when it helps the user." if conversation_history else "")
+            )
+            user_prompt = (
+                "Question:\n" + question + "\n\n"
+                "Structured query returned no rows.\n\n"
+                "Active community notes:\n" + admin_notes_context + "\n\n"
+                "Please answer using the notes when relevant:"
+            )
+            full_prompt = system_prompt + "\n\n"
+            if conversation_history:
+                for msg in conversation_history[-10:]:
+                    role = msg.get("role", "")
+                    content = msg.get("content", "")
+                    full_prompt += f"{role.upper()}: {content}\n\n"
+            full_prompt += user_prompt
+            try:
+                content = _call_gemini_with_logging(default_model, full_prompt, temperature=0)
+                if content.strip():
+                    return content.strip()
+            except Exception:
+                pass
+
         unique_values = result.get("unique_values", {})
         if unique_values:
             # Build a helpful message with unique values
@@ -913,6 +1007,7 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
         "You are a friendly, non-technical assistant explaining results about Dorchester ONLY to a general audience.\n"
         "This system is configured to show ONLY Dorchester data. All queries are filtered to Dorchester only.\n"
         "Use clear, everyday language and speak as if you are talking directly to the user.\n"
+        "Before writing the answer, review the active community notes. If any note is relevant, incorporate it as supporting context.\n"
         "Focus on what the numbers mean for people in Dorchester (trends over time, comparisons within Dorchester, biggest/smallest values there), "
         "not on how the data was queried or any technical details.\n"
         "IMPORTANT: If you see any data from other neighborhoods in the results, ignore it completely and only discuss Dorchester data. "
@@ -927,6 +1022,7 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
 
     user_prompt = (
         "Question:\n" + question + "\n\n"
+        "Active community notes:\n" + admin_notes_context + "\n\n"
         "Executed SQL:\n" + sql + "\n\n"
         "Result (JSON, possibly truncated):\n" + json.dumps(data_blob, ensure_ascii=False, default=str)
     )
@@ -1157,4 +1253,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

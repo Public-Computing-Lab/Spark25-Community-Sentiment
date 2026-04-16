@@ -41,7 +41,26 @@ MYSQL_CONFIG = {
 }
 
 # Tables to generate metadata for
-TARGET_TABLES = ["crime_incident_reports", "service_requests_311", "shootings"]
+TARGET_TABLES = ["crime_incident_reports", "service_requests_311", "shootings", "admin_knowledge"]
+
+TABLE_DESCRIPTIONS = {
+    "crime_incident_reports": (
+        "Crime incident reports from Boston Police Department; one row per incident "
+        "with date, location, offense details, and related attributes."
+    ),
+    "service_requests_311": (
+        "Citywide 311 service requests from Boston Open Data Portal (NEW SYSTEM); "
+        "one row per request with lifecycle fields, request type, status, and location context. "
+        "Fields mapped from new API: open_date->open_dt, case_topic->type."
+    ),
+    "shootings": (
+        "Shooting incidents with victim/location details and event dates."
+    ),
+    "admin_knowledge": (
+        "Community notes and admin knowledge entries added by moderators; one row per note "
+        "with content, category, active status, source flag, and timestamps."
+    ),
+}
 
 # Heuristic: which MySQL types should we treat as numeric?
 NUMERIC_PREFIXES = (
@@ -180,6 +199,51 @@ def write_metadata_file(metadata: Dict, output_dir: Path):
     print(f"Wrote: {output_path}")
 
 
+def update_tables_catalog(output_dir: Path, generated_tables: List[str]):
+    """Update tables_catalog.json with generated metadata entries."""
+    catalog_path = output_dir / "tables_catalog.json"
+    existing: List[Dict] = []
+
+    if catalog_path.exists():
+        try:
+            with open(catalog_path, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, list):
+                existing = [entry for entry in loaded if isinstance(entry, dict)]
+        except Exception as e:
+            print(f"WARNING: Could not read existing catalog: {e}")
+
+    by_table = {
+        entry.get("table"): entry
+        for entry in existing
+        if entry.get("table")
+    }
+
+    for table_name in generated_tables:
+        by_table[table_name] = {
+            "table": table_name,
+            "description": TABLE_DESCRIPTIONS.get(
+                table_name,
+                f"Metadata for table {table_name} generated from the live MySQL database.",
+            ),
+            "metadata_file": f"{table_name}.json",
+        }
+
+    ordered_tables = []
+    for table_name in TARGET_TABLES:
+        if table_name in by_table:
+            ordered_tables.append(by_table.pop(table_name))
+
+    # Keep any unrelated existing entries after the known tables.
+    for table_name in sorted(by_table.keys()):
+        ordered_tables.append(by_table[table_name])
+
+    with open(catalog_path, "w", encoding="utf-8") as f:
+        json.dump(ordered_tables, f, ensure_ascii=False, indent=2)
+
+    print(f"Wrote: {catalog_path}")
+
+
 def main():
     """Main entry point."""
     print("="*60)
@@ -197,16 +261,21 @@ def main():
         
         # Generate metadata for each table
         generated_count = 0
+        generated_tables: List[str] = []
         for table_name in TARGET_TABLES:
             try:
                 metadata = generate_metadata_for_table(conn, table_name)
                 if metadata:
                     write_metadata_file(metadata, output_dir)
                     generated_count += 1
+                    generated_tables.append(table_name)
             except Exception as e:
                 print(f"ERROR: Error processing {table_name}: {e}")
                 import traceback
                 traceback.print_exc()
+
+        if generated_tables:
+            update_tables_catalog(output_dir, generated_tables)
         
         print("\n" + "="*60)
         print(f"Generated metadata for {generated_count} table(s)")
@@ -224,4 +293,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

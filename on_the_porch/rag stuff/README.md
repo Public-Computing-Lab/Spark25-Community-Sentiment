@@ -13,6 +13,7 @@ Provides semantic search over unstructured text data:
 
 - `retrieval.py` - Main retrieval functions (used by unified_chatbot.py)
 - `build_vectordb.py` - Builds vector database from Data/ folder
+- `ingest_community_notes.py` - Appends approved notes from `admin_knowledge` into the shared vector DB
 - `Data/` - Source documents
 - `vectordb_new/` - Chroma vector database (generated)
 
@@ -108,6 +109,19 @@ results = vectordb.max_marginal_relevance_search(
     lambda_mult=0.5  # 0=max diversity, 1=max relevance
 )
 ```
+
+### Community Notes Ingestion
+
+Append approved community notes from MySQL into the shared vector DB:
+
+```bash
+python "on_the_porch/rag stuff/ingest_community_notes.py"
+```
+
+This script:
+- Creates the vector DB if it does not exist
+- Appends only new active notes from `admin_knowledge`
+- Ignores `expires_at`
 
 ---
 
