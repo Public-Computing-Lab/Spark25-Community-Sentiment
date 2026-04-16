@@ -37,7 +37,6 @@ if str(_RAG_DIR) not in sys.path:
 
 from retrieval import GeminiEmbeddings  # noqa: E402
 from ingest_rss import (               # reuse everything from ingest_rss.py
-    RSS_FEEDS,
     DEFAULT_VECTORDB_DIR,
     _stable_id,
     _entry_to_document,
@@ -46,7 +45,15 @@ from ingest_rss import (               # reuse everything from ingest_rss.py
 # ── config ────────────────────────────────────────────────────────────────────
 CDX_API      = "http://web.archive.org/cdx/search/cdx"
 WAYBACK_BASE = "https://web.archive.org/web"
-REQUEST_DELAY = 1.5   # seconds between Wayback requests — be polite
+REQUEST_DELAY = 1.5 
+
+WAYBACK_FEEDS: list[dict] = [
+    {
+        "url":    "https://www.csndc.com/feed/",
+        "source": "Codman Square Neighborhood Development Corporation",
+        "tag":    "codman square,development",
+    },
+]
 
 
 # ── CDX helpers ───────────────────────────────────────────────────────────────
@@ -117,7 +124,7 @@ def fetch_wayback_feed(feed_url: str, timestamp: str, feed_meta: dict) -> list[t
 
 def ingest_rss_wayback(
     vectordb_dir: Path = DEFAULT_VECTORDB_DIR,
-    feeds: list[dict] = RSS_FEEDS,
+    feeds: list[dict] = WAYBACK_FEEDS,
     dry_run: bool = False,
     from_date: str = "",
     to_date: str = "",
@@ -197,6 +204,7 @@ if __name__ == "__main__":
 
     ingest_rss_wayback(
         vectordb_dir=args.vectordb_dir,
+        feeds=WAYBACK_FEEDS,
         dry_run=args.dry_run,
         from_date=args.from_date,
         to_date=args.to_date,
