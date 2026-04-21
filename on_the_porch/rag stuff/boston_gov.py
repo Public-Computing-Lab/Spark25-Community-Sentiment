@@ -189,7 +189,6 @@ def add_boston_gov_answer_to_vectordb(
         "source": "BostonGov",
         "doc_type": "boston_gov_answer",
         "tags": "boston.gov",
-        "question": question,
     }
 
     document = Document(page_content=page_content, metadata=metadata)

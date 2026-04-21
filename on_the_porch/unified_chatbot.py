@@ -33,6 +33,13 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
 GEMINI_SUMMARY_MODEL = os.getenv("GEMINI_SUMMARY_MODEL", GEMINI_MODEL)
 FALLBACK_TRIGGER_PREFIX = "i did not find exact information"
+BOSTON_GOV_BOILERPLATE_PATTERNS = (
+    "search results below",
+    "links to relevant pages",
+    "links to relevant",
+    "relevant pages and more information",
+    "find links",
+)
 
 
 def _bootstrap_env() -> None:
@@ -66,6 +73,20 @@ def _should_trigger_boston_gov_fallback(answer: str) -> bool:
         return False
     first_two_lines = [line.strip() for line in answer.splitlines() if line.strip()][:2]
     return any(FALLBACK_TRIGGER_PREFIX in line.lower() for line in first_two_lines)
+
+
+def _clean_boston_gov_fallback_text(text: str) -> str:
+    """Remove Boston.gov search UI boilerplate before exposing text to users."""
+    cleaned_lines: List[str] = []
+    for line in (text or "").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        lowered = stripped.lower()
+        if any(pattern in lowered for pattern in BOSTON_GOV_BOILERPLATE_PATTERNS):
+            continue
+        cleaned_lines.append(stripped)
+    return "\n".join(cleaned_lines).strip()
 
 
 def _classify_boston_gov_exact_match(question: str, page_text: str) -> bool:
@@ -115,6 +136,7 @@ def _regenerate_with_boston_gov_context(question: str, original_answer: str, ai_
         "Write one clean final answer for the user.\n"
         "Use the Boston.gov information only as supporting context when it is relevant.\n"
         "Do not claim Boston.gov directly answers the question if it does not.\n"
+        "Remove search-page boilerplate such as references to links, relevant pages, or search results below.\n"
         "Do not mention internal tools, fallback logic, classifiers, or vector databases.\n"
         "If the exact answer is still not available, say so clearly and then share the most helpful related information."
     )
@@ -125,7 +147,7 @@ def _regenerate_with_boston_gov_context(question: str, original_answer: str, ai_
         f"{original_answer}\n\n"
         "Related Boston.gov AI answer:\n"
         f"{ai_text[:4000]}\n\n"
-        "Please produce a single improved answer for the user:"
+        "Please produce a single/combined improved answer for the user:"
     )
     try:
         resp = model.generate_content(
@@ -148,23 +170,27 @@ def _build_boston_gov_fallback_answer(question: str, original_answer: str) -> st
     if not ai_text:
         print("  ⚠️ Boston.gov fallback: no AI answer text found")
         return original_answer
+    cleaned_ai_text = _clean_boston_gov_fallback_text(ai_text)
+    if not cleaned_ai_text:
+        print("  ⚠️ Boston.gov fallback: AI answer only contained boilerplate")
+        return original_answer
 
     print("  🏛️ Boston.gov fallback: scraped AI answer text:")
-    for line in ai_text.splitlines():
+    for line in cleaned_ai_text.splitlines():
         if line.strip():
             print(f"     {line}")
 
-    excerpt = ai_text[:2000].strip()
+    excerpt = cleaned_ai_text[:2000].strip()
     is_exact_match = _classify_boston_gov_exact_match(question, ai_text)
     if is_exact_match:
         try:
-            boston_gov.add_boston_gov_answer_to_vectordb(question, ai_text)
+            boston_gov.add_boston_gov_answer_to_vectordb(question, cleaned_ai_text)
         except Exception as exc:
             print(f"  ⚠️ Boston.gov fallback vectordb save failed: {exc}")
         return excerpt
 
     print("  ⚠️ Boston.gov fallback: classifier said scraped AI answer is not an exact match")
-    return _regenerate_with_boston_gov_context(question, original_answer, ai_text)
+    return _regenerate_with_boston_gov_context(question, original_answer, cleaned_ai_text)
 
 
 def _apply_default_fallback_if_needed(question: str, answer: str) -> str:
@@ -369,6 +395,8 @@ def _route_question(question: str) -> Dict[str, Any]:
     system_prompt = (
         f"Today's date is {date.today().strftime('%A, %B %d, %Y')}.\n\n"
         "You are a STRICT routing classifier for a chatbot that combines SQL (structured data) and RAG (text documents).\n"
+        "RAG includes transcripts, policy documents, RSS/news items, and cached Boston.gov answers.\n"
+        "Whenever a question is routed to RAG or hybrid, cached Boston.gov answers will be searched along with the other RAG sources.\n"
         "You MUST classify the user's question into EXACTLY one of three modes: 'sql', 'rag', or 'hybrid'.\n"
         "These rules are MANDATORY and NON-NEGOTIABLE. Follow them EXACTLY.\n\n"
         "═══════════════════════════════════════════════════════════════════════════════\n"
@@ -818,6 +846,16 @@ def _run_rag(
             combined_meta.extend(rss_res.get("metadata", []))
         except Exception as e:
             print(f"  ⚠️ RSS retrieval error: {e}")
+
+    # cached Boston.gov answers are a regular RAG source; search them on every RAG pass.
+    try:
+        boston_res = retrieval.retrieve(question, k=k, doc_type="boston_gov_answer")
+        boston_chunks = boston_res.get("chunks", [])
+        print(f"  🏛️ BostonGov: {len(boston_chunks)} chunks found")
+        combined_chunks.extend(boston_chunks)
+        combined_meta.extend(boston_res.get("metadata", []))
+    except Exception as e:
+        print(f"  ⚠️ BostonGov retrieval error: {e}")
 
     # transcripts
     try:
