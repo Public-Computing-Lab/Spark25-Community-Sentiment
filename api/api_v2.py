@@ -2090,6 +2090,11 @@ def events():
                 }
             )
         return jsonify({"events": events_list, "total": len(events_list)})
+    except mysql.connector.Error as exc:
+        if getattr(exc, "errno", None) == 1146:
+            return jsonify({"events": [], "total": 0})
+        print(f"Error in /events: {exc}")
+        return _json_error("Failed to fetch events.", 500, "events_failed")
     except Exception as exc:
         print(f"Error in /events: {exc}")
         return _json_error("Failed to fetch events.", 500, "events_failed")

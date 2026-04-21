@@ -71,6 +71,34 @@ class BostonDataSyncer:
         
         with open(self.config_file, 'r') as f:
             return json.load(f)
+
+    @staticmethod
+    def _candidate_date_fields(date_field: Optional[str]) -> List[str]:
+        if not date_field:
+            return []
+        normalized = date_field.replace(' ', '_').replace('-', '_').lower()
+        candidates = [normalized]
+        synonyms = {
+            "open_dt": ["open_date"],
+            "open_date": ["open_dt"],
+            "closed_dt": ["close_date"],
+            "close_date": ["closed_dt"],
+        }
+        candidates.extend(synonyms.get(normalized, []))
+        seen = set()
+        ordered = []
+        for candidate in candidates:
+            if candidate not in seen:
+                seen.add(candidate)
+                ordered.append(candidate)
+        return ordered
+
+    @classmethod
+    def _resolve_date_field(cls, date_field: Optional[str], available_columns: set) -> Optional[str]:
+        for candidate in cls._candidate_date_fields(date_field):
+            if candidate in available_columns:
+                return candidate
+        return None
     
     def _create_default_config(self):
         """Create a default configuration file with example datasets."""
@@ -402,8 +430,15 @@ class BostonDataSyncer:
             
             if table_exists and date_field_normalized:
                 try:
+                    table_columns = self._get_table_columns(cursor, table_name)
+                    table_date_field = self._resolve_date_field(date_field, table_columns)
+                    if not table_date_field:
+                        raise KeyError(
+                            f"Expected one of {self._candidate_date_fields(date_field)} in `{table_name}`, "
+                            f"found columns: {sorted(table_columns)}"
+                        )
                     # Get the latest date from the database
-                    cursor.execute(f"SELECT MAX(`{date_field_normalized}`) as max_date FROM `{table_name}`")
+                    cursor.execute(f"SELECT MAX(`{table_date_field}`) as max_date FROM `{table_name}`")
                     result = cursor.fetchone()
                     if result and result.get('max_date'):
                         max_date = result['max_date']
@@ -432,20 +467,25 @@ class BostonDataSyncer:
             
             df = self.fetch_all_records(resource_id, max_records=max_records, filters=filters,
                                        date_field=date_field_normalized, date_from=date_from, date_to=date_to)
+
+            if date_field_normalized and len(df) > 0:
+                df_date_field = self._resolve_date_field(date_field, set(df.columns))
+            else:
+                df_date_field = date_field_normalized
             
             # Note: Date filtering is already done in fetch_all_records, so we just need to ensure
             # the data is ready for database insertion (timezone-naive)
-            if date_field_normalized and len(df) > 0 and date_field_normalized in df.columns:
+            if df_date_field and len(df) > 0 and df_date_field in df.columns:
                 # Convert to datetime if not already
-                if not pd.api.types.is_datetime64_any_dtype(df[date_field_normalized]):
-                    df[date_field_normalized] = pd.to_datetime(df[date_field_normalized], errors='coerce')
+                if not pd.api.types.is_datetime64_any_dtype(df[df_date_field]):
+                    df[df_date_field] = pd.to_datetime(df[df_date_field], errors='coerce')
                 
                 # Handle timezone-aware columns: convert datetime64[ns, UTC] to timezone-naive
                 # This is critical for MySQL compatibility and to avoid comparison errors
-                if pd.api.types.is_datetime64_any_dtype(df[date_field_normalized]):
+                if pd.api.types.is_datetime64_any_dtype(df[df_date_field]):
                     # Check if the column is timezone-aware and strip it
-                    if df[date_field_normalized].dt.tz is not None:
-                        df[date_field_normalized] = df[date_field_normalized].dt.tz_localize(None)
+                    if df[df_date_field].dt.tz is not None:
+                        df[df_date_field] = df[df_date_field].dt.tz_localize(None)
             
             if df.empty:
                 print("   ⚠️  No data to sync")
