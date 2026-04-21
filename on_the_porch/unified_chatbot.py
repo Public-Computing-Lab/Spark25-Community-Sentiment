@@ -753,7 +753,8 @@ _RSS_SOURCE_ALIASES = (
     "codman square health center",   
     "codman.org",                   
     "codman square neighborhood council", 
-    "codman council",                
+    "codman council"
+    "south dorchester",                
 )
 
 _RSS_NEWS_HINTS = (
@@ -773,6 +774,7 @@ _RSS_NEWS_HINTS = (
     "what is going on in",
     "lately in",
     "dorchester",
+    "south dorchester",
     "codman square",
     "csndc",
     "tell me about",
