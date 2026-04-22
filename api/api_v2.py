@@ -2116,7 +2116,7 @@ def events():
         return result
 
     limit = max(1, min(request.args.get("limit", 10, type=int), 100))
-    days_ahead = max(1, min(request.args.get("days_ahead", 7, type=int), 30))
+    days_ahead = max(1, min(request.args.get("days_ahead", 7, type=int), 365))
 
     conn = None
     cursor = None
