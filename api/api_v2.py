@@ -12,6 +12,7 @@ import datetime
 import os
 import re
 import sys
+import threading
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -76,8 +77,29 @@ from unified_chatbot import (  # noqa: E402
     create_empty_cache,
 )
 
+try:
+    from ingest_community_notes import ingest_community_notes as _ingest_community_notes  # noqa: E402
+except Exception as _ingest_import_err:
+    _ingest_community_notes = None
+    print(f"Warning: could not import ingest_community_notes: {_ingest_import_err}")
+
 _bootstrap_env()
 _fix_retrieval_vectordb_path()
+
+
+def _trigger_ingest() -> None:
+    """Run ingest_community_notes in a daemon thread so it doesn't block the response."""
+    if _ingest_community_notes is None:
+        return
+
+    def _run():
+        try:
+            stats = _ingest_community_notes()
+            print(f"Community notes ingested: {stats}")
+        except Exception as exc:
+            print(f"Background community notes ingest failed: {exc}")
+
+    threading.Thread(target=_run, daemon=True).start()
 
 _legacy_session_caches: Dict[str, Dict[str, Any]] = {}
 _CACHE_MAX_SESSIONS = 100
@@ -2430,6 +2452,7 @@ def admin_add_knowledge():
             g.current_user_row["username"] if g.get("current_user_row") else "admin",
         ))
         conn.commit()
+        _trigger_ingest()
         return jsonify({"id": cursor.lastrowid, "message": "Knowledge entry added"}), 201
     except Exception as e:
         return _json_error(str(e), 500, "admin_knowledge_add_failed")
@@ -2613,6 +2636,7 @@ def admin_approve_note(entry_id):
         cursor = conn.cursor(dictionary=True)
         cursor.execute("UPDATE admin_knowledge SET active = TRUE WHERE id = %s", (entry_id,))
         conn.commit()
+        _trigger_ingest()
         return jsonify({"message": "Note approved"})
     except Exception as e:
         return _json_error(str(e), 500, "approve_failed")
