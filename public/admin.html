@@ -6,7 +6,8 @@
   <title>Admin | On The Porch</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;500;600;700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=20260422k">
   <style>
     :root {
       --bg: #07111d;
@@ -402,9 +403,319 @@
         grid-template-columns: 1fr;
       }
     }
+
+    body.admin-page {
+      min-height: 100dvh;
+      overflow: auto;
+      font-family: var(--font-ui);
+      color: var(--text-primary);
+      background:
+        radial-gradient(circle at 12% 14%, rgba(48, 131, 123, 0.18), transparent 26%),
+        radial-gradient(circle at 88% 8%, rgba(201, 149, 92, 0.12), transparent 18%),
+        linear-gradient(180deg, #121a21 0%, #0c1218 100%);
+    }
+
+    body.admin-page[data-theme='light'] {
+      background:
+        radial-gradient(circle at 10% 18%, rgba(23, 73, 62, 0.08), transparent 24%),
+        radial-gradient(circle at 84% 12%, rgba(159, 118, 80, 0.08), transparent 16%),
+        linear-gradient(180deg, #f8f4ed 0%, #f3eee6 100%);
+    }
+
+    body.admin-page .shell {
+      min-height: 100dvh;
+      padding: clamp(18px, 3vw, 34px);
+    }
+
+    body.admin-page .card {
+      width: min(560px, 100%);
+      padding: clamp(28px, 4vw, 44px);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--line-strong);
+      background: linear-gradient(180deg, rgba(18, 23, 28, 0.96), rgba(12, 16, 20, 0.98));
+      box-shadow: var(--shadow-heavy);
+    }
+
+    body.admin-page[data-theme='light'] .card {
+      background: rgba(251, 248, 242, 0.96);
+      border-color: rgba(17, 36, 32, 0.12);
+      box-shadow: var(--shadow-heavy);
+    }
+
+    body.admin-page .badge {
+      margin: 0 0 14px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    body.admin-page .card h1,
+    body.admin-page .topbar-title h1,
+    body.admin-page .panel h2 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: var(--text-primary);
+    }
+
+    body.admin-page .card h1 {
+      font-size: clamp(44px, 5vw, 64px);
+      line-height: 0.95;
+    }
+
+    body.admin-page p,
+    body.admin-page .panel-copy,
+    body.admin-page .muted,
+    body.admin-page .status-note {
+      color: var(--text-muted);
+    }
+
+    body.admin-page .btn,
+    body.admin-page .btn-ghost {
+      min-height: 44px;
+      padding: 0 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid var(--line-strong);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-primary);
+      font-weight: 700;
+      box-shadow: none;
+    }
+
+    body.admin-page .btn {
+      background: var(--accent-mint);
+      color: #0d201b;
+      border-color: transparent;
+    }
+
+    body.admin-page[data-theme='light'] .btn-ghost,
+    body.admin-page[data-theme='light'] .btn-icon {
+      background: rgba(17, 36, 32, 0.04);
+      border-color: rgba(17, 36, 32, 0.1);
+      color: var(--text-secondary);
+    }
+
+    body.admin-page .dashboard {
+      min-height: 100dvh;
+      background: transparent;
+    }
+
+    body.admin-page .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      padding: 28px 32px 22px;
+      background: rgba(12, 18, 24, 0.82);
+      border-bottom: 1px solid var(--line-soft);
+      backdrop-filter: blur(18px);
+    }
+
+    body.admin-page[data-theme='light'] .topbar {
+      background: rgba(248, 244, 237, 0.86);
+    }
+
+    body.admin-page .topbar-title {
+      display: grid;
+      gap: 8px;
+    }
+
+    body.admin-page .topbar-title h1 {
+      margin: 0;
+      font-size: clamp(42px, 4vw, 66px);
+      line-height: 0.92;
+    }
+
+    body.admin-page .topbar-title p {
+      font-size: 14px;
+    }
+
+    body.admin-page .topbar-actions {
+      gap: 12px;
+    }
+
+    body.admin-page .tabs {
+      padding: 24px 32px 0;
+      border: 0;
+    }
+
+    body.admin-page .tab {
+      min-height: 58px;
+      padding: 0 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid transparent;
+      border-radius: 0;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      box-shadow: inset 0 0 0 0 transparent;
+    }
+
+    body.admin-page .tab.active {
+      border-left: 5px solid var(--accent-mint);
+      background: rgba(255, 255, 255, 0.045);
+      color: var(--text-primary);
+      box-shadow: inset 0 0 0 1px var(--line-soft);
+    }
+
+    body.admin-page[data-theme='light'] .tab.active {
+      border-left-color: var(--accent-forest);
+      background: rgba(16, 40, 32, 0.045);
+      box-shadow: inset 0 0 0 1px rgba(17, 36, 32, 0.12);
+    }
+
+    body.admin-page .content {
+      width: min(1540px, 100%);
+      padding: 26px 32px 42px;
+      gap: 24px;
+    }
+
+    body.admin-page .panel {
+      padding: clamp(22px, 3vw, 34px);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--line-strong);
+      background: linear-gradient(180deg, rgba(18, 23, 28, 0.94), rgba(13, 16, 20, 0.96));
+      box-shadow: var(--shadow-medium);
+    }
+
+    body.admin-page[data-theme='light'] .panel {
+      background: rgba(251, 248, 242, 0.78);
+      border-color: rgba(17, 36, 32, 0.12);
+      box-shadow: var(--shadow-medium);
+    }
+
+    body.admin-page .panel h2 {
+      margin-bottom: 8px;
+      font-size: clamp(30px, 3vw, 44px);
+      line-height: 1;
+    }
+
+    body.admin-page .stats-grid {
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+    }
+
+    body.admin-page .stat-card {
+      min-height: 160px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-radius: 10px;
+      border: 1px solid var(--line-strong);
+      background: rgba(255, 255, 255, 0.035);
+      box-shadow: none;
+    }
+
+    body.admin-page[data-theme='light'] .stat-card {
+      background: rgba(255, 255, 255, 0.68);
+      border-color: rgba(17, 36, 32, 0.12);
+    }
+
+    body.admin-page .stat-card label {
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      letter-spacing: 0.18em;
+    }
+
+    body.admin-page .stat-card strong {
+      font-family: var(--font-display);
+      font-size: clamp(48px, 5vw, 74px);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    body.admin-page .item-row {
+      border-radius: 10px;
+      border: 1px solid var(--line-soft);
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    body.admin-page[data-theme='light'] .item-row {
+      background: rgba(255, 255, 255, 0.62);
+      border-color: rgba(17, 36, 32, 0.1);
+    }
+
+    body.admin-page .count-badge {
+      background: rgba(97, 216, 181, 0.1);
+      color: var(--success);
+    }
+
+    body.admin-page .table-shell {
+      border-radius: 12px;
+      border: 1px solid var(--line-strong);
+      background: rgba(255, 255, 255, 0.035);
+      box-shadow: none;
+    }
+
+    body.admin-page[data-theme='light'] .table-shell {
+      background: rgba(255, 255, 255, 0.72);
+      border-color: rgba(17, 36, 32, 0.12);
+    }
+
+    body.admin-page th,
+    body.admin-page td {
+      border-bottom-color: var(--line-soft);
+    }
+
+    body.admin-page th {
+      background: rgba(8, 12, 16, 0.96);
+      color: var(--text-dim);
+    }
+
+    body.admin-page[data-theme='light'] th {
+      background: rgba(244, 239, 231, 0.96);
+    }
+
+    body.admin-page td {
+      color: var(--text-secondary);
+    }
+
+    body.admin-page .empty {
+      color: var(--text-muted);
+    }
+
+    body.admin-page .danger {
+      color: var(--danger);
+    }
+
+    body.admin-page .error-banner {
+      border-color: rgba(255, 142, 138, 0.26);
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    @media (max-width: 980px) {
+      body.admin-page .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      body.admin-page .topbar-actions {
+        width: 100%;
+      }
+
+      body.admin-page .stats-grid,
+      body.admin-page .split {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
-<body>
+<body class="admin-page" data-theme="dark">
   <div class="shell" id="loading-view">
     <div class="card">
       <div class="badge">Admin dashboard</div>
@@ -434,6 +745,9 @@
         <p id="admin-identity">Loading session…</p>
       </div>
       <div class="topbar-actions">
+        <button class="btn-icon btn-theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode" title="Switch to light mode">
+          <span class="theme-toggle-icon" aria-hidden="true">☀</span>
+        </button>
         <span class="status-note" id="refresh-status">Idle</span>
         <a class="btn-ghost" href="index.html">Back to app</a>
         <button class="btn-ghost" id="refresh-button" type="button">Refresh</button>
@@ -544,7 +858,10 @@
       interactions: [],
       noResults: [],
       activeTab: 'overview',
+      theme: 'dark',
     };
+
+    const THEME_STORAGE_KEY = 'otp-theme';
 
     const elements = {
       loadingView: document.getElementById('loading-view'),
@@ -556,6 +873,7 @@
       accessLogout: document.getElementById('access-logout'),
       adminIdentity: document.getElementById('admin-identity'),
       refreshStatus: document.getElementById('refresh-status'),
+      themeToggle: document.getElementById('theme-toggle'),
       refreshButton: document.getElementById('refresh-button'),
       logoutButton: document.getElementById('logout-button'),
       tabs: Array.from(document.querySelectorAll('.tab')),
@@ -604,6 +922,41 @@
 
     function setRefreshStatus(message) {
       elements.refreshStatus.textContent = message;
+    }
+
+    function getStoredTheme() {
+      try {
+        const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+        return stored === 'light' ? 'light' : 'dark';
+      } catch (error) {
+        return 'dark';
+      }
+    }
+
+    function applyTheme(theme) {
+      state.theme = theme === 'light' ? 'light' : 'dark';
+      document.body.dataset.theme = state.theme;
+
+      const isLight = state.theme === 'light';
+      const label = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+      if (elements.themeToggle) {
+        elements.themeToggle.setAttribute('aria-label', label);
+        elements.themeToggle.setAttribute('title', label);
+        const icon = elements.themeToggle.querySelector('.theme-toggle-icon');
+        if (icon) {
+          icon.textContent = isLight ? '☾' : '☀';
+        }
+      }
+    }
+
+    function toggleTheme() {
+      const nextTheme = state.theme === 'light' ? 'dark' : 'light';
+      applyTheme(nextTheme);
+      try {
+        window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+      } catch (error) {
+        // Keep the UI toggle working even if localStorage is unavailable.
+      }
     }
 
     function renderKeyValueRows(target, data, emptyMessage) {
@@ -776,10 +1129,12 @@
     elements.tabs.forEach((tab) => {
       tab.addEventListener('click', () => switchTab(tab.dataset.tab));
     });
+    elements.themeToggle.addEventListener('click', toggleTheme);
     elements.refreshButton.addEventListener('click', loadAll);
     elements.logoutButton.addEventListener('click', logout);
     elements.accessLogout.addEventListener('click', logout);
 
+    applyTheme(getStoredTheme());
     bootstrap();
   </script>
 </body>

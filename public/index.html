@@ -7,194 +7,215 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏘️</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260403a">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;500;600;700&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=20260422k">
 </head>
 <body>
   <div class="auth-shell" id="auth-view">
-    <div class="auth-scene">
-      <section class="auth-story">
-        <div class="story-badge">Dorchester Decoded</div>
-        <h1>Neighborhood answers with receipts.</h1>
-        <p class="story-copy">
-          Search local events, public data, and policy documents in one place, with every conversation tied to your own account.
-        </p>
-        <div class="story-grid">
-          <article class="story-card">
-            <span class="story-index">01</span>
-            <h2>User-scoped threads</h2>
-            <p>Each conversation belongs to one account, so follow-ups and history stay separate.</p>
-          </article>
-          <article class="story-card">
-            <span class="story-index">02</span>
-            <h2>Grounded answers</h2>
-            <p>Chat responses surface source links from community newsletters, policy docs, and city data.</p>
-          </article>
-          <article class="story-card">
-            <span class="story-index">03</span>
-            <h2>Local-first workflow</h2>
-            <p>Events, services, safety, and neighborhood context stay in one interface instead of scattered tools.</p>
-          </article>
+    <div class="auth-layout">
+      <section class="auth-hero auth-hero--photo">
+        <div class="auth-hero-overlay"></div>
+        <div class="auth-hero-inner">
+          <div class="brand-lockup brand-lockup--light">
+            <span class="brand-icon" aria-hidden="true">
+              <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5 8.5H27V24.5H5V8.5Z" stroke="currentColor" stroke-width="2"/>
+                <path d="M5 14.5H27" stroke="currentColor" stroke-width="2"/>
+                <path d="M12 8.5V24.5" stroke="currentColor" stroke-width="2"/>
+                <path d="M19 14.5V24.5" stroke="currentColor" stroke-width="2"/>
+                <path d="M19 19.5H27" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </span>
+            <span class="brand-wordmark">On The Porch</span>
+          </div>
+
+          <div class="auth-hero-copy">
+            <h1 class="auth-hero-title">Dorchester Decoded.</h1>
+            <p class="auth-hero-text">
+              Answers to neighborhood questions, sourced from civic data and local reporting. No noise, just the intelligence you need.
+            </p>
+          </div>
+
+          <p class="auth-hero-footnote">
+            <span>© 2026 On The Porch. Built for Dorchester.</span>
+            <span class="auth-hero-credit">Photo: Dorchester Avenue, Dorchester, MA by John Phelan / Wikimedia Commons.</span>
+          </p>
         </div>
       </section>
 
-      <section class="auth-card">
-        <div class="brand-mark">🏘️</div>
-        <h2 class="auth-title">On The Porch</h2>
-        <p class="auth-subtitle">Sign in to keep every conversation tied to your account.</p>
+      <section class="auth-panel auth-panel--dark">
+        <div class="auth-panel-inner">
+          <h2 class="auth-title">Welcome Back</h2>
+          <p class="auth-subtitle">Access your local intelligence feed.</p>
 
-        <div class="auth-tabs">
-          <button class="auth-tab active" id="tab-login" type="button">Login</button>
-          <button class="auth-tab" id="tab-signup" type="button">Create account</button>
+          <div class="auth-tabs">
+            <button class="auth-tab active" id="tab-login" type="button">Login</button>
+            <button class="auth-tab" id="tab-signup" type="button">Sign Up</button>
+          </div>
+
+          <form id="login-form" class="auth-form">
+            <label>
+              <span>Email address</span>
+              <input type="email" id="login-email" autocomplete="email" required>
+            </label>
+            <label>
+              <span>Password</span>
+              <input type="password" id="login-password" autocomplete="current-password" required>
+            </label>
+            <button class="btn-primary auth-submit" type="submit">Sign In</button>
+          </form>
+
+          <form id="signup-form" class="auth-form" hidden>
+            <label>
+              <span>Username</span>
+              <input type="text" id="signup-username" autocomplete="username" required>
+            </label>
+            <label>
+              <span>Email address</span>
+              <input type="email" id="signup-email" autocomplete="email" required>
+            </label>
+            <label>
+              <span>Password</span>
+              <input type="password" id="signup-password" autocomplete="new-password" required>
+            </label>
+            <button class="btn-primary auth-submit" type="submit">Create Account</button>
+          </form>
+
+          <div class="auth-divider"><span>or</span></div>
+
+          <button class="btn-secondary auth-google" id="google-auth-button" type="button">
+            <span class="google-mark" aria-hidden="true">G</span>
+            <span>Continue with Google</span>
+          </button>
+
+          <div class="auth-error" id="auth-error" hidden></div>
+          <p class="auth-note">Use a local password or Google sign-in. Accounts and saved conversations stay scoped to the signed-in user.</p>
         </div>
-
-        <form id="login-form" class="auth-form">
-          <label>
-            <span>Email</span>
-            <input type="email" id="login-email" autocomplete="email" required>
-          </label>
-          <label>
-            <span>Password</span>
-            <input type="password" id="login-password" autocomplete="current-password" required>
-          </label>
-          <button class="btn-primary auth-submit" type="submit">Sign in</button>
-        </form>
-
-        <form id="signup-form" class="auth-form" hidden>
-          <label>
-            <span>Username</span>
-            <input type="text" id="signup-username" autocomplete="username" required>
-          </label>
-          <label>
-            <span>Email</span>
-            <input type="email" id="signup-email" autocomplete="email" required>
-          </label>
-          <label>
-            <span>Password</span>
-            <input type="password" id="signup-password" autocomplete="new-password" required>
-          </label>
-          <button class="btn-primary auth-submit" type="submit">Create account</button>
-        </form>
-
-        <div class="auth-divider"><span>or</span></div>
-
-        <button class="btn-secondary auth-google" id="google-auth-button" type="button">
-          <span class="google-mark" aria-hidden="true">G</span>
-          <span>Continue with Google</span>
-        </button>
-
-        <div class="auth-error" id="auth-error" hidden></div>
-        <p class="auth-note">Local accounts stay isolated by user, and Google sign-in works once OAuth credentials are configured.</p>
       </section>
+      <button class="btn-icon btn-theme-toggle auth-layout-theme-toggle" data-theme-toggle type="button" aria-label="Switch to light mode" title="Switch to light mode">
+        <span class="theme-toggle-icon" aria-hidden="true">☀</span>
+        <span class="sr-only">Toggle theme</span>
+      </button>
     </div>
   </div>
 
   <div class="auth-shell" id="profile-view" hidden>
-    <div class="auth-scene auth-scene--compact">
-      <section class="auth-story auth-story--compact">
-        <div class="story-badge">Final step</div>
-        <h1>Claim your handle.</h1>
-        <p class="story-copy">
-          Pick the username this account will use across saved threads, feedback, and admin-visible interaction logs.
-        </p>
+    <div class="auth-layout auth-layout--profile">
+      <section class="auth-hero auth-hero--minimal">
+        <div class="auth-hero-inner auth-hero-inner--minimal">
+          <div class="brand-lockup">
+            <span class="brand-wordmark brand-wordmark--dark">ON THE PORCH</span>
+          </div>
+          <div class="auth-hero-copy auth-hero-copy--minimal">
+            <div class="story-badge story-badge--minimal">The Digital Town Square</div>
+            <h1 class="auth-hero-title auth-hero-title--minimal">Claim your civic profile.</h1>
+            <p class="auth-hero-text auth-hero-text--minimal">
+              Choose the username this account will use across conversations, feedback, and admin-visible interaction logs.
+            </p>
+          </div>
+        </div>
       </section>
 
-      <section class="auth-card auth-card--compact">
-        <div class="brand-mark">👤</div>
-        <h2 class="auth-title">Finish your profile</h2>
-        <p class="auth-subtitle">Choose a username before you enter the app.</p>
+      <section class="auth-panel auth-panel--light">
+        <div class="auth-panel-inner auth-panel-inner--light">
+          <h2 class="auth-title auth-title--dark">Finish your profile</h2>
+          <p class="auth-subtitle auth-subtitle--dark">Pick a username before entering the workspace.</p>
 
-        <form id="profile-form" class="auth-form">
-          <label>
-            <span>Username</span>
-            <input type="text" id="profile-username" autocomplete="username" required>
-          </label>
-          <button class="btn-primary auth-submit" type="submit">Save username</button>
-        </form>
+          <form id="profile-form" class="auth-form auth-form--light">
+            <label>
+              <span>Username</span>
+              <input type="text" id="profile-username" autocomplete="username" required>
+            </label>
+            <button class="btn-primary btn-primary--dark auth-submit" type="submit">Save Username</button>
+          </form>
 
-        <button class="btn-secondary" id="profile-logout" type="button">Log out</button>
-        <div class="auth-error" id="profile-error" hidden></div>
+          <button class="btn-secondary btn-secondary--light" id="profile-logout" type="button">Log Out</button>
+          <div class="auth-error" id="profile-error" hidden></div>
+        </div>
       </section>
+      <button class="btn-icon btn-theme-toggle auth-layout-theme-toggle" data-theme-toggle type="button" aria-label="Switch to light mode" title="Switch to light mode">
+        <span class="theme-toggle-icon" aria-hidden="true">☀</span>
+        <span class="sr-only">Toggle theme</span>
+      </button>
     </div>
   </div>
 
   <div class="app-container" id="app-view" hidden>
     <aside class="sidebar">
-      <div class="sidebar-top">
-        <div class="sidebar-header">
-          <div class="logo">
-            <div class="logo-icon">🏘️</div>
-            <div class="logo-text">
-              <h1>On The Porch</h1>
-              <p>Dorchester Decoded</p>
+      <div class="sidebar-shell">
+        <div class="sidebar-top">
+          <div class="sidebar-brand">
+            <div class="brand-lockup brand-lockup--stacked">
+              <span class="brand-wordmark brand-wordmark--dark">On The Porch</span>
+              <span class="brand-tagline">Neighborhood Assistant</span>
             </div>
           </div>
+
+          <button class="btn-primary btn-primary--dark new-thread-button" id="new-thread-button" type="button">
+            <span aria-hidden="true">＋</span>
+            <span>New Inquiry</span>
+          </button>
+
+          <nav class="workspace-nav" aria-label="Workspace navigation">
+            <button class="workspace-nav-item workspace-nav-item--active" type="button">
+              <span class="workspace-nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M4 5.5H14.5V13H8.5L5 16V13H4V5.5Z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/>
+                  <path d="M15 9H20V15.5H18.5V18L15.5 15.5H15" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/>
+                </svg>
+              </span>
+              <span>Chat</span>
+            </button>
+            <a class="workspace-nav-item" href="#events-panel">
+              <span class="workspace-nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.9"/>
+                  <path d="M8 3.5V7" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                  <path d="M16 3.5V7" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                  <path d="M4 9.5H20" stroke="currentColor" stroke-width="1.9"/>
+                </svg>
+              </span>
+              <span>Events</span>
+            </a>
+            <a class="workspace-nav-item hidden" id="admin-link" href="admin.html">
+              <span class="workspace-nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 3L19 5.8V11.4C19 15.7 16.2 19.5 12 21C7.8 19.5 5 15.7 5 11.4V5.8L12 3Z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/>
+                  <path d="M12 8.2C10.8 8.2 9.8 9.2 9.8 10.4C9.8 11.6 10.8 12.6 12 12.6C13.2 12.6 14.2 11.6 14.2 10.4C14.2 9.2 13.2 8.2 12 8.2Z" stroke="currentColor" stroke-width="1.7"/>
+                  <path d="M8.9 16.4C9.7 14.9 10.8 14.1 12 14.1C13.2 14.1 14.3 14.9 15.1 16.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                </svg>
+              </span>
+              <span>Admin</span>
+            </a>
+          </nav>
         </div>
 
-        <section class="sidebar-section account-section">
-          <div class="account-summary">
+        <section class="sidebar-section sidebar-section--threads">
+          <div class="section-heading section-heading--sidebar">
             <div>
+              <div class="section-kicker">History</div>
+              <h2>Conversations</h2>
+            </div>
+          </div>
+          <div class="thread-list" id="thread-list"></div>
+        </section>
+
+        <section class="sidebar-account-footer">
+          <div class="account-summary">
+            <div class="account-avatar">🏘️</div>
+            <div class="account-copy">
               <div class="account-label">Signed in as</div>
               <div class="account-name" id="account-username">—</div>
               <div class="account-email" id="account-email">—</div>
             </div>
-            <div class="account-providers" id="account-providers"></div>
           </div>
+          <div class="account-providers" id="account-providers"></div>
           <div class="account-actions">
-            <button class="btn-secondary small" id="google-link-toggle" type="button">Link Google</button>
-            <a class="btn-secondary small hidden" id="admin-link" href="admin.html">Admin</a>
-            <button class="btn-secondary small" id="logout-button" type="button">Log out</button>
+            <button class="btn-secondary btn-secondary--ghost small" id="google-link-toggle" type="button">Link Google</button>
+            <button class="btn-secondary btn-secondary--ghost small" id="logout-button" type="button">Log Out</button>
           </div>
         </section>
       </div>
-
-      <section class="sidebar-section sidebar-section--threads">
-        <div class="section-heading">
-          <div>
-            <div class="section-kicker">History</div>
-            <h2>Conversations</h2>
-          </div>
-          <button class="btn-icon" id="new-thread-button" type="button" aria-label="Create conversation">＋</button>
-        </div>
-        <div class="thread-list" id="thread-list"></div>
-      </section>
-
-      <section class="sidebar-section sidebar-section--events">
-        <div class="section-heading">
-          <div>
-            <div class="section-kicker">Calendar</div>
-            <h2>Upcoming Events</h2>
-          </div>
-          <button class="btn-icon" id="events-refresh" type="button" aria-label="Refresh events">↻</button>
-        </div>
-        <div class="sidebar-filters">
-          <div class="filter-group">
-            <label for="events-days">Time range</label>
-            <select id="events-days">
-              <option value="7">Next 7 days</option>
-              <option value="14" selected>Next 14 days</option>
-              <option value="30">Next 30 days</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label for="events-limit">Show</label>
-            <select id="events-limit">
-              <option value="5">5 events</option>
-              <option value="10" selected>10 events</option>
-              <option value="20">20 events</option>
-            </select>
-          </div>
-        </div>
-        <div class="loading-state" id="events-loading" hidden>
-          <div class="spinner"></div>
-          <p>Loading events...</p>
-        </div>
-        <div class="error-state" id="events-error" hidden></div>
-        <div class="events-list" id="events-list"></div>
-        <div class="empty-state" id="events-empty" hidden>
-          <p>No upcoming events found</p>
-        </div>
-      </section>
     </aside>
 
     <main class="chat-container">
@@ -206,6 +227,21 @@
         <div class="header-right">
           <button class="btn-secondary small" id="rename-thread-button" type="button">Rename</button>
           <button class="btn-secondary small danger" id="delete-thread-button" type="button">Delete</button>
+          <button class="btn-icon btn-theme-toggle" id="theme-toggle" data-theme-toggle type="button" aria-label="Switch to light mode" title="Switch to light mode">
+            <span class="theme-toggle-icon" aria-hidden="true">☀</span>
+            <span class="sr-only">Toggle theme</span>
+          </button>
+          <button class="btn-icon btn-panel-toggle" id="events-panel-toggle" type="button" aria-label="Collapse events panel" title="Collapse events panel">
+            <span class="panel-toggle-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 6H14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                <path d="M4 12H14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                <path d="M4 18H14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                <path d="M19 8L15 12L19 16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span class="sr-only">Toggle events panel</span>
+          </button>
           <div class="status-indicator" id="api-status">
             <span class="status-dot"></span>
             <span class="status-text">Checking...</span>
@@ -243,6 +279,45 @@
         </form>
       </div>
     </main>
+
+    <aside class="events-panel" id="events-panel">
+      <section class="events-panel-inner sidebar-section sidebar-section--events">
+        <div class="section-heading section-heading--events">
+          <div>
+            <div class="section-kicker">Calendar</div>
+            <h2>Upcoming Events</h2>
+          </div>
+          <button class="btn-icon" id="events-refresh" type="button" aria-label="Refresh events">↻</button>
+        </div>
+        <div class="sidebar-filters">
+          <div class="filter-group">
+            <label for="events-days">Time range</label>
+            <select id="events-days">
+              <option value="7">Next 7 days</option>
+              <option value="14" selected>Next 14 days</option>
+              <option value="30">Next 30 days</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="events-limit">Show</label>
+            <select id="events-limit">
+              <option value="5">5 events</option>
+              <option value="10" selected>10 events</option>
+              <option value="20">20 events</option>
+            </select>
+          </div>
+        </div>
+        <div class="loading-state" id="events-loading" hidden>
+          <div class="spinner"></div>
+          <p>Loading events...</p>
+        </div>
+        <div class="error-state" id="events-error" hidden></div>
+        <div class="events-list" id="events-list"></div>
+        <div class="empty-state" id="events-empty" hidden>
+          <p>No upcoming events found</p>
+        </div>
+      </section>
+    </aside>
   </div>
 
   <div class="modal-backdrop" id="flag-modal" hidden>
@@ -284,6 +359,6 @@
 
   <script src="config.js?v=20260317c"></script>
   <script src="api.js?v=20260317c"></script>
-  <script src="app.js?v=20260317c"></script>
+  <script src="app.js?v=20260422d"></script>
 </body>
 </html>
