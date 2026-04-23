@@ -507,13 +507,23 @@ function setEventsLoading(loading) {
   elements.eventsLoading.hidden = !loading;
 }
 
+function formatEventDate(isoDate, fallbackText) {
+  if (!isoDate) return fallbackText || 'Upcoming';
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  return d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric'
+  });
+}
 function renderEvents(events) {
   elements.eventsList.innerHTML = '';
   elements.eventsEmpty.hidden = events.length > 0;
   events.forEach((event) => {
     const card = document.createElement('div');
     card.className = 'event-card';
-    const date = event.event_date || event.start_date || 'Upcoming';
+    const date = formatEventDate(event.start_date, event.event_date);
     const start = formatTime(event.start_time);
     const end = formatTime(event.end_time);
     const timeLabel = start && end ? `${start} - ${end}` : (start || '');

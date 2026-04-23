@@ -2116,7 +2116,7 @@ def events():
         return result
 
     limit = max(1, min(request.args.get("limit", 10, type=int), 100))
-    days_ahead = max(1, min(request.args.get("days_ahead", 7, type=int), 30))
+    days_ahead = max(1, min(request.args.get("days_ahead", 7, type=int), 365))
 
     conn = None
     cursor = None
@@ -2411,6 +2411,9 @@ def admin_add_knowledge():
     content = data.get("content", "").strip()
     if not content:
         return _json_error("content is required", 400, "missing_content")
+    expires_at = data.get("expires_at") or (
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
+    ).strftime("%Y-%m-%d")
     conn = None
     cursor = None
     try:
@@ -2422,7 +2425,7 @@ def admin_add_knowledge():
         """, (
             content,
             data.get("category", "general"),
-            data.get("expires_at"),
+            expires_at,
             data.get("source_flag_id"),
             g.current_user_row["username"] if g.get("current_user_row") else "admin",
         ))
