@@ -47,8 +47,13 @@ SQL_MAX_RETRIES = int(os.getenv("SQL_MAX_RETRIES", "2"))  # Reduced default to 2
 try:
     from langsmith import traceable  # type: ignore
 except Exception:
-    def traceable(func: Callable):  # type: ignore
-        return func
+    def traceable(*args, **kwargs):  # type: ignore
+        # Supports both @traceable and @traceable(name="foo") styles
+        if len(args) == 1 and callable(args[0]) and not kwargs:
+            return args[0]
+        def decorator(func):
+            return func
+        return decorator
 
 
 def _langsmith_enabled() -> bool:
