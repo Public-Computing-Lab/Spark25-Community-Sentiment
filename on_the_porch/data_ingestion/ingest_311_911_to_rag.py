@@ -38,7 +38,7 @@ from dotenv import load_dotenv
 # ---------------------------------------------------------------------------
 _THIS_FILE = Path(__file__).resolve()
 _INGEST_DIR = _THIS_FILE.parent
-_ROOT_DIR = _INGEST_DIR.parents[2]
+_ROOT_DIR = _INGEST_DIR.parents[1]
 _ON_THE_PORCH_DIR = _ROOT_DIR / "on_the_porch"
 _RAG_STUFF_DIR = _ON_THE_PORCH_DIR / "rag stuff"
 
@@ -83,10 +83,15 @@ DEFAULT_BATCH_SIZE = 100
 
 # Columns to pull from each table (avoids fetching large unused fields)
 COLS_311 = [
-    "case_id", "case_enquiry_id", "open_dt", "closed_dt",
-    "case_status", "closure_reason", "case_title",
-    "subject", "reason", "type", "neighborhood",
-    "street", "latitude", "longitude",
+    "case_id", "case_enquiry_id",
+    "open_dt", "open_date",
+    "closed_dt", "close_date",
+    "case_status", "closure_reason",
+    "case_title", "case_topic", "service_name",
+    "subject", "reason", "type", "assigned_department",
+    "neighborhood", "street", "full_address",
+    "street_number", "street_name",
+    "latitude", "longitude",
 ]
 
 COLS_CRIME = [
@@ -96,6 +101,23 @@ COLS_CRIME = [
     "day_of_week", "hour", "ucr_part", "street",
     "lat", "long",
 ]
+
+TABLE_311 = "service_requests_311"
+TABLE_CRIME = "crime_incident_reports"
+
+
+def _pick_first(record: Dict[str, Any], *keys: str, default: Any = "") -> Any:
+    for key in keys:
+        value = record.get(key)
+        if value not in (None, ""):
+            return value
+    return default
+
+
+def _table_columns(conn: pymysql.connections.Connection, table_name: str) -> set[str]:
+    with conn.cursor() as cur:
+        cur.execute(f"SHOW COLUMNS FROM `{table_name}`")
+        return {row["Field"] for row in cur.fetchall()}
 
 
 # ---------------------------------------------------------------------------
@@ -171,15 +193,24 @@ def fetch_311_records(
     Skips records whose case_id is already in `already_ingested`.
     """
     since = datetime.now() - timedelta(days=days)
-    cols = ", ".join(COLS_311)
+    available_cols = _table_columns(conn, TABLE_311)
+    selected_cols = [col for col in COLS_311 if col in available_cols]
+    if not selected_cols:
+        raise RuntimeError(f"No compatible 311 columns found in `{TABLE_311}`")
+
+    open_field = "open_dt" if "open_dt" in available_cols else "open_date" if "open_date" in available_cols else None
+    if not open_field:
+        raise RuntimeError(f"Expected `open_dt` or `open_date` in `{TABLE_311}`")
+
+    cols = ", ".join(f"`{col}`" for col in selected_cols)
 
     with conn.cursor() as cur:
         cur.execute(
             f"""
             SELECT {cols}
-            FROM bos311_data
-            WHERE open_dt >= %s
-            ORDER BY open_dt DESC
+            FROM `{TABLE_311}`
+            WHERE `{open_field}` >= %s
+            ORDER BY `{open_field}` DESC
             LIMIT %s
             """,
             (since.strftime("%Y-%m-%d %H:%M:%S"), limit),
@@ -194,17 +225,21 @@ def fetch_311_records(
 
 def _311_record_to_text(r: Dict[str, Any]) -> str:
     """Convert a single 311 row into a descriptive natural-language sentence."""
-    case_id = r.get("case_id") or r.get("case_enquiry_id", "unknown")
-    title = r.get("case_title") or "Service Request"
-    neighborhood = r.get("neighborhood") or "unknown neighborhood"
-    street = r.get("street") or ""
-    subject = r.get("subject") or ""
-    reason = r.get("reason") or ""
-    request_type = r.get("type") or ""
-    status = r.get("case_status") or "Unknown"
-    open_dt = r.get("open_dt")
-    closed_dt = r.get("closed_dt")
-    closure_reason = r.get("closure_reason") or ""
+    case_id = _pick_first(r, "case_id", "case_enquiry_id", default="unknown")
+    title = _pick_first(r, "case_title", "service_name", "case_topic", default="Service Request")
+    neighborhood = _pick_first(r, "neighborhood", default="unknown neighborhood")
+    street = _pick_first(r, "street", "full_address", default="")
+    if not street:
+        street_number = _pick_first(r, "street_number", default="")
+        street_name = _pick_first(r, "street_name", default="")
+        street = " ".join(part for part in [str(street_number).strip(), str(street_name).strip()] if part).strip()
+    subject = _pick_first(r, "subject", "case_topic", default="")
+    reason = _pick_first(r, "reason", "assigned_department", default="")
+    request_type = _pick_first(r, "type", "service_name", default="")
+    status = _pick_first(r, "case_status", default="Unknown")
+    open_dt = _pick_first(r, "open_dt", "open_date", default=None)
+    closed_dt = _pick_first(r, "closed_dt", "close_date", default=None)
+    closure_reason = _pick_first(r, "closure_reason", default="")
 
     open_str = str(open_dt)[:10] if open_dt else "unknown date"
     closed_str = str(closed_dt)[:10] if closed_dt else None
@@ -242,29 +277,29 @@ def build_311_documents(
     tracking = []
 
     for r in records:
-        record_id = str(r.get("case_id") or r.get("case_enquiry_id", ""))
+        record_id = str(_pick_first(r, "case_id", "case_enquiry_id", default=""))
         if not record_id:
             continue
 
         text = _311_record_to_text(r)
         chunk_id = hashlib.sha256(text.encode()).hexdigest()[:16]
 
-        open_dt = r.get("open_dt")
+        open_dt = _pick_first(r, "open_dt", "open_date", default=None)
         open_date_str = str(open_dt)[:10] if open_dt else ""
 
         metadata = {
             "doc_type": "311_request",
             "source": "Boston 311 Service Requests",
             "record_id": record_id,
-            "case_title": r.get("case_title") or "",
-            "neighborhood": r.get("neighborhood") or "",
-            "case_status": r.get("case_status") or "",
+            "case_title": _pick_first(r, "case_title", "service_name", "case_topic", default=""),
+            "neighborhood": _pick_first(r, "neighborhood", default=""),
+            "case_status": _pick_first(r, "case_status", default=""),
             "open_date": open_date_str,
         }
 
         # Optional geo metadata (ChromaDB stores as string)
-        lat = r.get("latitude")
-        lng = r.get("longitude")
+        lat = _pick_first(r, "latitude", "lat", default=None)
+        lng = _pick_first(r, "longitude", "long", default=None)
         if lat and lng:
             try:
                 metadata["lat"] = str(float(lat))
@@ -293,8 +328,8 @@ def build_311_aggregate_docs(
 
     groups: Dict[Tuple[str, str], List[Dict]] = defaultdict(list)
     for r in records:
-        neighborhood = (r.get("neighborhood") or "Unknown Neighborhood").strip()
-        title = (r.get("case_title") or "General Request").strip()
+        neighborhood = str(_pick_first(r, "neighborhood", default="Unknown Neighborhood")).strip()
+        title = str(_pick_first(r, "case_title", "service_name", "case_topic", default="General Request")).strip()
         groups[(neighborhood, title)].append(r)
 
     documents = []
@@ -306,7 +341,7 @@ def build_311_aggregate_docs(
 
         dates = []
         for r in group_records:
-            od = r.get("open_dt")
+            od = _pick_first(r, "open_dt", "open_date", default=None)
             if od:
                 dates.append(str(od)[:10])
         dates_sorted = sorted(set(dates))
@@ -356,15 +391,15 @@ def fetch_crime_records(
     Skips records whose incident_number is already tracked.
     """
     since = datetime.now() - timedelta(days=days)
-    cols = ", ".join(COLS_CRIME)
+    cols = ", ".join(f"`{col}`" for col in COLS_CRIME)
 
     with conn.cursor() as cur:
         cur.execute(
             f"""
             SELECT {cols}
-            FROM crime_incident_reports
-            WHERE occurred_on_date >= %s
-            ORDER BY occurred_on_date DESC
+            FROM `{TABLE_CRIME}`
+            WHERE `occurred_on_date` >= %s
+            ORDER BY `occurred_on_date` DESC
             LIMIT %s
             """,
             (since.strftime("%Y-%m-%d %H:%M:%S"), limit),
