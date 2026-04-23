@@ -26,6 +26,37 @@ import re as _re
 import requests as _requests
 from urllib.parse import urlparse as _urlparse, parse_qs as _parse_qs, unquote as _unquote
 
+# ---- Legal notice filter -------------------------------------------------
+# Dotnews publishes probate filings, licensing hearings, zoning notices, etc.
+# mixed in with community events. These are not real community events and
+# should not land in weekly_events. Filter applied both via the Gemini prompt
+# (upstream) and a regex check on returned events (downstream safety net).
+LEGAL_NOTICE_PATTERNS = [
+    r"\bpetition for\b",
+    r"\bwritten appearance\b",
+    r"\bprobate\b",
+    r"\bguardian(ship)?\b",
+    r"\bconservator\b",
+    r"\bestate of\b",
+    r"\bforeclosure\b",
+    r"\bmortgagee\b",
+    r"\bliquor license\b",
+    r"\blicensing board\b",
+    r"\bzoning board\b",
+    r"\bvariance\b",
+    r"\bpublic notice\b",
+    r"\blegal notice\b",
+    r"\bdeadline to file\b",
+    r"\bchange of occupancy\b",
+    r"\bproposal to (erect|renovate|construct|extend|subdivide)\b",
+]
+_LEGAL_NOTICE_RE = re.compile("|".join(LEGAL_NOTICE_PATTERNS), re.IGNORECASE)
+
+
+def looks_like_legal_notice(event: dict) -> bool:
+    """True if event_name or raw_text matches known legal-notice phrasing."""
+    blob = " ".join(str(event.get(k, "")) for k in ("event_name", "raw_text"))
+    return bool(_LEGAL_NOTICE_RE.search(blob))
 
 def download_latest_pdf_v2(output_dir: Path):
     """Replacement scraper for dotnews.com's new (2026) Elementor-based site."""
@@ -204,7 +235,23 @@ Extract ALL events with their dates and times from this page.
 CRITICAL: Convert day-of-week references (Monday, Tuesday, etc.) to EXACT dates
 (YYYY-MM-DD) using the newsletter publication date as reference.
 
+DO NOT EXTRACT any of the following — they are legal/administrative notices,
+NOT community events:
+- Probate / estate filings (wills, guardianship, conservatorship petitions)
+- Foreclosure or mortgagee sale notices
+- Liquor license hearings or licensing board applications
+- Zoning board of appeal hearings, variance requests
+- Public notices, legal notices, "written appearance" deadlines
+- Change-of-occupancy proposals, building permit notices
+- Any item whose purpose is legal compliance or filing deadlines rather
+  than a community-attendable gathering
+
+Only extract events a neighborhood resident could actually attend: meetings,
+classes, workshops, performances, health clinics, tree lightings, job fairs,
+community dinners, religious services, cleanups, etc.
+
 Return ONLY valid JSON (no explanations, no markdown, no code fences):
+
 [
   {{
     "event_name": "...",
@@ -282,6 +329,8 @@ Page {page_num} text:
                     event[key] = None
             event["source"] = source
             event["page_number"] = page_num
+            if looks_like_legal_notice(event):
+                continue
             validated.append(event)
         return validated
 
