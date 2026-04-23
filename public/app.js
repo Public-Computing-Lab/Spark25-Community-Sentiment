@@ -1,5 +1,7 @@
 const state = {
   authMode: 'login',
+  theme: 'dark',
+  eventsPanelCollapsed: false,
   user: null,
   googleEnabled: false,
   threads: [],
@@ -37,6 +39,9 @@ const elements = {
   activeThreadTitle: document.getElementById('active-thread-title'),
   renameThreadButton: document.getElementById('rename-thread-button'),
   deleteThreadButton: document.getElementById('delete-thread-button'),
+  themeToggle: document.getElementById('theme-toggle'),
+  themeToggles: Array.from(document.querySelectorAll('[data-theme-toggle]')),
+  eventsPanelToggle: document.getElementById('events-panel-toggle'),
   chatMessages: document.getElementById('chat-messages'),
   chatError: document.getElementById('chat-error'),
   chatForm: document.getElementById('chat-form'),
@@ -79,6 +84,89 @@ const providerLabels = {
   password: 'Email',
   google: 'Google',
 };
+
+const THEME_STORAGE_KEY = 'otp-theme';
+const EVENTS_PANEL_STORAGE_KEY = 'otp-events-panel-collapsed';
+
+function getStoredTheme() {
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return stored === 'light' ? 'light' : 'dark';
+  } catch (error) {
+    return 'dark';
+  }
+}
+
+function applyTheme(theme) {
+  state.theme = theme === 'light' ? 'light' : 'dark';
+  document.body.dataset.theme = state.theme;
+
+  const isLight = state.theme === 'light';
+  const label = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+  elements.themeToggles.forEach((toggle) => {
+    toggle.setAttribute('aria-label', label);
+    toggle.setAttribute('title', label);
+
+    const icon = toggle.querySelector('.theme-toggle-icon');
+    if (icon) {
+      icon.textContent = isLight ? '☾' : '☀';
+    }
+  });
+}
+
+function toggleTheme() {
+  const nextTheme = state.theme === 'light' ? 'dark' : 'light';
+  applyTheme(nextTheme);
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+  } catch (error) {
+    // Ignore storage failures; the toggle still works for the active session.
+  }
+}
+
+function getStoredEventsPanelCollapsed() {
+  try {
+    return window.localStorage.getItem(EVENTS_PANEL_STORAGE_KEY) === 'true';
+  } catch (error) {
+    return false;
+  }
+}
+
+function applyEventsPanelCollapsed(collapsed) {
+  state.eventsPanelCollapsed = Boolean(collapsed);
+  document.body.dataset.eventsCollapsed = state.eventsPanelCollapsed ? 'true' : 'false';
+
+  if (!elements.eventsPanelToggle) return;
+
+  const label = state.eventsPanelCollapsed ? 'Expand events panel' : 'Collapse events panel';
+  elements.eventsPanelToggle.setAttribute('aria-label', label);
+  elements.eventsPanelToggle.setAttribute('title', label);
+  elements.eventsPanelToggle.setAttribute('aria-pressed', String(state.eventsPanelCollapsed));
+  elements.eventsPanelToggle.classList.toggle('is-collapsed', state.eventsPanelCollapsed);
+}
+
+function toggleEventsPanel() {
+  const nextCollapsed = !state.eventsPanelCollapsed;
+  applyEventsPanelCollapsed(nextCollapsed);
+  try {
+    window.localStorage.setItem(EVENTS_PANEL_STORAGE_KEY, String(nextCollapsed));
+  } catch (error) {
+    // Ignore storage failures; collapse still works for the current session.
+  }
+}
+
+function getAssistantAvatarMarkup() {
+  return `
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M4.5 9.25L12 5L19.5 9.25" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M6 10.5H18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      <path d="M7.5 10.75V17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      <path d="M12 10.75V17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      <path d="M16.5 10.75V17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      <path d="M5.5 19H18.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+    </svg>
+  `;
+}
 
 function showView(name) {
   elements.authView.hidden = name !== 'auth';
@@ -246,19 +334,11 @@ function renderThreads() {
 
 function renderMessages() {
   elements.chatMessages.innerHTML = '';
+  elements.suggestions.hidden = !state.messages.length;
   if (!state.messages.length) {
-    const empty = document.createElement('div');
-    empty.className = 'message assistant';
-    empty.innerHTML = `
-      <div class="message-avatar">🤖</div>
-      <div class="message-content">
-        <div class="message-text">
-          <p><strong>Start the conversation.</strong></p>
-          <p>Ask about local events, community data, policy documents, or neighborhood trends.</p>
-        </div>
-      </div>
-    `;
+    const empty = createEmptyStateElement();
     elements.chatMessages.appendChild(empty);
+    elements.chatMessages.scrollTop = 0;
     return;
   }
 
@@ -268,13 +348,72 @@ function renderMessages() {
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
 }
 
+function createEmptyStateElement() {
+  const prompts = [
+    {
+      tone: 'records',
+      label: 'Records',
+      query: 'Summarize the latest city council minutes related to Dorchester transportation projects.',
+    },
+    {
+      tone: 'policy',
+      label: 'Policy',
+      query: 'What zoning rules apply to mixed-use development proposals in Dorchester?',
+    },
+    {
+      tone: 'community',
+      label: 'Community',
+      query: 'Draft a response to neighbors about upcoming park improvements, citing approved budget details.',
+      wide: true,
+    },
+  ];
+
+  const wrapper = document.createElement('section');
+  wrapper.className = 'conversation-empty';
+
+  const heading = document.createElement('h2');
+  heading.className = 'conversation-empty-title';
+  heading.textContent = 'How can I assist you today?';
+  wrapper.appendChild(heading);
+
+  const grid = document.createElement('div');
+  grid.className = 'conversation-empty-grid';
+
+  prompts.forEach((prompt) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = `empty-state-card empty-state-card--${prompt.tone}`;
+    if (prompt.wide) {
+      card.classList.add('empty-state-card--wide');
+    }
+    card.dataset.query = prompt.query;
+    card.innerHTML = `
+      <span class="empty-state-card-label">${escapeHtml(prompt.label)}</span>
+      <span class="empty-state-card-copy">${escapeHtml(prompt.query)}</span>
+    `;
+    card.addEventListener('click', () => {
+      elements.chatInput.value = prompt.query;
+      elements.chatInput.focus();
+    });
+    grid.appendChild(card);
+  });
+
+  wrapper.appendChild(grid);
+  return wrapper;
+}
+
 function createMessageElement(message) {
   const wrapper = document.createElement('div');
   wrapper.className = `message ${message.role}`;
 
   const avatar = document.createElement('div');
   avatar.className = 'message-avatar';
-  avatar.textContent = message.role === 'user' ? '👤' : '🤖';
+  if (message.role === 'assistant') {
+    avatar.classList.add('message-avatar--assistant');
+    avatar.innerHTML = getAssistantAvatarMarkup();
+  } else {
+    avatar.textContent = '👤';
+  }
 
   const content = document.createElement('div');
   content.className = 'message-content';
@@ -336,7 +475,7 @@ function renderTypingIndicator() {
   wrapper.className = 'message assistant';
   wrapper.id = 'typing-indicator';
   wrapper.innerHTML = `
-    <div class="message-avatar">🤖</div>
+    <div class="message-avatar message-avatar--assistant">${getAssistantAvatarMarkup()}</div>
     <div class="message-content">
       <div class="typing-indicator"><span></span><span></span><span></span></div>
     </div>
@@ -971,6 +1110,10 @@ function initEventListeners() {
   elements.newThreadButton.addEventListener('click', createThread);
   elements.renameThreadButton.addEventListener('click', () => renameThread());
   elements.deleteThreadButton.addEventListener('click', () => deleteThread());
+  elements.themeToggles.forEach((toggle) => {
+    toggle.addEventListener('click', toggleTheme);
+  });
+  elements.eventsPanelToggle.addEventListener('click', toggleEventsPanel);
   elements.chatForm.addEventListener('submit', sendChatMessage);
   elements.threadList.addEventListener('click', handleThreadListClick);
   elements.eventsRefresh.addEventListener('click', loadEvents);
@@ -999,6 +1142,8 @@ function initEventListeners() {
 }
 
 async function initApp() {
+  applyTheme(getStoredTheme());
+  applyEventsPanelCollapsed(getStoredEventsPanelCollapsed());
   initEventListeners();
   setAuthMode('login');
   await refreshSession();
