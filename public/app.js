@@ -322,8 +322,15 @@ function renderThreads() {
     const actions = document.createElement('div');
     actions.className = 'thread-actions';
     actions.innerHTML = `
-      <button class="thread-action" type="button" data-action="rename" aria-label="Rename conversation">✎</button>
-      <button class="thread-action" type="button" data-action="delete" aria-label="Delete conversation">🗑</button>
+      <button class="thread-action thread-action--delete" type="button" data-action="delete" aria-label="Delete conversation">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M9 4H15L16 6H20" />
+          <path d="M4 6H20" />
+          <path d="M18 6L17.25 19C17.2 19.6 16.7 20 16.1 20H7.9C7.3 20 6.8 19.6 6.75 19L6 6" />
+          <path d="M10 10V16" />
+          <path d="M14 10V16" />
+        </svg>
+      </button>
     `;
 
     item.appendChild(body);

@@ -950,7 +950,10 @@ body[data-events-collapsed='true'] .app-container {
 }
 
 .thread-item {
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
   padding: 12px 14px;
   border-radius: 8px;
   border: 1px solid transparent;
@@ -992,7 +995,53 @@ body[data-events-collapsed='true'] .app-container {
 }
 
 .thread-actions {
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(4px);
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease, visibility 160ms ease;
+}
+
+.thread-item:hover .thread-actions,
+.thread-item:focus-within .thread-actions {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.thread-action {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.thread-action:hover,
+.thread-action:focus-visible {
+  background: rgba(255, 103, 103, 0.12);
+  border-color: rgba(255, 103, 103, 0.34);
+  color: #ffb8b8;
+  transform: translateY(-1px);
+}
+
+.thread-action svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .sidebar-account-footer {
@@ -1775,6 +1824,19 @@ body[data-theme='light'] .thread-item:hover {
 body[data-theme='light'] .thread-item.active {
   background: rgba(17, 36, 32, 0.08);
   border-color: rgba(17, 36, 32, 0.08);
+}
+
+body[data-theme='light'] .thread-action {
+  background: rgba(17, 36, 32, 0.04);
+  border-color: rgba(17, 36, 32, 0.1);
+  color: rgba(17, 36, 32, 0.48);
+}
+
+body[data-theme='light'] .thread-action:hover,
+body[data-theme='light'] .thread-action:focus-visible {
+  background: rgba(150, 34, 34, 0.08);
+  border-color: rgba(150, 34, 34, 0.24);
+  color: #962222;
 }
 
 body[data-theme='light'] .account-avatar,
