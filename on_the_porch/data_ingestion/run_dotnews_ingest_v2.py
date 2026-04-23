@@ -58,18 +58,17 @@ def looks_like_legal_notice(event: dict) -> bool:
     blob = " ".join(str(event.get(k, "")) for k in ("event_name", "raw_text"))
     return bool(_LEGAL_NOTICE_RE.search(blob))
 
-def download_latest_pdf_v2(output_dir: Path):
-    """Replacement scraper for dotnews.com's new (2026) Elementor-based site."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    INPRINT = "https://www.dotnews.com/inprint/"
+def fetch_issue_urls():
+    """Fetch DotNews print-issue URLs from newest to oldest."""
+    inprint_url = "https://www.dotnews.com/inprint/"
 
-    print(f"  ↪ Fetching {INPRINT}")
+    print(f"  ↪ Fetching {inprint_url}")
     try:
-        r = _requests.get(INPRINT, timeout=30)
+        r = _requests.get(inprint_url, timeout=30)
         r.raise_for_status()
     except Exception as e:
         print(f"  ✗ Could not fetch inprint page: {e}")
-        return None
+        return []
 
     # Print issue URLs look like: /YYYY/MM/DD/<3-4 letter month>-<day>/
     issue_pattern = _re.compile(
@@ -78,14 +77,19 @@ def download_latest_pdf_v2(output_dir: Path):
     matches = issue_pattern.findall(r.text)
     if not matches:
         print("  ✗ No print issue links found on inprint page")
-        return None
+        return []
 
     matches.sort(key=lambda m: (m[1], m[2], m[3]), reverse=True)
-    latest_url = matches[0][0]
-    print(f"  ↪ Latest print issue: {latest_url}")
+    return [match[0] for match in matches]
+
+
+def download_issue_pdf(issue_url: str, output_dir: Path):
+    """Download a single DotNews issue PDF from its issue page."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"  ↪ Issue page: {issue_url}")
 
     try:
-        r = _requests.get(latest_url, timeout=30)
+        r = _requests.get(issue_url, timeout=30)
         r.raise_for_status()
     except Exception as e:
         print(f"  ✗ Could not fetch issue page: {e}")
@@ -136,6 +140,10 @@ def download_latest_pdf_v2(output_dir: Path):
     filename = Path(_urlparse(pdf_url).path).name or "dotnews_latest.pdf"
     filename = _re.sub(r"[<>:\"/\\|?*]", "_", filename)
     out_path = output_dir / filename
+    if out_path.exists():
+        print(f"  ↪ Already downloaded: {out_path}")
+        return out_path
+
     with open(out_path, "wb") as f:
         for chunk in pr.iter_content(chunk_size=8192):
             if chunk:
@@ -149,6 +157,33 @@ def download_latest_pdf_v2(output_dir: Path):
 
     print(f"  ✓ Saved: {out_path} ({out_path.stat().st_size // 1024} KB)")
     return out_path
+
+
+def download_latest_pdf_v2(output_dir: Path):
+    """Replacement scraper for dotnews.com's new (2026) Elementor-based site."""
+    issue_urls = fetch_issue_urls()
+    if not issue_urls:
+        return None
+
+    latest_url = issue_urls[0]
+    print(f"  ↪ Latest print issue: {latest_url}")
+    return download_issue_pdf(latest_url, output_dir=output_dir)
+
+
+def download_all_pdfs_v2(output_dir: Path):
+    """Download every DotNews print issue currently listed on the inprint page."""
+    issue_urls = fetch_issue_urls()
+    if not issue_urls:
+        return []
+
+    downloaded_paths = []
+    total = len(issue_urls)
+    for idx, issue_url in enumerate(issue_urls, start=1):
+        print(f"📥 Downloading issue {idx}/{total}...")
+        pdf_path = download_issue_pdf(issue_url, output_dir=output_dir)
+        if pdf_path:
+            downloaded_paths.append(pdf_path)
+    return downloaded_paths
 
 REPO_ROOT = THIS_DIR.parent.parent
 load_dotenv(REPO_ROOT / ".env")
@@ -396,22 +431,7 @@ def insert_events_to_db(events):
     return inserted
 
 
-def main():
-    if len(sys.argv) > 1:
-        pdf_path = Path(sys.argv[1])
-        if not pdf_path.exists():
-            print(f"✗ File not found: {pdf_path}")
-            return 1
-        print(f"📄 Using provided PDF: {pdf_path}")
-    else:
-        dotnews_dir = THIS_DIR / "temp_downloads" / "dotnews"
-        dotnews_dir.mkdir(parents=True, exist_ok=True)
-        print("📥 Downloading latest newsletter from dotnews.com...")
-        pdf_path = download_latest_pdf_v2(output_dir=dotnews_dir)
-        if not pdf_path:
-            print("✗ Download failed or no new PDF available")
-            return 1
-
+def process_pdf(pdf_path: Path):
     print(f"📰 Got: {pdf_path.name}")
 
     mtime = datetime.fromtimestamp(pdf_path.stat().st_mtime)
@@ -432,7 +452,7 @@ def main():
             print(f"   + {len(events)} events")
             all_events.extend(events)
 
-    print(f"\n📊 Total extracted: {len(all_events)} events")
+    print(f"\n📊 Total extracted from {pdf_path.name}: {len(all_events)} events")
 
     if all_events:
         inserted = insert_events_to_db(all_events)
@@ -440,6 +460,49 @@ def main():
     else:
         print("⚠ No events extracted — PDF may not have a calendar section")
 
+    return len(all_events)
+
+
+def main():
+    args = sys.argv[1:]
+    first_time = "--first-time" in args
+    args = [arg for arg in args if arg != "--first-time"]
+
+    dotnews_dir = THIS_DIR / "temp_downloads" / "dotnews"
+    dotnews_dir.mkdir(parents=True, exist_ok=True)
+
+    if first_time:
+        if args:
+            print("✗ --first-time cannot be combined with a manual PDF path")
+            return 1
+        print("📥 First-time sync: downloading all DotNews newsletters...")
+        pdf_paths = download_all_pdfs_v2(output_dir=dotnews_dir)
+        if not pdf_paths:
+            print("✗ Download failed or no newsletters were found")
+            return 1
+
+        total_events = 0
+        for idx, pdf_path in enumerate(pdf_paths, start=1):
+            print(f"\n===== Processing newsletter {idx}/{len(pdf_paths)} =====")
+            total_events += process_pdf(pdf_path)
+
+        print(f"\n✅ First-time sync complete: processed {len(pdf_paths)} PDFs, extracted {total_events} events")
+        return 0
+
+    if args:
+        pdf_path = Path(args[0])
+        if not pdf_path.exists():
+            print(f"✗ File not found: {pdf_path}")
+            return 1
+        print(f"📄 Using provided PDF: {pdf_path}")
+    else:
+        print("📥 Downloading latest newsletter from dotnews.com...")
+        pdf_path = download_latest_pdf_v2(output_dir=dotnews_dir)
+        if not pdf_path:
+            print("✗ Download failed or no new PDF available")
+            return 1
+
+    process_pdf(pdf_path)
     return 0
 
 
