@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,24 +45,32 @@ from retrieval import GeminiEmbeddings  # noqa: E402  (same embeddings as the re
 DEFAULT_VECTORDB_DIR = Path("../vectordb_new")
 RSS_FEEDS: list[dict] = [
     {
-        "url":    "https://www.dotnews.com/rss/",
-        "source": "DOT Reporter",
+        "url":    "https://www.dotnews.com/feed/",         
+        "source": "Dorchester Reporter",
         "tag":    "dorchester,news",
-    },
-    {
-        "url":    "https://www.bpl.org/codman-square/feed/",
-        "source": "Codman Square Library",
-        "tag":    "codman square,library",
     },
     {
         "url":    "https://www.csndc.com/feed/",
         "source": "Codman Square Neighborhood Development Corporation",
         "tag":    "codman square,development",
     },
+    {
+        "url":    "https://www.codman.org/feed/",          
+        "source": "Codman Square Health Center",
+        "tag":    "codman square,health",
+    },
+    {
+        "url":    "https://codmansquarecouncil.org/feed/",  
+        "source": "Codman Square Neighborhood Council",
+        "tag":    "codman square,civic",
+    },
 ]
  
 # ── helpers ───────────────────────────────────────────────────────────────────
- 
+def _strip_html(text: str) -> str:
+    """Strip HTML tags and collapse whitespace."""
+    return re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', text)).strip()
+
 def _stable_id(entry_id: str, source: str) -> str:
     """
     Deterministic short hash used as the ChromaDB document ID.
@@ -88,7 +97,7 @@ def _parse_date(entry) -> Optional[str]:
 def _entry_to_document(entry, feed_meta: dict) -> Document:
     """Convert a single feedparser entry into a LangChain Document."""
     title   = getattr(entry, "title",   "").strip()
-    summary = getattr(entry, "summary", "").strip()
+    summary = _strip_html(getattr(entry, "summary", ""))
     link    = getattr(entry, "link",    "").strip()
  
     # Build a self-contained text blob the LLM can use

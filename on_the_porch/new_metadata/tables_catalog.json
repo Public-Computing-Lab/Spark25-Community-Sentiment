@@ -10,6 +10,11 @@
     "metadata_file": "service_requests_311.json"
   },
   {
+    "table": "admin_knowledge",
+    "description": "Community notes and admin knowledge entries added by moderators; one row per note with content, category, active status, source flag, and timestamps.",
+    "metadata_file": "admin_knowledge.json"
+  },
+  {
     "table": "weekly_events",
     "description": "Events schedule extracted from PDF calendars; one row per event with event name, original date label, normalized start/end dates, and raw text.",
     "metadata_file": "weekly_events.json"
