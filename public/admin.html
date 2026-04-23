@@ -947,7 +947,6 @@
       <button class="tab" data-tab="interactions" type="button">Interactions</button>
       <button class="tab" data-tab="noresults" type="button">No results</button>
       <button class="tab" data-tab="knowledge" type="button">Community Notes</button>
-      <button class="tab" data-tab="pending" type="button">Pending</button>
     </nav>
 
     <main class="content">
@@ -963,11 +962,6 @@
       </section>
 
       <section class="split tab-panel" data-panel="overview">
-        <div class="panel">
-          <h2>Routing mix</h2>
-          <p class="panel-copy">How the chatbot is routing recent questions.</p>
-          <div class="pill-row" id="mode-breakdown"></div>
-        </div>
         <div class="panel">
           <h2>Flag reasons</h2>
           <p class="panel-copy">Most common reasons users are reporting assistant responses.</p>
@@ -1075,13 +1069,6 @@
         </div>
       </section>
 
-      <section class="panel tab-panel" data-panel="pending" hidden>
-        <h2>Pending community notes</h2>
-        <p class="panel-copy">Notes submitted by community members waiting for admin approval.</p>
-        <div class="knowledge-list" id="pending-list">
-          <div class="empty">Loading…</div>
-        </div>
-      </section>
     </main>
   </div>
 
@@ -1121,7 +1108,6 @@
       statFlagged: document.getElementById('stat-flagged'),
       statWeek: document.getElementById('stat-week'),
       statNoResults: document.getElementById('stat-noresults'),
-      modeBreakdown: document.getElementById('mode-breakdown'),
       flagReasons: document.getElementById('flag-reasons'),
       flagsBody: document.getElementById('flags-body'),
       interactionsBody: document.getElementById('interactions-body'),
@@ -1237,7 +1223,6 @@
       elements.statFlagged.textContent = stats.total_flagged ?? '0';
       elements.statWeek.textContent = stats.interactions_this_week ?? '0';
       elements.statNoResults.textContent = stats.no_result_count ?? '0';
-      renderKeyValueRows(elements.modeBreakdown, stats.mode_breakdown, 'No interaction routing data yet.');
       renderKeyValueRows(elements.flagReasons, stats.flag_reasons, 'No flagged responses yet.');
     }
 
@@ -1490,42 +1475,6 @@
     }
 
 
-    async function loadPending() {
-      const result = await ApiClient.adminGetPending();
-      if (!result.success) return;
-      renderPending(result.data.pending || []);
-    }
-
-    function renderPending(items) {
-      const list = document.getElementById('pending-list');
-      list.innerHTML = '';
-      if (!items.length) { list.innerHTML = `<div class="empty">No pending notes.</div>`; return; }
-      items.forEach((item) => {
-        const div = document.createElement('div');
-        div.className = 'knowledge-item';
-        div.innerHTML = `
-          <div class="knowledge-item-body">
-            <div class="knowledge-item-content">${escapeHtml(item.content)}</div>
-            <div class="knowledge-item-meta">
-              <span class="cat-badge">${escapeHtml(item.category || 'community')}</span>
-              <span>Submitted by ${escapeHtml(item.added_by || 'anonymous')}</span>
-              <span>${escapeHtml(formatDate(item.created_at))}</span>
-            </div>
-          </div>
-          <button class="btn-ghost btn-sm btn-success" type="button" onclick="approveNote(${item.id})">Approve</button>
-        `;
-        list.appendChild(div);
-      });
-    }
-
-    async function approveNote(id) {
-      const result = await ApiClient.adminApproveNote(id);
-      if (!result.success) { alert(result.error); return; }
-      showToast('Note approved — chatbot will now use it.', 'success');
-      await loadPending();
-      await loadKnowledge();
-    }
-
     function switchTab(nextTab) {
       state.activeTab = nextTab;
       elements.tabs.forEach((tab) => {
@@ -1538,7 +1487,6 @@
         }
       });
       if (nextTab === 'knowledge') { loadKnowledge(); resetAdminNoteChat(); }
-      if (nextTab === 'pending') loadPending();
     }
 
     async function logout() {
