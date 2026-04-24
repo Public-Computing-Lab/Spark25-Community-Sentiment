@@ -271,7 +271,8 @@ def _newsletter_events_to_documents(events, pdf_path: str):
             continue
 
         metadata = {
-            "source": pdf_name,
+            "source": "Dorchester Reporter",
+            "source_pdf": pdf_name,
             "doc_type": "calendar_event",
         }
         for key, value in ev.items():
