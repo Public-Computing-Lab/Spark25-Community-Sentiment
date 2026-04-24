@@ -1361,6 +1361,7 @@
       active.forEach((item) => {
         const div = document.createElement('div');
         div.className = 'knowledge-item';
+        div.id = `knowledge-item-${item.id}`;
         div.innerHTML = `
           <div class="knowledge-item-body">
             <div class="knowledge-item-content">${escapeHtml(item.content)}</div>
@@ -1372,7 +1373,10 @@
               ${item.source_flag_id ? `<span class="muted">From flag #${escapeHtml(String(item.source_flag_id))}</span>` : ''}
             </div>
           </div>
-          <button class="btn-ghost btn-sm btn-danger" type="button" onclick="deactivateKnowledge(${item.id})">Remove</button>
+          <div style="display:flex;gap:8px;flex-shrink:0;">
+            <button class="btn-ghost btn-sm" type="button" onclick="editKnowledge(${item.id})">Edit</button>
+            <button class="btn-ghost btn-sm btn-danger" type="button" onclick="deactivateKnowledge(${item.id})">Remove</button>
+          </div>
         `;
         list.appendChild(div);
       });
@@ -1472,6 +1476,43 @@
       if (!result.success) { alert(result.error); return; }
       state.knowledge = state.knowledge.map(k => k.id === id ? { ...k, active: false } : k);
       renderKnowledge();
+    }
+
+    function editKnowledge(id) {
+      const item = state.knowledge.find(k => k.id === id);
+      if (!item) return;
+      const div = document.getElementById(`knowledge-item-${id}`);
+      const expiresValue = item.expires_at ? item.expires_at.split('T')[0] : '';
+      const cats = ['general','safety','events','infrastructure','community'];
+      const catOptions = cats.map(c => `<option value="${c}"${item.category === c ? ' selected' : ''}>${c.charAt(0).toUpperCase()+c.slice(1)}</option>`).join('');
+      div.innerHTML = `
+        <div class="knowledge-item-body" style="flex:1">
+          <textarea id="edit-content-${id}" style="width:100%;min-height:80px;background:rgba(0,0,0,0.2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px;resize:vertical;font-family:inherit;font-size:14px;line-height:1.5;box-sizing:border-box;" spellcheck="false">${escapeHtml(item.content)}</textarea>
+          <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;align-items:center;">
+            <select id="edit-category-${id}" style="padding:6px 10px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;">${catOptions}</select>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);font-family:var(--mono);">
+              Expires
+              <input type="date" id="edit-expires-${id}" value="${expiresValue}" style="padding:6px 10px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;">
+            </label>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0;">
+          <button class="btn btn-sm" type="button" onclick="saveKnowledge(${id})">Save</button>
+          <button class="btn-ghost btn-sm" type="button" onclick="renderKnowledge()">Cancel</button>
+        </div>
+      `;
+    }
+
+    async function saveKnowledge(id) {
+      const content = document.getElementById(`edit-content-${id}`).value.trim();
+      if (!content) return;
+      const category = document.getElementById(`edit-category-${id}`).value;
+      const expiresRaw = document.getElementById(`edit-expires-${id}`).value;
+      const payload = { content, category };
+      if (expiresRaw) payload.expires_at = expiresRaw;
+      const result = await ApiClient.adminEditKnowledge(id, payload);
+      if (!result.success) { alert(result.error); return; }
+      await loadKnowledge();
     }
 
 
