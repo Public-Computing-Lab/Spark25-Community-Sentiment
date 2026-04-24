@@ -168,6 +168,10 @@ window.ApiClient = {
   }),
   adminGetKnowledge: () => apiRequest('/admin/knowledge', { method: 'GET' }),
   adminDeleteKnowledge: (id) => apiRequest(`/admin/knowledge/${id}`, { method: 'DELETE' }),
+  adminEditKnowledge: (id, payload) => apiRequest(`/admin/knowledge/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  }),
   submitCommunityNote: (content, category) => apiRequest('/community/notes', {
     method: 'POST',
     body: JSON.stringify({ content, category }),
