@@ -332,19 +332,22 @@ def _check_if_needs_new_data(
     cache_summary = summarize_cache(retrieval_cache)
     
     system_prompt = (
-        "You analyze if a user's question can be answered from conversation history and/or cached retrieval data, or if it needs new data retrieval.\n\n"
-        "You have access to:\n"
-        "1. Conversation history (previous Q&A exchanges)\n"
-        "2. Cached data (the actual data rows/chunks from the most recent retrieval)\n\n"
-        "Rules:\n"
-        "- If the cached data contains the information needed to answer the question → needs_new_data = false\n"
-        "- If question is a follow-up asking for more detail about items in the cached data (e.g., 'tell me more about event #2', 'what about the first one') → needs_new_data = false\n"
-        "- If question is a follow-up, clarification, or reference to previous answers → needs_new_data = false\n"
-        "- If question asks for new data, different time period not in cache, different metrics, or completely new topic → needs_new_data = true\n"
-        "- If question references specific items visible in the cached data preview → needs_new_data = false\n"
-        "- If question asks to compare, explain, or provide more detail on cached data → needs_new_data = false\n\n"
-        "Return ONLY valid JSON with keys: needs_new_data (boolean) and reason (brief string explaining your decision)."
-    )
+    "You analyze if a user's question can be answered from conversation history and/or cached retrieval data, or if it needs new data retrieval.\n\n"
+    "You have access to:\n"
+    "1. Conversation history (previous Q&A exchanges)\n"
+    "2. Cached data (the actual data rows/chunks from the most recent retrieval)\n\n"
+    "CRITICAL RULES (check these FIRST):\n"
+    "- If the question names a specific event, person, place, or entity by name, and that exact name is NOT visibly present in the cached data or conversation history → needs_new_data = true\n"
+    "- If the question references a specific date, day of the week, or time period (e.g., 'April 25', 'this Saturday', 'tomorrow', 'next week') and the cached data does not already contain matching data for that date → needs_new_data = true\n"
+    "- If the question asks for factual details (location, time, description, contact info, schedule) about an entity and those specific details are NOT in the cache → needs_new_data = true\n\n"
+    "Only after checking the critical rules above, apply these:\n"
+    "- If the cached data contains the information needed to answer the question → needs_new_data = false\n"
+    "- If question is a pure follow-up referencing items already shown in the cache (e.g., 'the second one', 'the one in Dorchester') AND that item is visible in the cache → needs_new_data = false\n"
+    "- If question is a clarification or rephrasing of a previous answer → needs_new_data = false\n"
+    "- If question asks for new data, different time period not in cache, different metrics, or a completely new topic → needs_new_data = true\n\n"
+    "When in doubt, prefer needs_new_data = true. It is much worse to answer with stale or missing data than to fetch fresh data.\n\n"
+    "Return ONLY valid JSON with keys: needs_new_data (boolean) and reason (brief string explaining your decision)."
+)
     
     user_prompt = (
         "Conversation History:\n" + (history_context if history_context else "(No previous conversation)") + "\n\n"
@@ -405,7 +408,7 @@ def _route_question(question: str) -> Dict[str, Any]:
         "RULE 0: NEIGHBORHOOD NEWS / RSS QUESTIONS → 'rag' or 'hybrid'\n"
         "   - If question uses phrases like 'what's going on in [neighborhood]', 'what's new in', 'lately', 'recent news about', 'updates from [neighborhood]', 'what's happening in [neighborhood]' without asking for specific event schedules\n"
         "   - AND does not mention a specific day/week/date → mode MUST be 'hybrid' (SQL for 311 activity + RAG for RSS news)\n"
-        "   - If question explicitly names a feed source (DOT Reporter, CSNDC, etc.) → mode MUST be 'rag'\n\n"
+        "   - If question explicitly names a feed source (Dorchester Reporter, CSNDC, etc.) → mode MUST be 'rag'\n\n"
         "RULE 1: CRIME-RELATED QUESTIONS → Route based on question type\n"
         "   - If the question mentions ANY of: crime, crimes, arrest, arrests, offense, offenses, homicide, homicides, shooting, shootings, shots fired, safety incident, safety incidents, criminal activity, violence, violent\n"
         "   - THEN apply these sub-rules:\n"

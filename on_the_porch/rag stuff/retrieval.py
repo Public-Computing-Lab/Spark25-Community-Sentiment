@@ -382,7 +382,7 @@ def retrieve_rss(query, k=5, source=None):
     Args:
         query: Search query
         k: Number of results
-        source: Optional specific feed source name (e.g., 'DOT Reporter')
+        source: Optional specific feed source name (e.g., 'Dorchester Reporter')
     
     Example:
         retrieve_rss("upcoming events Codman Square")
@@ -426,7 +426,7 @@ def retrieve_rss(query, k=5, source=None):
     Args:
         query: Search query
         k: Number of results
-        source: Optional specific feed source name (e.g., 'DOT Reporter')
+        source: Optional specific feed source name (e.g., 'Dorchester Reporter')
     
     Example:
         retrieve_rss("upcoming events Codman Square")
