@@ -33,6 +33,15 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
 GEMINI_SUMMARY_MODEL = os.getenv("GEMINI_SUMMARY_MODEL", GEMINI_MODEL)
 FALLBACK_TRIGGER_PREFIX = "i did not find exact information"
+SQL_FALLBACK_TRIGGER_PHRASES = (
+    FALLBACK_TRIGGER_PREFIX,
+    "i don't see",
+    "i do not see",
+    "i don't currently see",
+    "i do not currently see",
+    "i couldn't find",
+    "i could not find",
+)
 BOSTON_GOV_BOILERPLATE_PATTERNS = (
     "search results below",
     "links to relevant pages",
@@ -73,6 +82,14 @@ def _should_trigger_boston_gov_fallback(answer: str) -> bool:
         return False
     first_two_lines = [line.strip() for line in answer.splitlines() if line.strip()][:2]
     return any(FALLBACK_TRIGGER_PREFIX in line.lower() for line in first_two_lines)
+
+
+def _should_trigger_sql_fallback(answer: str) -> bool:
+    if not answer:
+        return False
+    first_two_lines = [line.strip().lower() for line in answer.splitlines() if line.strip()][:2]
+    sentence_text = " ".join(first_two_lines)
+    return any(phrase in sentence_text for phrase in SQL_FALLBACK_TRIGGER_PHRASES)
 
 
 def _clean_boston_gov_fallback_text(text: str) -> str:
@@ -195,6 +212,12 @@ def _build_boston_gov_fallback_answer(question: str, original_answer: str) -> st
 
 def _apply_default_fallback_if_needed(question: str, answer: str) -> str:
     if not _should_trigger_boston_gov_fallback(answer):
+        return answer
+    return _build_boston_gov_fallback_answer(question, answer)
+
+
+def _apply_sql_fallback_if_needed(question: str, answer: str) -> str:
+    if not _should_trigger_sql_fallback(answer):
         return answer
     return _build_boston_gov_fallback_answer(question, answer)
 
@@ -957,7 +980,7 @@ def _run_sql(
         conversation_history,
     )
     if apply_fallback:
-        answer = _apply_default_fallback_if_needed(question, answer)
+        answer = _apply_sql_fallback_if_needed(question, answer)
     return {"answer": answer, "sql": final_sql, "result": result}
 
 
