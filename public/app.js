@@ -534,7 +534,7 @@ function renderEvents(events) {
       <div class="event-description">${escapeHtml(event.description || 'No description available.')}</div>
     `;
     card.addEventListener('click', () => {
-      elements.chatInput.value = `Tell me more about "${event.event_name}" happening on ${date}.`;
+      elements.chatInput.value = `Tell me more about "${event.event_name}" event happening on ${date}.`;
       elements.chatInput.focus();
     });
     elements.eventsList.appendChild(card);

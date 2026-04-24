@@ -13,6 +13,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from event_utils import normalize_title 
 
 from dotenv import load_dotenv
 import pymysql
@@ -52,11 +53,28 @@ LEGAL_NOTICE_PATTERNS = [
 ]
 _LEGAL_NOTICE_RE = re.compile("|".join(LEGAL_NOTICE_PATTERNS), re.IGNORECASE)
 
+def normalize_title(title: str) -> str:
+    t = title.lower()
+    t = re.sub(r"\([^)]*\)", "", t)     
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
 
 def looks_like_legal_notice(event: dict) -> bool:
     """True if event_name or raw_text matches known legal-notice phrasing."""
     blob = " ".join(str(event.get(k, "")) for k in ("event_name", "raw_text"))
     return bool(_LEGAL_NOTICE_RE.search(blob))
+
+
+def parse_issue_date_from_url(issue_url: str):
+    """Extract YYYY-MM-DD publication date from a DotNews issue URL."""
+    match = _re.search(r"/(\d{4})/(\d{2})/(\d{2})/", issue_url)
+    if not match:
+        return None
+    try:
+        return datetime.strptime("-".join(match.groups()), "%Y-%m-%d").date()
+    except ValueError:
+        return None
 
 def fetch_issue_urls():
     """Fetch DotNews print-issue URLs from newest to oldest."""
@@ -65,6 +83,7 @@ def fetch_issue_urls():
     print(f"  ↪ Fetching {inprint_url}")
     try:
         r = _requests.get(inprint_url, timeout=30)
+        print(r)
         r.raise_for_status()
     except Exception as e:
         print(f"  ✗ Could not fetch inprint page: {e}")
@@ -80,7 +99,33 @@ def fetch_issue_urls():
         return []
 
     matches.sort(key=lambda m: (m[1], m[2], m[3]), reverse=True)
-    return [match[0] for match in matches]
+
+    issue_urls = []
+    seen = set()
+    for match in matches:
+        issue_url = match[0]
+        if issue_url not in seen:
+            seen.add(issue_url)
+            issue_urls.append(issue_url)
+    return issue_urls
+
+
+def filter_issue_urls_by_cutoff(issue_urls, cutoff_date):
+    """Keep only issues published on or after the configured cutoff date."""
+    if not cutoff_date:
+        return issue_urls
+
+    filtered = []
+    for issue_url in issue_urls:
+        issue_date = parse_issue_date_from_url(issue_url)
+        if issue_date and issue_date >= cutoff_date:
+            filtered.append(issue_url)
+
+    print(
+        f"  ↪ Applying DOTNEWS_CUTOFF_DATE={cutoff_date.isoformat()}: "
+        f"keeping {len(filtered)} of {len(issue_urls)} issues"
+    )
+    return filtered
 
 
 def download_issue_pdf(issue_url: str, output_dir: Path):
@@ -96,29 +141,40 @@ def download_issue_pdf(issue_url: str, output_dir: Path):
         return None
 
     iframe_match = _re.search(r'<iframe[^>]+src="([^"]+)"', r.text)
-    if not iframe_match:
-        print("  ✗ No iframe on issue page")
+    embed_match = _re.search(r'<embed[^>]+src="([^"]+)"', r.text)
+    media_src = None
+    media_tag = None
+
+    if iframe_match:
+        media_src = iframe_match.group(1)
+        media_tag = "iframe"
+    elif embed_match:
+        media_src = embed_match.group(1)
+        media_tag = "embed"
+    else:
+        print("  ✗ No iframe or embed tag on issue page")
         return None
 
-    iframe_src = iframe_match.group(1)
+    print(f"  ↪ Found PDF container in <{media_tag}>")
+
     # Decode HTML entities first (&#038; -> &, &amp; -> &)
-    iframe_src = iframe_src.replace("&#038;", "&").replace("&amp;", "&")
+    media_src = media_src.replace("&#038;", "&").replace("&amp;", "&")
     pdf_url = None
-    if "gview" in iframe_src and "url=" in iframe_src:
+    if "gview" in media_src and "url=" in media_src:
         # Extract the url= param value (goes to end of string or next &)
-        url_match = _re.search(r"[?&]url=(.+?)(?:&|$)", iframe_src)
+        url_match = _re.search(r"[?&]url=(.+?)(?:&|$)", media_src)
         if url_match:
             pdf_url = _unquote(url_match.group(1))
-    elif "admin-ajax.php" in iframe_src and "file=" in iframe_src:
-        parsed = _urlparse(iframe_src)
+    elif "admin-ajax.php" in media_src and "file=" in media_src:
+        parsed = _urlparse(media_src)
         params = _parse_qs(parsed.query)
         if "file" in params:
             pdf_url = _unquote(params["file"][0])
-    elif iframe_src.lower().endswith(".pdf"):
-        pdf_url = iframe_src
+    elif media_src.lower().endswith(".pdf"):
+        pdf_url = media_src
 
     if not pdf_url:
-        print(f"  ✗ Could not extract PDF URL from iframe: {iframe_src}")
+        print(f"  ✗ Could not extract PDF URL from {media_tag}: {media_src}")
         return None
 
     if pdf_url.startswith("//"):
@@ -175,6 +231,10 @@ def download_all_pdfs_v2(output_dir: Path):
     issue_urls = fetch_issue_urls()
     if not issue_urls:
         return []
+    issue_urls = filter_issue_urls_by_cutoff(issue_urls, DOTNEWS_CUTOFF_DATE)
+    if not issue_urls:
+        print("  ✗ No print issues found on or after the configured cutoff date")
+        return []
 
     downloaded_paths = []
     total = len(issue_urls)
@@ -190,6 +250,19 @@ load_dotenv(REPO_ROOT / ".env")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+DOTNEWS_CUTOFF_DATE_RAW = os.environ.get("DOTNEWS_CUTOFF_DATE", "").strip()
+
+DOTNEWS_CUTOFF_DATE = None
+if DOTNEWS_CUTOFF_DATE_RAW:
+    try:
+        DOTNEWS_CUTOFF_DATE = datetime.strptime(DOTNEWS_CUTOFF_DATE_RAW, "%Y-%m-%d").date()
+    except ValueError:
+        print(
+            "✗ Invalid DOTNEWS_CUTOFF_DATE in .env. Expected YYYY-MM-DD, "
+            f"got: {DOTNEWS_CUTOFF_DATE_RAW}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 if not GEMINI_API_KEY:
     print("✗ GEMINI_API_KEY not set in .env", file=sys.stderr)
@@ -384,6 +457,7 @@ def insert_events_to_db(events):
         return 0
     conn = get_db_connection()
     inserted = 0
+    skipped = 0
     try:
         with conn.cursor() as cur:
             cur.execute("SHOW COLUMNS FROM weekly_events LIKE 'category'")
@@ -401,19 +475,39 @@ def insert_events_to_db(events):
                 event_date = (event.get("event_date") or "").strip()
                 if not event_date:
                     event_date = event.get("start_date") or event.get("end_date") or "no info"
+
+                normalized = normalize_title(event_name)
+
+                try:
+                    cur.execute(
+                        """
+                        SELECT id FROM weekly_events
+                        WHERE normalized_name = %s
+                        AND (start_date <=> %s)
+                        LIMIT 1
+                        """,
+                        (normalized, event.get("start_date")),
+                    )
+                    if cur.fetchone():
+                        skipped += 1
+                        continue
+                except Exception as e:
+                    print(f"    ⚠ Dedup check failed for '{event_name}': {e}")
+
                 try:
                     cur.execute(
                         """
                         INSERT INTO weekly_events (
-                            source_pdf, page_number, event_name, event_date,
+                            source_pdf, page_number, event_name, normalized_name, event_date,
                             start_date, end_date, start_time, end_time,
                             raw_text, category
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
                             event.get("source", "dotnews"),
                             event.get("page_number"),
                             event_name,
+                            normalized,
                             event_date,
                             event.get("start_date"),
                             event.get("end_date"),
@@ -428,8 +522,9 @@ def insert_events_to_db(events):
                     print(f"    ⚠ Could not insert '{event_name}': {e}")
     finally:
         conn.close()
+    if skipped:
+        print(f"  (skipped {skipped} already-present events)")
     return inserted
-
 
 def process_pdf(pdf_path: Path):
     print(f"📰 Got: {pdf_path.name}")
