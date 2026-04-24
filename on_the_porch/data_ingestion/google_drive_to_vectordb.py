@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 from typing import List, Dict
 from datetime import datetime
+from event_utils import normalize_title
 
 # Google Drive API
 from google.oauth2.service_account import Credentials as ServiceAccountCredentials
@@ -515,19 +516,19 @@ def insert_events_to_db(events: List[Dict]) -> int:
     """Insert events into the weekly_events SQL table."""
     if not events:
         return 0
-    
+
     conn = app4._get_db_connection()
     inserted_count = 0
-    
+
     try:
         with conn.cursor() as cur:
-            # Ensure weekly_events table exists
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS weekly_events (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     source_pdf VARCHAR(255) NULL,
                     page_number INT NULL,
                     event_name VARCHAR(255) NOT NULL,
+                    normalized_name VARCHAR(500) NULL,
                     event_date VARCHAR(255) NOT NULL,
                     start_date DATE NULL,
                     end_date DATE NULL,
@@ -537,8 +538,7 @@ def insert_events_to_db(events: List[Dict]) -> int:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
-            
-            # Check if category column exists, add it if not
+
             cur.execute("SHOW COLUMNS FROM weekly_events LIKE 'category'")
             if not cur.fetchone():
                 try:
@@ -549,44 +549,51 @@ def insert_events_to_db(events: List[Dict]) -> int:
 
             for event in events:
                 try:
-                    # Validate required fields
                     event_name = event.get('event_name', '').strip()
                     event_date = event.get('event_date', '').strip()
-                    
-                    # Skip events without required fields
+
                     if not event_name:
                         if config.VERBOSE_LOGGING:
                             print(f"    ⚠ Skipping event with no name")
                         continue
-                    
-                    # event_date is required by database - provide default if missing
+
                     if not event_date:
-                        # Try to use start_date or end_date as fallback
                         event_date = event.get('start_date') or event.get('end_date') or ''
                         if not event_date:
-                            # Last resort: use a placeholder
                             event_date = 'no info'
-                    
+
+                    normalized = normalize_title(event_name)
+
+                    try:
+                        cur.execute(
+                            """
+                            SELECT id FROM weekly_events
+                            WHERE normalized_name = %s
+                              AND (start_date <=> %s)
+                            LIMIT 1
+                            """,
+                            (normalized, event.get('start_date')),
+                        )
+                        if cur.fetchone():
+                            continue
+                    except Exception as e:
+                        if config.VERBOSE_LOGGING:
+                            print(f"    ⚠ Dedup check failed for '{event_name}': {e}")
+
                     cur.execute(
                         """
                         INSERT INTO weekly_events (
-                            source_pdf,
-                            page_number,
-                            event_name,
-                            event_date,
-                            start_date,
-                            end_date,
-                            start_time,
-                            end_time,
-                            raw_text,
-                            category
+                            source_pdf, page_number, event_name, normalized_name,
+                            event_date, start_date, end_date, start_time, end_time,
+                            raw_text, category
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
                             event.get('source', 'google_drive_newsletter'),
                             event.get('page_number'),
                             event_name,
+                            normalized,
                             event_date,
                             event.get('start_date'),
                             event.get('end_date'),
@@ -599,14 +606,12 @@ def insert_events_to_db(events: List[Dict]) -> int:
                     inserted_count += 1
                 except Exception as e:
                     if config.VERBOSE_LOGGING:
-                        print(f"    ⚠ Could not insert event '{event.get('event_name')}': {e}")
-        
+                        print(f"  ⚠ Could not insert event '{event.get('event_name')}': {e}")
+
         conn.commit()
     finally:
         conn.close()
-    
     return inserted_count
-
 
 def process_newsletter_pdf(file_path: Path, file_metadata: Dict) -> Dict:
     """

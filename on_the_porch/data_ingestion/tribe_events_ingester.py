@@ -28,6 +28,7 @@ from datetime import datetime
 from html import unescape
 from pathlib import Path
 from urllib.parse import urlencode
+from event_utils import normalize_title
 
 import pymysql
 import requests
@@ -158,6 +159,11 @@ def split_datetime(dt_str: str | None) -> tuple[str | None, str | None]:
         return None, None
     return date_part, time_part
 
+def normalize_title(title: str) -> str:
+    t = title.lower()
+    t = re.sub(r"\([^)]*\)", "", t)      
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
 
 def pick_category(raw_event: dict) -> str:
     """Keyword-based category mapping — works for both CSNDC and Codman events."""
@@ -265,40 +271,37 @@ def insert_events_to_db(events: list[dict]) -> int:
                 if not event_name:
                     continue
 
-                # Dedupe on (source, event_name, start_date) — important for
-                # Codman because recurring events (e.g. Virtual Baby Cafe every
-                # Wednesday) each have their own occurrence row we want to keep,
-                # but reruns shouldn't duplicate them.
+                normalized = normalize_title(event_name)
+
                 try:
                     cur.execute(
                         """
                         SELECT id FROM weekly_events
-                        WHERE source_pdf = %s AND event_name = %s
-                          AND (start_date <=> %s)
+                        WHERE normalized_name = %s
+                        AND (start_date <=> %s)
                         LIMIT 1
                         """,
-                        (event.get("source"), event_name, event.get("start_date")),
+                        (normalized, event.get("start_date")),
                     )
                     if cur.fetchone():
                         continue
-                except Exception:
-                    # If the schema doesn't allow this query, fall through and
-                    # let the insert run (or a unique index error harmlessly).
-                    pass
+                except Exception as e:
+                    print(f"    ⚠ Dedup check failed for '{event_name}': {e}")
 
                 try:
                     cur.execute(
                         """
                         INSERT INTO weekly_events (
-                            source_pdf, page_number, event_name, event_date,
+                            source_pdf, page_number, event_name, normalized_name, event_date,
                             start_date, end_date, start_time, end_time,
                             raw_text, category
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
                             event.get("source"),
-                            None,  # no page_number for API-sourced events
+                            None,
                             event_name,
+                            normalized,
                             event.get("event_date"),
                             event.get("start_date"),
                             event.get("end_date"),

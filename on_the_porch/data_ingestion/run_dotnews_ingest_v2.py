@@ -13,6 +13,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from event_utils import normalize_title 
 
 from dotenv import load_dotenv
 import pymysql
@@ -51,6 +52,12 @@ LEGAL_NOTICE_PATTERNS = [
     r"\bproposal to (erect|renovate|construct|extend|subdivide)\b",
 ]
 _LEGAL_NOTICE_RE = re.compile("|".join(LEGAL_NOTICE_PATTERNS), re.IGNORECASE)
+
+def normalize_title(title: str) -> str:
+    t = title.lower()
+    t = re.sub(r"\([^)]*\)", "", t)     
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
 
 
 def looks_like_legal_notice(event: dict) -> bool:
@@ -450,6 +457,7 @@ def insert_events_to_db(events):
         return 0
     conn = get_db_connection()
     inserted = 0
+    skipped = 0
     try:
         with conn.cursor() as cur:
             cur.execute("SHOW COLUMNS FROM weekly_events LIKE 'category'")
@@ -467,19 +475,39 @@ def insert_events_to_db(events):
                 event_date = (event.get("event_date") or "").strip()
                 if not event_date:
                     event_date = event.get("start_date") or event.get("end_date") or "no info"
+
+                normalized = normalize_title(event_name)
+
+                try:
+                    cur.execute(
+                        """
+                        SELECT id FROM weekly_events
+                        WHERE normalized_name = %s
+                        AND (start_date <=> %s)
+                        LIMIT 1
+                        """,
+                        (normalized, event.get("start_date")),
+                    )
+                    if cur.fetchone():
+                        skipped += 1
+                        continue
+                except Exception as e:
+                    print(f"    ⚠ Dedup check failed for '{event_name}': {e}")
+
                 try:
                     cur.execute(
                         """
                         INSERT INTO weekly_events (
-                            source_pdf, page_number, event_name, event_date,
+                            source_pdf, page_number, event_name, normalized_name, event_date,
                             start_date, end_date, start_time, end_time,
                             raw_text, category
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
                             event.get("source", "dotnews"),
                             event.get("page_number"),
                             event_name,
+                            normalized,
                             event_date,
                             event.get("start_date"),
                             event.get("end_date"),
@@ -494,8 +522,9 @@ def insert_events_to_db(events):
                     print(f"    ⚠ Could not insert '{event_name}': {e}")
     finally:
         conn.close()
+    if skipped:
+        print(f"  (skipped {skipped} already-present events)")
     return inserted
-
 
 def process_pdf(pdf_path: Path):
     print(f"📰 Got: {pdf_path.name}")
