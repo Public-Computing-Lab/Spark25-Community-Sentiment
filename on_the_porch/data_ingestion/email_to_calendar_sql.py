@@ -23,6 +23,7 @@ import google.generativeai as genai
 # Local imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import sql_chat.app4 as app4
+from event_utils import normalize_title
 
 import config
 from utils.email_parser import (
@@ -275,19 +276,19 @@ def insert_events_to_db(events: List[Dict]) -> int:
     """Insert events into the weekly_events table."""
     if not events:
         return 0
-    
+
     conn = app4._get_db_connection()
     inserted_count = 0
-    
+
     try:
         with conn.cursor() as cur:
-            # Ensure weekly_events table exists
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS weekly_events (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     source_pdf VARCHAR(255) NULL,
                     page_number INT NULL,
                     event_name VARCHAR(255) NOT NULL,
+                    normalized_name VARCHAR(500) NULL,
                     event_date VARCHAR(255) NOT NULL,
                     start_date DATE NULL,
                     end_date DATE NULL,
@@ -297,28 +298,44 @@ def insert_events_to_db(events: List[Dict]) -> int:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
-            
+
             for event in events:
+                event_name = event.get('event_name', '')
+                if not event_name:
+                    continue
+
+                normalized = normalize_title(event_name)
+
+                try:
+                    cur.execute(
+                        """
+                        SELECT id FROM weekly_events
+                        WHERE normalized_name = %s
+                          AND (start_date <=> %s)
+                        LIMIT 1
+                        """,
+                        (normalized, event.get('start_date')),
+                    )
+                    if cur.fetchone():
+                        continue
+                except Exception as e:
+                    if config.VERBOSE_LOGGING:
+                        print(f"    ⚠ Dedup check failed for '{event_name}': {e}")
+
                 try:
                     cur.execute(
                         """
                         INSERT INTO weekly_events (
-                            source_pdf,
-                            page_number,
-                            event_name,
-                            event_date,
-                            start_date,
-                            end_date,
-                            start_time,
-                            end_time,
-                            raw_text
+                            source_pdf, page_number, event_name, normalized_name,
+                            event_date, start_date, end_date, start_time, end_time, raw_text
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
                             event.get('source', 'email_newsletter'),
-                            None,  # page_number not applicable for emails
-                            event.get('event_name', ''),
+                            None,
+                            event_name,
+                            normalized,
                             event.get('event_date', ''),
                             event.get('start_date'),
                             event.get('end_date'),
@@ -330,12 +347,11 @@ def insert_events_to_db(events: List[Dict]) -> int:
                     inserted_count += 1
                 except Exception as e:
                     if config.VERBOSE_LOGGING:
-                        print(f"  ⚠ Could not insert event '{event.get('event_name')}': {e}")
-        
+                        print(f"  ⚠ Could not insert event '{event_name}': {e}")
+
         conn.commit()
     finally:
         conn.close()
-    
     return inserted_count
 
 
