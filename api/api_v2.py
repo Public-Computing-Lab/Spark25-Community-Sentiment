@@ -83,6 +83,14 @@ except Exception as _ingest_import_err:
     _ingest_community_notes = None
     print(f"Warning: could not import ingest_community_notes: {_ingest_import_err}")
 
+try:
+    import chromadb as _chromadb
+    import retrieval as _retrieval
+except Exception as _chroma_import_err:
+    _chromadb = None
+    _retrieval = None
+    print(f"Warning: could not import chromadb/retrieval: {_chroma_import_err}")
+
 _bootstrap_env()
 _fix_retrieval_vectordb_path()
 
@@ -98,6 +106,23 @@ def _trigger_ingest() -> None:
             print(f"Community notes ingested: {stats}")
         except Exception as exc:
             print(f"Background community notes ingest failed: {exc}")
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _remove_from_chroma(entry_id: int) -> None:
+    """Delete a community note from the Chroma vector DB by its note ID."""
+    if _chromadb is None or _retrieval is None:
+        return
+
+    def _run():
+        try:
+            client = _chromadb.PersistentClient(path=str(_retrieval.VECTORDB_DIR))
+            collection = client.get_collection("langchain")
+            collection.delete(ids=[f"community_note_{entry_id}"])
+            print(f"Removed community_note_{entry_id} from Chroma")
+        except Exception as exc:
+            print(f"Background Chroma removal failed for note {entry_id}: {exc}")
 
     threading.Thread(target=_run, daemon=True).start()
 
@@ -2461,6 +2486,36 @@ def admin_add_knowledge():
         if conn: conn.close()
 
 
+@app.route("/admin/knowledge/<int:entry_id>", methods=["PUT"])
+def admin_edit_knowledge(entry_id):
+    result = _require_admin()
+    if result:
+        return result
+    data = request.get_json() or {}
+    content = data.get("content", "").strip()
+    if not content:
+        return _json_error("content is required", 400, "admin_knowledge_edit_invalid")
+    category = data.get("category", "general")
+    expires_at = data.get("expires_at") or None
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "UPDATE admin_knowledge SET content = %s, category = %s, expires_at = %s WHERE id = %s",
+            (content, category, expires_at, entry_id),
+        )
+        conn.commit()
+        _trigger_ingest()
+        return jsonify({"message": "Note updated"})
+    except Exception as e:
+        return _json_error(str(e), 500, "admin_knowledge_edit_failed")
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
 @app.route("/admin/knowledge/<int:entry_id>", methods=["DELETE"])
 def admin_deactivate_knowledge(entry_id):
     result = _require_admin()
@@ -2473,6 +2528,7 @@ def admin_deactivate_knowledge(entry_id):
         cursor = conn.cursor(dictionary=True)
         cursor.execute("UPDATE admin_knowledge SET active = FALSE WHERE id = %s", (entry_id,))
         conn.commit()
+        _remove_from_chroma(entry_id)
         return jsonify({"message": "Entry deactivated"})
     except Exception as e:
         return _json_error(str(e), 500, "admin_knowledge_deactivate_failed")
