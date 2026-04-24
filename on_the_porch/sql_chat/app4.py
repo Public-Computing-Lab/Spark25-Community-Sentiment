@@ -553,6 +553,7 @@ def _llm_generate_sql(question: str, schema: str, default_model: str, metadata: 
         "NEVER return data from other neighborhoods or districts. If the question mentions another place, interpret it as \"in Dorchester\" and still filter to Dorchester only.\n"
         "- EXCEPTION: When querying the `weekly_events` table, DO NOT filter by Dorchester or any neighborhood; these events are general and should be returned regardless of location.\n"
         "- CRITICAL for `weekly_events` table: For date comparisons (e.g., 'this weekend', 'next week', date ranges), ALWAYS use `start_date` or `end_date` (DATE fields), NEVER use `event_date` (which is VARCHAR text like 'Monday' or 'June 3-5'). Use `event_date` only for display, not for filtering by date.\n"
+        "- If the question asks about a specific named item such as a named event, generate SQL that prefers exact or very close text matching on that item's name instead of broad related matches. This helps the downstream answer correctly say 'I did not find exact information about ...' when no exact match exists.\n"
         "- ALWAYS wrap table and column identifiers in backticks (`like_this`).\n"
         "- When using table aliases, always write them as separate backticked identifiers (for example, `T1`.`longitude`), never as a single backticked 'T1.longitude'."
         "- LOCATION OUTPUT RULE: For 311/911 location questions, prefer street-level fields over area labels.\n"
@@ -961,7 +962,9 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
                 "Before answering, review the active community notes. "
                 "If they are relevant to the user's question, use them in your answer.\n"
                 "Do not mention SQL, databases, or internal tools.\n"
-                "If the community notes do not answer the question, briefly say that no matching structured data was found."
+                "If the community notes do not answer the question, the first line of your answer must begin with "
+                "'I did not find exact information about ...' and briefly name the missing topic. "
+                "After that first line, you may provide related information from the notes if it is genuinely helpful."
                 + ("\n\nYou are in a conversation. Reference previous questions naturally when it helps the user." if conversation_history else "")
             )
             user_prompt = (
@@ -987,7 +990,7 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
         unique_values = result.get("unique_values", {})
         if unique_values:
             # Build a helpful message with unique values
-            msg_parts = ["No results found matching your query."]
+            msg_parts = [f"I did not find exact information about {question.strip().rstrip('?.!') or 'that topic'}."]
             msg_parts.append("\n\nTo help refine your search, here are available values in key columns:")
             for col, vals in list(unique_values.items())[:3]:  # Limit to 3 columns
                 sample_vals = vals[:10]  # Show first 10 values
@@ -997,7 +1000,7 @@ def _llm_generate_answer(question: str, sql: str, result: Dict[str, Any], defaul
                 msg_parts.append(f"\n- **{col}**: {vals_str}")
             msg_parts.append("\n\nTry using one of these actual values from the database in your question.")
             return "".join(msg_parts)
-        return "No results found."
+        return f"I did not find exact information about {question.strip().rstrip('?.!') or 'that topic'}."
 
     max_rows = 30
     sample_rows = rows[:max_rows]
