@@ -1,63 +1,48 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-# Create a Python 3.11 virtual environment for the demo if it does not exist
-if [ ! -d ".venv_demo" ]; then
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
+
+if [ ! -d ".venv" ]; then
   if command -v python3.11 >/dev/null 2>&1; then
-    python3.11 -m venv .venv_demo
+    python3.11 -m venv .venv
   elif command -v python3 >/dev/null 2>&1; then
-    python3 -m venv .venv_demo
+    python3 -m venv .venv
   else
-    python -m venv .venv_demo
+    python -m venv .venv
   fi
 fi
 
-# Select the venv Python executable
-if [ -x ".venv_demo/bin/python" ]; then
-  PYTHON=".venv_demo/bin/python"
-elif [ -x ".venv_demo/Scripts/python.exe" ]; then
-  PYTHON=".venv_demo/Scripts/python.exe"
+if [ -x ".venv/bin/python" ]; then
+  PYTHON=".venv/bin/python"
+elif [ -x ".venv/Scripts/python.exe" ]; then
+  PYTHON=".venv/Scripts/python.exe"
 else
-  PYTHON="python"
+  echo "Could not find the virtualenv Python executable." >&2
+  exit 1
 fi
 
-# Install Python requirements
+echo "Using Python: $PYTHON"
+
+echo "Installing dependencies..."
 "$PYTHON" -m pip install --upgrade pip
 "$PYTHON" -m pip install -r requirements.txt
 
-# Unzip the ChromaDB/vector store if the archive exists
-if [ -f "demo/vectordb_new.zip" ]; then
-  unzip -o demo/vectordb_new.zip
-fi
+echo "Creating empty vector DB..."
+"$PYTHON" -c 'from pathlib import Path; import os; import chromadb; from dotenv import load_dotenv; root = Path.cwd(); load_dotenv(root / ".env"); raw = os.getenv("VECTORDB_DIR", "on_the_porch/vectordb_new"); db_path = Path(raw) if Path(raw).is_absolute() else (root / raw).resolve(); db_path.mkdir(parents=True, exist_ok=True); chromadb.PersistentClient(path=str(db_path)).get_or_create_collection("langchain"); print(f"Empty vector DB ready at {db_path}")'
 
-# Start MySQL demo database via Docker Compose
-if command -v docker-compose >/dev/null 2>&1; then
-  docker-compose -f demo/docker-compose.demo.yml up -d
-else
-  docker compose -f demo/docker-compose.demo.yml up -d
-fi
+echo "Running Google Drive ingestion..."
+"$PYTHON" "on_the_porch/data_ingestion/google_drive_to_vectordb.py"
 
-echo "Waiting for MySQL demo database to be ready..."
-for i in $(seq 1 60); do
-  if docker exec mysql_demo mysqladmin ping -h 127.0.0.1 -u root -proot --silent >/dev/null 2>&1; then
-    echo "MySQL is ready."
-    break
-  fi
-  if [ "$i" -eq 60 ]; then
-    echo "MySQL did not become ready in time."
-    exit 1
-  fi
-  sleep 2
-done
+echo "Running Boston Open Data sync..."
+"$PYTHON" "on_the_porch/data_ingestion/boston_data_sync/boston_data_sync.py"
 
-if [ "${DEMO_SYNC_LIVE_BOSTON_DATA:-0}" = "1" ]; then
-  echo "Syncing live 311 and crime data into the demo database..."
-  "$PYTHON" demo/sync_boston_data_to_demo.py
-fi
+echo "Running RSS Wayback ingestion..."
+"$PYTHON" "on_the_porch/rag stuff/ingest_rss_wayback.py"
 
-# Activate the demo virtual environment for interactive use
-if [ -f ".venv_demo/bin/activate" ]; then
-  . .venv_demo/bin/activate
-elif [ -f ".venv_demo/Scripts/activate" ]; then
-  . .venv_demo/Scripts/activate
-fi
+echo "Running DotNews first-time ingestion..."
+"$PYTHON" "on_the_porch/data_ingestion/run_dotnews_ingest_v2.py" --first-time
+
+echo
+echo "Setup complete."

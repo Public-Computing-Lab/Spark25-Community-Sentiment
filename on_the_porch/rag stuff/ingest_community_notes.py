@@ -90,6 +90,19 @@ def fetch_active_community_notes(conn: pymysql.connections.Connection) -> list[d
         return list(cursor.fetchall())
 
 
+def fetch_inactive_community_note_ids(conn: pymysql.connections.Connection) -> set[str]:
+    """Fetch note IDs from admin_knowledge that are explicitly inactive."""
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id
+            FROM admin_knowledge
+            WHERE active = FALSE
+            """
+        )
+        return {str(row["id"]) for row in cursor.fetchall()}
+
+
 def _note_to_document(note: dict[str, Any]) -> Document:
     note_id = str(note["id"])
     content = (note.get("content") or "").strip()
@@ -150,20 +163,31 @@ def ingest_community_notes(vectordb_dir: Path | None = None) -> dict[str, int]:
     stats = {
         "notes_fetched": 0,
         "notes_added": 0,
+        "notes_removed": 0,
         "notes_skipped_existing": 0,
     }
 
     conn = _connect()
     try:
         notes = fetch_active_community_notes(conn)
+        inactive_note_ids = fetch_inactive_community_note_ids(conn)
         stats["notes_fetched"] = len(notes)
         print(f"Fetched {len(notes)} active community notes from admin_knowledge")
-
-        if not notes:
-            return stats
+        print(f"Fetched {len(inactive_note_ids)} inactive community note IDs from admin_knowledge")
 
         existing_note_ids = _get_existing_note_ids(vectordb_dir)
         print(f"Found {len(existing_note_ids)} community notes already in the vector DB")
+
+        note_ids_to_remove = sorted(existing_note_ids & inactive_note_ids)
+        vectordb: Chroma | None = None
+        if note_ids_to_remove:
+            vectordb = _get_vectordb(vectordb_dir)
+            vectordb.delete(ids=[f"community_note_{note_id}" for note_id in note_ids_to_remove])
+            stats["notes_removed"] = len(note_ids_to_remove)
+            print(f"Removed {len(note_ids_to_remove)} inactive community notes from the vector DB")
+
+        if not notes:
+            return stats
 
         new_notes = [note for note in notes if str(note["id"]) not in existing_note_ids]
         stats["notes_skipped_existing"] = len(notes) - len(new_notes)
@@ -175,7 +199,8 @@ def ingest_community_notes(vectordb_dir: Path | None = None) -> dict[str, int]:
         documents = [_note_to_document(note) for note in new_notes]
         document_ids = [f"community_note_{note['id']}" for note in new_notes]
 
-        vectordb = _get_vectordb(vectordb_dir)
+        if vectordb is None:
+            vectordb = _get_vectordb(vectordb_dir)
         vectordb.add_documents(documents=documents, ids=document_ids)
         stats["notes_added"] = len(documents)
         print(f"Added {len(documents)} community notes to the vector DB")
@@ -201,6 +226,7 @@ def main() -> None:
     print("-" * 40)
     print(f"Notes fetched:           {stats['notes_fetched']}")
     print(f"Notes added:             {stats['notes_added']}")
+    print(f"Notes removed:           {stats['notes_removed']}")
     print(f"Skipped existing notes:  {stats['notes_skipped_existing']}")
 
 
