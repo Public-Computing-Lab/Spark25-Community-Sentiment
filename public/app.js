@@ -87,6 +87,7 @@ const providerLabels = {
 
 const THEME_STORAGE_KEY = 'otp-theme';
 const EVENTS_PANEL_STORAGE_KEY = 'otp-events-panel-collapsed';
+const CHAT_INPUT_PLACEHOLDER = 'Ask about events, services, safety, or neighborhood trends...';
 
 function getStoredTheme() {
   try {
@@ -500,6 +501,7 @@ function setChatLoading(loading) {
   state.isSendingMessage = loading;
   elements.chatInput.disabled = loading;
   elements.chatSubmit.disabled = loading;
+  elements.chatInput.placeholder = loading ? '...' : CHAT_INPUT_PLACEHOLDER;
 }
 
 function setEventsLoading(loading) {
@@ -847,8 +849,22 @@ async function sendChatMessage(event) {
   if (!message) return;
   const threadId = state.activeThreadId;
   const requestVersion = ++state.messageVersion;
+  const optimisticMessageId = `pending-user-${Date.now()}-${requestVersion}`;
+  const optimisticMessage = {
+    id: optimisticMessageId,
+    role: 'user',
+    content: message,
+    created_at: new Date().toISOString(),
+    sources: [],
+  };
 
   setError(elements.chatError, '');
+  elements.chatInput.value = '';
+  state.messages = [
+    ...state.messages,
+    optimisticMessage,
+  ];
+  renderMessages();
   setChatLoading(true);
   renderTypingIndicator();
 
@@ -862,11 +878,15 @@ async function sendChatMessage(event) {
         showView('profile');
         return;
       }
+      state.messages = state.messages.filter((entry) => entry.id !== optimisticMessageId);
+      renderMessages();
+      if (!elements.chatInput.value) {
+        elements.chatInput.value = message;
+      }
       setError(elements.chatError, result.error);
       return;
     }
 
-    elements.chatInput.value = '';
     const threadIndex = state.threads.findIndex((entry) => entry.id === result.data.thread.id);
     if (threadIndex >= 0) {
       state.threads[threadIndex] = result.data.thread;
@@ -879,7 +899,7 @@ async function sendChatMessage(event) {
     }
 
     state.messages = normalizeMessages([
-      ...state.messages,
+      ...state.messages.filter((entry) => entry.id !== optimisticMessageId),
       result.data.user_message,
       result.data.assistant_message,
     ]);

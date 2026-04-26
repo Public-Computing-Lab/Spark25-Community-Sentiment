@@ -595,6 +595,10 @@
       overflow: auto;
       font-family: var(--font-ui);
       color: var(--text-primary);
+      --admin-cta-bg: #3d7a67;
+      --admin-cta-bg-hover: #336a59;
+      --admin-cta-border: #2e5f51;
+      --admin-cta-text: #eff7f3;
       background:
         radial-gradient(circle at 12% 14%, rgba(48, 131, 123, 0.18), transparent 26%),
         radial-gradient(circle at 88% 8%, rgba(201, 149, 92, 0.12), transparent 18%),
@@ -678,9 +682,16 @@
     }
 
     body.admin-page .btn {
-      background: var(--accent-mint);
-      color: #0d201b;
-      border-color: transparent;
+      background: var(--admin-cta-bg);
+      color: var(--admin-cta-text);
+      border-color: var(--admin-cta-border);
+    }
+
+    body.admin-page .btn:hover,
+    body.admin-page .btn:focus-visible {
+      background: var(--admin-cta-bg-hover);
+      border-color: var(--admin-cta-bg-hover);
+      color: var(--admin-cta-text);
     }
 
     body.admin-page[data-theme='light'] .btn-ghost,
@@ -884,6 +895,437 @@
       color: var(--danger);
     }
 
+    body.admin-page .community-notes-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      margin-bottom: 18px;
+    }
+
+    body.admin-page .community-notes-add-button {
+      min-height: 44px;
+      padding: 0 20px;
+      font-weight: 700;
+    }
+
+    body.admin-page .community-notes-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(4, 8, 12, 0.64);
+      backdrop-filter: blur(14px);
+    }
+
+    body.admin-page .community-notes-modal-card {
+      width: min(1040px, 100%);
+      max-height: min(92dvh, 980px);
+      min-height: min(78dvh, 820px);
+      overflow: auto;
+      padding: 24px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--line-strong);
+      background: linear-gradient(180deg, rgba(18, 23, 28, 0.98), rgba(13, 16, 20, 0.98));
+      box-shadow: var(--shadow-heavy);
+      display: flex;
+      flex-direction: column;
+    }
+
+    body.admin-page .community-notes-modal-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    body.admin-page .community-notes-modal-header h3 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      font-size: clamp(28px, 3.4vw, 40px);
+      line-height: 1;
+      color: var(--text-primary);
+    }
+
+    body.admin-page .community-notes-modal-copy {
+      margin-bottom: 16px;
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    body.admin-page .community-notes-close {
+      min-width: 44px;
+      min-height: 44px;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    body.admin-page .community-notes-chat {
+      margin-bottom: 0;
+      padding: 20px;
+      border-radius: 16px;
+      background: rgba(20, 31, 49, 0.5);
+      border: 1px solid var(--line-strong);
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+
+    body.admin-page .community-notes-messages {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 360px;
+      max-height: none;
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 14px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 10px;
+      border: 1px solid var(--line-soft);
+    }
+
+    body.admin-page .community-notes-messages.is-empty {
+      justify-content: center;
+      align-items: center;
+    }
+
+    body.admin-page .community-notes-empty {
+      max-width: 620px;
+      margin: 0 auto;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: clamp(19px, 2vw, 28px);
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+      font-family: var(--font-display);
+      font-weight: 500;
+    }
+
+    body.admin-page .community-notes-input-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    body.admin-page .community-notes-field {
+      flex: 1;
+      min-width: 180px;
+      padding: 10px 12px;
+      background: rgba(10, 18, 31, 0.8);
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+
+    body.admin-page .community-notes-field::placeholder {
+      color: var(--text-dim);
+    }
+
+    body.admin-page .community-notes-preview {
+      margin-top: 12px;
+      padding: 14px;
+      border-radius: 10px;
+      background: rgba(97, 216, 181, 0.06);
+      border: 1px solid rgba(97, 216, 181, 0.26);
+    }
+
+    body.admin-page .community-notes-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    body.admin-page .community-notes-preview-label {
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    body.admin-page .community-notes-preview-text {
+      width: 100%;
+      min-height: 112px;
+      margin-bottom: 12px;
+      padding: 8px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(97, 216, 181, 0.2);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 13px;
+      line-height: 1.6;
+      resize: vertical;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+
+    body.admin-page .community-notes-form-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    body.admin-page .community-notes-field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 170px;
+    }
+
+    body.admin-page .community-notes-field-group .community-notes-field {
+      flex: 0 0 auto;
+      width: 100%;
+    }
+
+    body.admin-page .community-notes-action-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    body.admin-page .community-notes-heading {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    body.admin-page .knowledge-item {
+      border-color: var(--line-soft);
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    body.admin-page .knowledge-item-content {
+      color: var(--text-primary);
+    }
+
+    body.admin-page .knowledge-item-meta {
+      color: var(--text-muted);
+    }
+
+    body.admin-page .knowledge-item-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    body.admin-page .community-notes-message-row {
+      display: flex;
+    }
+
+    body.admin-page .community-notes-message-row--user {
+      justify-content: flex-end;
+    }
+
+    body.admin-page .community-notes-message-row--assistant {
+      justify-content: flex-start;
+    }
+
+    body.admin-page .community-notes-message-bubble {
+      max-width: 80%;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      border: 1px solid transparent;
+    }
+
+    body.admin-page .community-notes-message-bubble--assistant {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: var(--line-soft);
+      color: var(--text-secondary);
+    }
+
+    body.admin-page .community-notes-thinking-dots {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 12px;
+    }
+
+    body.admin-page .community-notes-thinking-dots span {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: currentColor;
+      opacity: 0.35;
+      animation: communityNotesThinking 1.1s infinite ease-in-out;
+    }
+
+    body.admin-page .community-notes-thinking-dots span:nth-child(2) {
+      animation-delay: 0.16s;
+    }
+
+    body.admin-page .community-notes-thinking-dots span:nth-child(3) {
+      animation-delay: 0.32s;
+    }
+
+    @keyframes communityNotesThinking {
+      0%,
+      80%,
+      100% {
+        opacity: 0.3;
+        transform: translateY(0);
+      }
+
+      40% {
+        opacity: 1;
+        transform: translateY(-2px);
+      }
+    }
+
+    body.admin-page .community-notes-message-bubble--user {
+      background: rgba(97, 216, 181, 0.14);
+      border-color: rgba(97, 216, 181, 0.32);
+      color: var(--text-primary);
+    }
+
+    body.admin-page .community-notes-edit-body {
+      flex: 1;
+    }
+
+    body.admin-page .community-notes-edit-textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 8px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.5;
+      resize: vertical;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+
+    body.admin-page .community-notes-edit-controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    body.admin-page .community-notes-edit-select,
+    body.admin-page .community-notes-edit-date {
+      padding: 6px 10px;
+      background: rgba(10, 18, 31, 0.8);
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+
+    body.admin-page .community-notes-edit-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    body.admin-page .community-notes-edit-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    body.admin-page[data-theme='light'] .community-notes-chat {
+      background: rgba(17, 36, 32, 0.04);
+      border-color: rgba(17, 36, 32, 0.12);
+    }
+
+    body.admin-page[data-theme='light'] .community-notes-modal {
+      background: rgba(17, 36, 32, 0.24);
+    }
+
+    body.admin-page[data-theme='light'] .community-notes-modal-card {
+      background: rgba(251, 248, 242, 0.98);
+      border-color: rgba(17, 36, 32, 0.12);
+    }
+
+    body.admin-page[data-theme='light'] .community-notes-close {
+      background: rgba(17, 36, 32, 0.04);
+      border-color: rgba(17, 36, 32, 0.1);
+      color: var(--text-secondary);
+    }
+
+    body.admin-page[data-theme='light'] .community-notes-messages {
+      background: rgba(255, 255, 255, 0.56);
+      border-color: rgba(17, 36, 32, 0.1);
+    }
+
+    body.admin-page[data-theme='light'] .community-notes-field,
+    body.admin-page[data-theme='light'] .community-notes-edit-select,
+    body.admin-page[data-theme='light'] .community-notes-edit-date {
+      background: rgba(255, 255, 255, 0.9);
+      border-color: rgba(17, 36, 32, 0.16);
+      color: var(--text-primary);
+    }
+
+    body.admin-page[data-theme='light'] .community-notes-preview {
+      background: rgba(30, 139, 113, 0.08);
+      border-color: rgba(30, 139, 113, 0.22);
+    }
+
+    body.admin-page[data-theme='light'] .community-notes-preview-text,
+    body.admin-page[data-theme='light'] .community-notes-edit-textarea {
+      background: rgba(255, 255, 255, 0.92);
+      border-color: rgba(17, 36, 32, 0.16);
+      color: var(--text-primary);
+    }
+
+    body.admin-page[data-theme='light'] .knowledge-item {
+      background: rgba(255, 255, 255, 0.84);
+      border-color: rgba(17, 36, 32, 0.12);
+    }
+
+    body.admin-page[data-theme='light'] .cat-badge {
+      background: rgba(59, 130, 246, 0.16);
+      color: #1e3a8a;
+    }
+
+    body.admin-page[data-theme='light'] .warning {
+      color: #92400e;
+    }
+
+    body.admin-page[data-theme='light'] .btn-danger {
+      background: rgba(220, 38, 38, 0.1);
+      border-color: rgba(220, 38, 38, 0.28);
+      color: #991b1b;
+    }
+
+    body.admin-page[data-theme='light'] .community-notes-message-bubble--assistant {
+      background: rgba(17, 36, 32, 0.08);
+      border-color: rgba(17, 36, 32, 0.12);
+      color: var(--text-secondary);
+    }
+
+    body.admin-page[data-theme='light'] .community-notes-message-bubble--user {
+      background: rgba(30, 139, 113, 0.12);
+      border-color: rgba(30, 139, 113, 0.26);
+      color: #0f2c25;
+    }
+
+    body.admin-page[data-theme='light'] .community-notes-edit-label {
+      color: var(--text-muted);
+    }
+
     @media (max-width: 980px) {
       body.admin-page .topbar {
         align-items: flex-start;
@@ -897,6 +1339,33 @@
       body.admin-page .stats-grid,
       body.admin-page .split {
         grid-template-columns: 1fr;
+      }
+
+      body.admin-page .community-notes-modal {
+        padding: 12px;
+      }
+
+      body.admin-page .community-notes-modal-card {
+        padding: 16px;
+        min-height: 0;
+      }
+
+      body.admin-page .community-notes-messages {
+        min-height: 300px;
+      }
+
+      body.admin-page .community-notes-input-row {
+        flex-wrap: wrap;
+      }
+
+      body.admin-page .community-notes-input-row .btn {
+        width: 100%;
+      }
+
+      body.admin-page .knowledge-item-actions,
+      body.admin-page .community-notes-edit-actions {
+        width: 100%;
+        flex-direction: row;
       }
     }
   </style>
@@ -1031,45 +1500,60 @@
       <section class="panel tab-panel" data-panel="knowledge" hidden>
         <h2>Community Notes</h2>
         <p class="panel-copy">Add local knowledge the chatbot uses when answering questions. Notes with an expiry automatically stop being used after that date.</p>
-        <div id="admin-note-chat" style="margin-bottom:24px;padding:20px;border-radius:16px;background:rgba(20,31,49,0.5);border:1px solid var(--border);">
-          <div id="admin-chat-messages" style="display:flex;flex-direction:column;gap:10px;max-height:240px;overflow-y:auto;margin-bottom:14px;padding:12px;background:rgba(0,0,0,0.15);border-radius:10px;border:1px solid var(--border)"></div>
-          <div id="admin-chat-input-row" style="display:flex;gap:8px;">
-            <input type="text" id="admin-chat-input" placeholder="Describe what to add to the knowledge base…" style="flex:1;padding:10px 12px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;" autocomplete="off">
-            <button class="btn btn-sm" id="admin-chat-send" type="button">Send</button>
-          </div>
-          <div id="admin-note-preview" hidden style="margin-top:12px;padding:14px;border-radius:10px;background:rgba(22,199,132,0.06);border:1px solid rgba(22,199,132,0.25);">
-            <p style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;">Compiled note — edit if needed, then confirm</p>
-            <textarea id="admin-note-preview-text" style="font-size:13px;line-height:1.6;margin-bottom:12px;width:100%;min-height:80px;background:rgba(0,0,0,0.2);border:1px solid rgba(22,199,132,0.2);border-radius:8px;color:var(--text);padding:8px;resize:vertical;font-family:inherit;box-sizing:border-box;" spellcheck="false"></textarea>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
-              <label style="display:flex;flex-direction:column;gap:4px;">
-                <span style="font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;">Category</span>
-                <select id="admin-note-category" style="padding:8px 12px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;">
-                  <option value="general">General</option>
-                  <option value="safety">Safety</option>
-                  <option value="events">Events</option>
-                  <option value="infrastructure">Infrastructure</option>
-                  <option value="community">Community</option>
-                </select>
-              </label>
-              <label style="display:flex;flex-direction:column;gap:4px;">
-                <span style="font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;">Expires (optional)</span>
-                <input type="date" id="admin-note-expires" style="padding:8px 12px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;">
-              </label>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <button class="btn btn-sm" id="admin-note-confirm" type="button">Add to knowledge base</button>
-                <button class="btn-ghost btn-sm" id="admin-note-edit-btn" type="button">Start over</button>
-              </div>
-            </div>
-          </div>
-          <div class="form-success" id="admin-note-chat-success">Note added — the chatbot will use this in future responses.</div>
+        <div class="community-notes-toolbar">
+          <button class="btn community-notes-add-button" id="open-note-modal" type="button">Add New Note</button>
         </div>
-        <h3 style="font-size:11px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:14px;">Active notes</h3>
+        <h3 class="community-notes-heading">Active notes</h3>
         <div class="knowledge-list" id="knowledge-list">
           <div class="empty">Loading…</div>
         </div>
       </section>
 
     </main>
+  </div>
+
+  <div class="community-notes-modal" id="community-notes-modal" hidden>
+    <div class="community-notes-modal-card" role="dialog" aria-modal="true" aria-labelledby="community-notes-modal-title">
+      <div class="community-notes-modal-header">
+        <h3 id="community-notes-modal-title">Add Community Note</h3>
+        <button class="btn-icon community-notes-close" id="close-note-modal" type="button" aria-label="Close add note dialog">✕</button>
+      </div>
+      <p class="community-notes-modal-copy">Describe the local information you want the assistant to remember, then confirm the compiled note with category and expiry.</p>
+      <div id="admin-note-chat" class="community-notes-chat">
+        <div id="admin-chat-messages" class="community-notes-messages is-empty">
+          <p class="community-notes-empty" id="admin-chat-empty">Add a new note to the Knowledge. What would you like to share?</p>
+        </div>
+        <div id="admin-chat-input-row" class="community-notes-input-row">
+          <input type="text" id="admin-chat-input" class="community-notes-field" placeholder="Describe what to add to the knowledge base…" autocomplete="off">
+          <button class="btn btn-sm" id="admin-chat-send" type="button">Send</button>
+        </div>
+        <div id="admin-note-preview" class="community-notes-preview" hidden>
+          <p class="community-notes-label community-notes-preview-label">Compiled note — edit if needed, then confirm</p>
+          <textarea id="admin-note-preview-text" class="community-notes-preview-text" spellcheck="false"></textarea>
+          <div class="community-notes-form-row">
+            <label class="community-notes-field-group">
+              <span class="community-notes-label">Category</span>
+              <select id="admin-note-category" class="community-notes-field">
+                <option value="general">General</option>
+                <option value="safety">Safety</option>
+                <option value="events">Events</option>
+                <option value="infrastructure">Infrastructure</option>
+                <option value="community">Community</option>
+              </select>
+            </label>
+            <label class="community-notes-field-group">
+              <span class="community-notes-label">Expires (optional)</span>
+              <input type="date" id="admin-note-expires" class="community-notes-field">
+            </label>
+            <div class="community-notes-action-row">
+              <button class="btn btn-sm" id="admin-note-confirm" type="button">Add to knowledge base</button>
+              <button class="btn-ghost btn-sm" id="admin-note-edit-btn" type="button">Start over</button>
+            </div>
+          </div>
+        </div>
+        <div class="form-success" id="admin-note-chat-success">Note added — the chatbot will use this in future responses.</div>
+      </div>
+    </div>
   </div>
 
   <script src="config.js?v=20260317b"></script>
@@ -1113,6 +1597,9 @@
       interactionsBody: document.getElementById('interactions-body'),
       noResultsBody: document.getElementById('noresults-body'),
       knowledgeList: document.getElementById('knowledge-list'),
+      openNoteModal: document.getElementById('open-note-modal'),
+      noteModal: document.getElementById('community-notes-modal'),
+      closeNoteModal: document.getElementById('close-note-modal'),
     };
 
     function escapeHtml(value) {
@@ -1373,7 +1860,7 @@
               ${item.source_flag_id ? `<span class="muted">From flag #${escapeHtml(String(item.source_flag_id))}</span>` : ''}
             </div>
           </div>
-          <div style="display:flex;gap:8px;flex-shrink:0;">
+          <div class="knowledge-item-actions">
             <button class="btn-ghost btn-sm" type="button" onclick="editKnowledge(${item.id})">Edit</button>
             <button class="btn-ghost btn-sm btn-danger" type="button" onclick="deactivateKnowledge(${item.id})">Remove</button>
           </div>
@@ -1384,29 +1871,73 @@
 
     // Admin note chatbot
     const adminNoteState = { messages: [], waiting: false, compiled: null };
+    const ADMIN_CHAT_PLACEHOLDER = 'Describe what to add to the knowledge base…';
+
+    function syncAdminChatEmptyState() {
+      const container = document.getElementById('admin-chat-messages');
+      const emptyState = document.getElementById('admin-chat-empty');
+      if (!container || !emptyState) return;
+      const hasMessages = Boolean(container.querySelector('.community-notes-message-row'));
+      emptyState.hidden = hasMessages;
+      container.classList.toggle('is-empty', !hasMessages);
+    }
+
+    function openAdminNoteModal() {
+      resetAdminNoteChat();
+      elements.noteModal.hidden = false;
+      window.setTimeout(() => {
+        document.getElementById('admin-chat-input').focus();
+      }, 0);
+    }
+
+    function closeAdminNoteModal() {
+      elements.noteModal.hidden = true;
+    }
+
+    function handleNoteModalBackdropClick(event) {
+      if (event.target === elements.noteModal) {
+        closeAdminNoteModal();
+      }
+    }
+
+    function handleGlobalKeydown(event) {
+      if (event.key === 'Escape' && !elements.noteModal.hidden) {
+        closeAdminNoteModal();
+      }
+    }
 
     function addAdminChatMsg(role, content) {
       const container = document.getElementById('admin-chat-messages');
       const isUser = role === 'user';
       const div = document.createElement('div');
-      div.style.cssText = `display:flex;justify-content:${isUser ? 'flex-end' : 'flex-start'}`;
-      div.innerHTML = `<div style="max-width:80%;padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.5;background:${isUser ? 'rgba(22,199,132,0.15)' : 'rgba(255,255,255,0.06)'};border:1px solid ${isUser ? 'rgba(22,199,132,0.3)' : 'rgba(255,255,255,0.1)'}">${escapeHtml(content)}</div>`;
+      div.className = `community-notes-message-row community-notes-message-row--${isUser ? 'user' : 'assistant'}`;
+
+      const bubble = document.createElement('div');
+      bubble.className = `community-notes-message-bubble community-notes-message-bubble--${isUser ? 'user' : 'assistant'}`;
+      bubble.textContent = content;
+
+      div.appendChild(bubble);
       container.appendChild(div);
       container.scrollTop = container.scrollHeight;
+      syncAdminChatEmptyState();
     }
 
     function resetAdminNoteChat() {
       adminNoteState.messages = [];
       adminNoteState.waiting = false;
       adminNoteState.compiled = null;
-      document.getElementById('admin-chat-messages').innerHTML = '';
-      document.getElementById('admin-chat-input').value = '';
+      document.getElementById('admin-chat-messages').innerHTML = '<p class="community-notes-empty" id="admin-chat-empty">Add a new note to the Knowledge. What would you like to share?</p>';
+      const input = document.getElementById('admin-chat-input');
+      input.value = '';
+      input.disabled = false;
+      input.placeholder = ADMIN_CHAT_PLACEHOLDER;
       document.getElementById('admin-chat-input-row').hidden = false;
       document.getElementById('admin-note-preview').hidden = true;
       document.getElementById('admin-note-preview-text').value = '';
       document.getElementById('admin-note-expires').value = '';
       document.getElementById('admin-note-chat-success').style.display = 'none';
-      addAdminChatMsg('assistant', 'What would you like to add to the knowledge base?');
+      document.getElementById('admin-chat-send').disabled = false;
+      syncAdminChatEmptyState();
     }
 
     async function sendAdminMessage() {
@@ -1419,17 +1950,25 @@
       input.value = '';
       adminNoteState.waiting = true;
       document.getElementById('admin-chat-send').disabled = true;
+      input.disabled = true;
+      input.placeholder = '...';
 
       const typing = document.createElement('div');
       typing.id = 'admin-typing';
-      typing.style.cssText = 'display:flex;justify-content:flex-start';
-      typing.innerHTML = `<div style="padding:8px 12px;border-radius:10px;font-size:13px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#94a3b8">Typing…</div>`;
-      document.getElementById('admin-chat-messages').appendChild(typing);
+      typing.className = 'community-notes-message-row community-notes-message-row--assistant';
+      typing.innerHTML = '<div class="community-notes-message-bubble community-notes-message-bubble--assistant"><span class="community-notes-thinking-dots" aria-label="Assistant is thinking"><span></span><span></span><span></span></span></div>';
+      const messages = document.getElementById('admin-chat-messages');
+      messages.appendChild(typing);
+      messages.scrollTop = messages.scrollHeight;
+      syncAdminChatEmptyState();
 
       const result = await ApiClient.communityNotesChat(adminNoteState.messages);
       document.getElementById('admin-typing')?.remove();
       adminNoteState.waiting = false;
       document.getElementById('admin-chat-send').disabled = false;
+      input.disabled = false;
+      input.placeholder = ADMIN_CHAT_PLACEHOLDER;
+      syncAdminChatEmptyState();
 
       if (!result.success) {
         addAdminChatMsg('assistant', 'Something went wrong. Please try again.');
@@ -1457,16 +1996,9 @@
       if (expiresRaw) payload.expires_at = expiresRaw;
       const result = await ApiClient.adminAddKnowledge(payload);
       if (!result.success) { alert(result.error); return; }
-      document.getElementById('admin-note-preview').hidden = true;
-      document.getElementById('admin-chat-input-row').hidden = false;
+      resetAdminNoteChat();
       document.getElementById('admin-note-chat-success').style.display = 'block';
       setTimeout(() => { document.getElementById('admin-note-chat-success').style.display = 'none'; }, 3500);
-      adminNoteState.messages = [];
-      adminNoteState.compiled = null;
-      document.getElementById('admin-chat-messages').innerHTML = '';
-      document.getElementById('admin-note-preview-text').value = '';
-      document.getElementById('admin-note-expires').value = '';
-      addAdminChatMsg('assistant', 'Note added! Want to add another?');
       await loadKnowledge();
     }
 
@@ -1486,17 +2018,17 @@
       const cats = ['general','safety','events','infrastructure','community'];
       const catOptions = cats.map(c => `<option value="${c}"${item.category === c ? ' selected' : ''}>${c.charAt(0).toUpperCase()+c.slice(1)}</option>`).join('');
       div.innerHTML = `
-        <div class="knowledge-item-body" style="flex:1">
-          <textarea id="edit-content-${id}" style="width:100%;min-height:80px;background:rgba(0,0,0,0.2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px;resize:vertical;font-family:inherit;font-size:14px;line-height:1.5;box-sizing:border-box;" spellcheck="false">${escapeHtml(item.content)}</textarea>
-          <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;align-items:center;">
-            <select id="edit-category-${id}" style="padding:6px 10px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;">${catOptions}</select>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);font-family:var(--mono);">
+        <div class="knowledge-item-body community-notes-edit-body">
+          <textarea id="edit-content-${id}" class="community-notes-edit-textarea" spellcheck="false">${escapeHtml(item.content)}</textarea>
+          <div class="community-notes-edit-controls">
+            <select id="edit-category-${id}" class="community-notes-edit-select">${catOptions}</select>
+            <label class="community-notes-edit-label">
               Expires
-              <input type="date" id="edit-expires-${id}" value="${expiresValue}" style="padding:6px 10px;background:rgba(10,18,31,0.8);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;">
+              <input type="date" id="edit-expires-${id}" value="${expiresValue}" class="community-notes-edit-date">
             </label>
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0;">
+        <div class="community-notes-edit-actions">
           <button class="btn btn-sm" type="button" onclick="saveKnowledge(${id})">Save</button>
           <button class="btn-ghost btn-sm" type="button" onclick="renderKnowledge()">Cancel</button>
         </div>
@@ -1527,7 +2059,11 @@
           panel.hidden = panel.dataset.panel !== 'overview';
         }
       });
-      if (nextTab === 'knowledge') { loadKnowledge(); resetAdminNoteChat(); }
+      if (nextTab === 'knowledge') {
+        loadKnowledge();
+      } else {
+        closeAdminNoteModal();
+      }
     }
 
     async function logout() {
@@ -1602,6 +2138,9 @@
     elements.refreshButton.addEventListener('click', loadAll);
     elements.logoutButton.addEventListener('click', logout);
     elements.accessLogout.addEventListener('click', logout);
+    elements.openNoteModal.addEventListener('click', openAdminNoteModal);
+    elements.closeNoteModal.addEventListener('click', closeAdminNoteModal);
+    elements.noteModal.addEventListener('click', handleNoteModalBackdropClick);
     document.getElementById('admin-chat-send').addEventListener('click', sendAdminMessage);
     document.getElementById('admin-chat-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendAdminMessage(); } });
     document.getElementById('admin-note-confirm').addEventListener('click', confirmAdminNote);
@@ -1610,6 +2149,7 @@
       document.getElementById('admin-chat-input-row').hidden = false;
       adminNoteState.compiled = null;
     });
+    document.addEventListener('keydown', handleGlobalKeydown);
 
     applyTheme(getStoredTheme());
     bootstrap();
