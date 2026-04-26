@@ -2,6 +2,7 @@ const state = {
   authMode: 'login',
   theme: 'dark',
   eventsPanelCollapsed: false,
+  eventsPanelWidth: 340,
   user: null,
   googleEnabled: false,
   threads: [],
@@ -42,6 +43,7 @@ const elements = {
   themeToggle: document.getElementById('theme-toggle'),
   themeToggles: Array.from(document.querySelectorAll('[data-theme-toggle]')),
   eventsPanelToggle: document.getElementById('events-panel-toggle'),
+  eventsResizer: document.getElementById('events-resizer'),
   chatMessages: document.getElementById('chat-messages'),
   chatError: document.getElementById('chat-error'),
   chatForm: document.getElementById('chat-form'),
@@ -87,7 +89,16 @@ const providerLabels = {
 
 const THEME_STORAGE_KEY = 'otp-theme';
 const EVENTS_PANEL_STORAGE_KEY = 'otp-events-panel-collapsed';
+const EVENTS_PANEL_WIDTH_STORAGE_KEY = 'otp-events-panel-width';
 const CHAT_INPUT_PLACEHOLDER = 'Ask about events, services, safety, or neighborhood trends...';
+const DEFAULT_EVENTS_PANEL_WIDTH = 340;
+const MIN_EVENTS_PANEL_WIDTH = 280;
+const MAX_EVENTS_PANEL_WIDTH = 560;
+const EVENT_CARD_MAX_HEIGHT = 390;
+
+let eventsPanelResizeState = null;
+let eventCardsLayoutFrame = null;
+let eventCardsResizeObserver = null;
 
 function getStoredTheme() {
   try {
@@ -133,6 +144,38 @@ function getStoredEventsPanelCollapsed() {
   }
 }
 
+function clampEventsPanelWidth(width) {
+  const numeric = Number.parseInt(width, 10);
+  if (!Number.isFinite(numeric)) {
+    return DEFAULT_EVENTS_PANEL_WIDTH;
+  }
+  return Math.min(MAX_EVENTS_PANEL_WIDTH, Math.max(MIN_EVENTS_PANEL_WIDTH, numeric));
+}
+
+function getStoredEventsPanelWidth() {
+  try {
+    return clampEventsPanelWidth(window.localStorage.getItem(EVENTS_PANEL_WIDTH_STORAGE_KEY));
+  } catch (error) {
+    return DEFAULT_EVENTS_PANEL_WIDTH;
+  }
+}
+
+function applyEventsPanelWidth(width, options = {}) {
+  const { persist = false } = options;
+  const nextWidth = clampEventsPanelWidth(width);
+  state.eventsPanelWidth = nextWidth;
+  document.body.style.setProperty('--events-panel-width', `${nextWidth}px`);
+  scheduleEventCardLayoutSync();
+
+  if (persist) {
+    try {
+      window.localStorage.setItem(EVENTS_PANEL_WIDTH_STORAGE_KEY, String(nextWidth));
+    } catch (error) {
+      // Ignore storage failures; resizing still works for the current session.
+    }
+  }
+}
+
 function applyEventsPanelCollapsed(collapsed) {
   state.eventsPanelCollapsed = Boolean(collapsed);
   document.body.dataset.eventsCollapsed = state.eventsPanelCollapsed ? 'true' : 'false';
@@ -144,6 +187,11 @@ function applyEventsPanelCollapsed(collapsed) {
   elements.eventsPanelToggle.setAttribute('title', label);
   elements.eventsPanelToggle.setAttribute('aria-pressed', String(state.eventsPanelCollapsed));
   elements.eventsPanelToggle.classList.toggle('is-collapsed', state.eventsPanelCollapsed);
+
+  if (elements.eventsResizer) {
+    elements.eventsResizer.setAttribute('aria-hidden', String(state.eventsPanelCollapsed));
+    elements.eventsResizer.tabIndex = state.eventsPanelCollapsed ? -1 : 0;
+  }
 }
 
 function toggleEventsPanel() {
@@ -154,6 +202,144 @@ function toggleEventsPanel() {
   } catch (error) {
     // Ignore storage failures; collapse still works for the current session.
   }
+}
+
+function beginEventsPanelResize(event) {
+  if (state.eventsPanelCollapsed) return;
+  if (window.matchMedia('(max-width: 1024px)').matches) return;
+  if (event.button !== 0) return;
+
+  event.preventDefault();
+  eventsPanelResizeState = {
+    startX: event.clientX,
+    startWidth: state.eventsPanelWidth,
+  };
+  document.body.dataset.eventsResizing = 'true';
+
+  const handlePointerMove = (moveEvent) => {
+    if (!eventsPanelResizeState) return;
+    const delta = eventsPanelResizeState.startX - moveEvent.clientX;
+    applyEventsPanelWidth(eventsPanelResizeState.startWidth + delta);
+  };
+
+  const handlePointerUp = () => {
+    if (!eventsPanelResizeState) return;
+    eventsPanelResizeState = null;
+    delete document.body.dataset.eventsResizing;
+    applyEventsPanelWidth(state.eventsPanelWidth, { persist: true });
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', handlePointerUp);
+    window.removeEventListener('pointercancel', handlePointerUp);
+  };
+
+  window.addEventListener('pointermove', handlePointerMove);
+  window.addEventListener('pointerup', handlePointerUp);
+  window.addEventListener('pointercancel', handlePointerUp);
+}
+
+function syncEventCardLayout(card, options = {}) {
+  const { forceCollapsed = true } = options;
+  const textElement = card.querySelector('.event-description-text');
+  const toggle = card.querySelector('.event-description-toggle');
+  if (!textElement || !toggle) return;
+
+  const previousExpanded = card.classList.contains('is-expanded');
+
+  card.classList.remove('is-expanded');
+  card.classList.add('event-card--collapsible');
+  textElement.classList.remove('is-clamped');
+  textElement.style.removeProperty('--event-description-clamp-lines');
+  toggle.hidden = false;
+  toggle.style.visibility = 'hidden';
+
+  if (card.scrollHeight <= EVENT_CARD_MAX_HEIGHT + 1) {
+    card.classList.remove('event-card--collapsible');
+    toggle.hidden = true;
+    toggle.style.visibility = '';
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.textContent = '...see more';
+    return;
+  }
+
+  const textStyle = window.getComputedStyle(textElement);
+  const lineHeight = Number.parseFloat(textStyle.lineHeight) || 22;
+  const fullTextHeight = textElement.getBoundingClientRect().height;
+  const maxLines = Math.max(1, Math.ceil(fullTextHeight / lineHeight));
+
+  let low = 1;
+  let high = maxLines;
+  let bestLines = 1;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    textElement.classList.add('is-clamped');
+    textElement.style.setProperty('--event-description-clamp-lines', String(mid));
+    const fitsWithinCard = card.scrollHeight <= EVENT_CARD_MAX_HEIGHT + 1;
+
+    if (fitsWithinCard) {
+      bestLines = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  const shouldCollapse = bestLines < maxLines;
+
+  if (!shouldCollapse) {
+    card.classList.remove('event-card--collapsible');
+    textElement.classList.remove('is-clamped');
+    textElement.style.removeProperty('--event-description-clamp-lines');
+    toggle.hidden = true;
+    toggle.style.visibility = '';
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.textContent = '...see more';
+    return;
+  }
+
+  textElement.classList.add('is-clamped');
+  textElement.style.setProperty('--event-description-clamp-lines', String(bestLines));
+  toggle.hidden = false;
+  toggle.style.visibility = '';
+
+  if (previousExpanded && !forceCollapsed) {
+    card.classList.add('is-expanded');
+    textElement.classList.remove('is-clamped');
+    textElement.style.removeProperty('--event-description-clamp-lines');
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.textContent = 'see less';
+    return;
+  }
+
+  textElement.classList.add('is-clamped');
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.textContent = '...see more';
+}
+
+function scheduleEventCardLayoutSync() {
+  if (!elements.eventsList) return;
+  if (eventCardsLayoutFrame !== null) return;
+
+  eventCardsLayoutFrame = window.requestAnimationFrame(() => {
+    eventCardsLayoutFrame = null;
+    elements.eventsList.querySelectorAll('.event-card').forEach((card) => {
+      syncEventCardLayout(card);
+    });
+  });
+}
+
+function setupEventCardLayoutObserver() {
+  if (!elements.eventsPanel || eventCardsResizeObserver) return;
+
+  if (typeof ResizeObserver === 'undefined') {
+    window.addEventListener('resize', scheduleEventCardLayoutSync);
+    return;
+  }
+
+  eventCardsResizeObserver = new ResizeObserver(() => {
+    scheduleEventCardLayoutSync();
+  });
+  eventCardsResizeObserver.observe(elements.eventsPanel);
 }
 
 function getAssistantAvatarMarkup() {
@@ -522,25 +708,50 @@ function formatEventDate(isoDate, fallbackText) {
 function renderEvents(events) {
   elements.eventsList.innerHTML = '';
   elements.eventsEmpty.hidden = events.length > 0;
-  events.forEach((event) => {
+  events.forEach((event, index) => {
     const card = document.createElement('div');
     card.className = 'event-card';
     const date = formatEventDate(event.start_date, event.event_date);
     const start = formatTime(event.start_time);
     const end = formatTime(event.end_time);
     const timeLabel = start && end ? `${start} - ${end}` : (start || '');
+    const description = String(event.description || 'No description available.');
+    const descriptionId = `event-description-${index}`;
+
     card.innerHTML = `
       <div class="event-date">${escapeHtml(date)}</div>
       <div class="event-title">${escapeHtml(event.event_name || 'Community Event')}</div>
       ${timeLabel ? `<div class="event-time">${escapeHtml(timeLabel)}</div>` : ''}
-      <div class="event-description">${escapeHtml(event.description || 'No description available.')}</div>
+      <div class="event-description">
+        <div class="event-description-text is-clamped" id="${descriptionId}">${escapeHtml(description)}</div>
+        <button class="event-description-toggle" type="button" data-description-id="${descriptionId}" aria-expanded="false" hidden>...see more</button>
+      </div>
     `;
-    card.addEventListener('click', () => {
-      elements.chatInput.value = `Tell me more about "${event.event_name}" event happening on ${date}.`;
+
+    card.addEventListener('click', (clickEvent) => {
+      const toggle = clickEvent.target.closest('.event-description-toggle');
+      if (toggle) {
+        clickEvent.preventDefault();
+        clickEvent.stopPropagation();
+        const targetId = toggle.dataset.descriptionId;
+        const textElement = targetId ? document.getElementById(targetId) : null;
+        if (!textElement) return;
+
+        const expanded = card.classList.toggle('is-expanded');
+        textElement.classList.toggle('is-clamped', !expanded);
+        toggle.setAttribute('aria-expanded', String(expanded));
+        toggle.textContent = expanded ? 'see less' : '...see more';
+        return;
+      }
+
+      const eventName = event.event_name || 'this event';
+      elements.chatInput.value = `Tell me more about "${eventName}" event happening on ${date}.`;
       elements.chatInput.focus();
     });
     elements.eventsList.appendChild(card);
+    syncEventCardLayout(card);
   });
+  scheduleEventCardLayoutSync();
 }
 
 function updateThreadHeader() {
@@ -1152,6 +1363,9 @@ function initEventListeners() {
     toggle.addEventListener('click', toggleTheme);
   });
   elements.eventsPanelToggle.addEventListener('click', toggleEventsPanel);
+  if (elements.eventsResizer) {
+    elements.eventsResizer.addEventListener('pointerdown', beginEventsPanelResize);
+  }
   elements.chatForm.addEventListener('submit', sendChatMessage);
   elements.threadList.addEventListener('click', handleThreadListClick);
   elements.eventsRefresh.addEventListener('click', loadEvents);
@@ -1183,7 +1397,9 @@ function initEventListeners() {
 
 async function initApp() {
   applyTheme(getStoredTheme());
+  applyEventsPanelWidth(getStoredEventsPanelWidth());
   applyEventsPanelCollapsed(getStoredEventsPanelCollapsed());
+  setupEventCardLayoutObserver();
   initEventListeners();
   setAuthMode('login');
   await refreshSession();
