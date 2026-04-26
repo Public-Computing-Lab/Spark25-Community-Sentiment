@@ -594,15 +594,22 @@ textarea:focus-visible {
 .google-mark {
   width: 24px;
   height: 24px;
-  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #4285f4 0 25%, #34a853 25% 50%, #fbbc05 50% 75%, #ea4335 75% 100%);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 700;
+  flex: 0 0 auto;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.google-mark img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  background: transparent;
 }
 
 .auth-note {
@@ -628,6 +635,10 @@ textarea:focus-visible {
   border-radius: 14px;
   padding: 14px 16px;
   font-size: 14px;
+}
+
+.auth-error {
+  margin-top: 16px;
 }
 
 .btn,
@@ -682,6 +693,18 @@ textarea:focus-visible {
   background: transparent;
   color: var(--text-primary);
   border-color: var(--line-strong);
+}
+
+.auth-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: min(420px, 100%);
+  min-height: 58px;
+  margin: 0 auto;
+  padding: 0 28px;
+  border-radius: 999px;
 }
 
 .btn-secondary--light {
@@ -1866,6 +1889,19 @@ body[data-theme='light'] .message.user .message-content {
   border-color: rgba(23, 73, 62, 0.18);
 }
 
+body[data-theme='light'] .flag-button {
+  background: rgba(166, 40, 40, 0.08);
+  border-color: rgba(166, 40, 40, 0.26);
+  color: #a62828;
+}
+
+body[data-theme='light'] .flag-button:hover,
+body[data-theme='light'] .flag-button:focus-visible {
+  background: rgba(166, 40, 40, 0.12);
+  border-color: rgba(166, 40, 40, 0.34);
+  color: #8f1f1f;
+}
+
 body[data-theme='light'] .message-text {
   color: #132b24;
 }
@@ -1937,12 +1973,53 @@ body[data-theme='light'] .empty-state-card:hover {
 }
 
 body[data-theme='light'] .thread-empty,
-body[data-theme='light'] .toast,
-body[data-theme='light'] #flag-detail,
-body[data-theme='light'] .flag-option,
-body[data-theme='light'] .modal-panel {
+body[data-theme='light'] .toast {
   background: rgba(255, 255, 255, 0.92);
   border-color: rgba(17, 36, 32, 0.1);
+}
+
+body[data-theme='light'] .modal-backdrop {
+  background: rgba(245, 239, 230, 0.56);
+}
+
+body[data-theme='light'] .modal-card {
+  background: linear-gradient(180deg, rgba(251, 249, 244, 0.98), rgba(246, 241, 233, 0.98));
+  border-color: rgba(17, 36, 32, 0.12);
+  box-shadow: 0 28px 56px rgba(73, 56, 38, 0.12);
+}
+
+body[data-theme='light'] .modal-card h3 {
+  color: #112420;
+}
+
+body[data-theme='light'] .modal-copy {
+  color: rgba(17, 36, 32, 0.72);
+}
+
+body[data-theme='light'] .flag-options label {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(17, 36, 32, 0.12);
+  color: #132b24;
+}
+
+body[data-theme='light'] .flag-options input[type='radio'] {
+  accent-color: #17493e;
+}
+
+body[data-theme='light'] #flag-detail {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(17, 36, 32, 0.12);
+  color: #132b24;
+}
+
+body[data-theme='light'] #flag-detail::placeholder {
+  color: rgba(17, 36, 32, 0.42);
+}
+
+body[data-theme='light'] .modal-error {
+  background: rgba(166, 40, 40, 0.08);
+  border-color: rgba(166, 40, 40, 0.24);
+  color: #a62828;
 }
 
 body[data-theme='light'] .spinner {
