@@ -14,7 +14,7 @@ This platform enables:
 
 ```
 ml-misi-community-sentiment/
-├── api/                          # Flask REST API (v2.0)
+├── api/                          # Flask REST API (session auth + legacy API keys)
 │   ├── api_v2.py                 # Main API endpoint (agent-powered)
 │   ├── api.py                    # Legacy API (deprecated)
 │   ├── datastore/                # Static data files
@@ -55,7 +55,7 @@ Once you’ve followed the steps in `demo/README.md`, you can **skip the Install
 ### Prerequisites
 
 - Python 3.11+
-- MySQL 8.0+ (for structured data)
+- MySQL 8.0+ (for structured data) or Docker (for the demo DB)
 - Google Gemini API key
 
 ### Installation
@@ -80,23 +80,25 @@ Once you’ve followed the steps in `demo/README.md`, you can **skip the Install
    ```
 
 4. **Set up environment variables**
-   - Copy `.env.example` files to `.env` in each directory
-   - See [Configuration](#configuration) section below
+   - This project uses a **single `.env` file at the repo root**
+   - Copy `example_env.txt` to `.env` (then edit values):
+   ```bash
+   cp example_env.txt .env
+   ```
 
 5. **Set up database**
-   - Create MySQL database: `rethink_ai_boston`
-   - Run database setup scripts (see `on_the_porch/data_ingestion/`)
+   - Create a MySQL database (default: `rethink_ai_boston`)
+   - Or use the demo DB described in `demo/README.md`
+   - For ingestion + live data sync, see `on_the_porch/data_ingestion/README.md`
 
 6. **Run the API**
    ```bash
-   cd api
-   python api_v2.py
+   python api/api_v2.py
    ```
    The API will start on `http://127.0.0.1:8888`
 
 7. **Run the Frontend** (in a separate terminal)
    ```bash
-   # From project root
    cd public
    python -m http.server 8000
    ```
@@ -118,7 +120,7 @@ The project uses a **single `.env` file at the repo root**.
 
 **Key Variables (non-exhaustive):**
 - `GEMINI_API_KEY` – Google Gemini API key (required)
-- `RETHINKAI_API_KEYS` – API authentication keys (comma-separated)
+- `RETHINKAI_API_KEYS` – legacy API keys (used only by `POST /chat` and `GET /events`)
 - `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DB` – MySQL connection
 - `VECTORDB_DIR` – path to the ChromaDB/vector DB directory
 - `GOOGLE_DRIVE_FOLDER_ID` and related `GOOGLE_*/GMAIL_*` settings – data ingestion
@@ -144,7 +146,20 @@ See `on_the_porch/data_ingestion/README.md` for details.
 
 ## 🔌 API Endpoints
 
-### Agent API v2.0 (`api/api_v2.py`)
+### Primary (session-based) endpoints (`api/api_v2.py`)
+
+- `GET /auth/me`
+- `POST /auth/signup`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /conversations`
+- `POST /conversations`
+- `GET /conversations/:id/messages`
+- `POST /conversations/:id/messages`
+
+The `public/` frontend uses these session-based endpoints (cookies + CSRF).
+
+### Legacy compatibility (API-key) endpoints (`api/api_v2.py`)
 
 - **POST /chat** - Main chat interaction with intelligent routing
 - **POST /log** - Log interactions
@@ -202,20 +217,16 @@ This project implements a **hybrid AI system** that combines:
 
 ### Development Workflow
 
-1. **Local Development**
+1. **Local Development (session-based UI)**
    ```bash
-   # Start API server
-   cd api
-   python api_v2.py
-   
-   # Test with curl or Postman
-   curl -X POST http://localhost:8888/chat \
-     -H "RethinkAI-API-Key: your-key" \
-     -H "Content-Type: application/json" \
-     -d '{"message": "What events are happening this weekend?"}'
+   python api/api_v2.py
+   cd public && python -m http.server 8000
    ```
 
-2. **Data Updates**
+2. **Legacy API-key testing**
+   - See `test_frontend/` (API-key based) or call `POST /chat` with header `RethinkAI-API-Key`
+
+3. **Data Updates**
    ```bash
    # Run data ingestion
    cd on_the_porch/data_ingestion
