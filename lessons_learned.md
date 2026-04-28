@@ -6,7 +6,7 @@ This document captures the reality of the project after implementation and testi
 
 ### Response speed remained inconsistent
 
-One of the biggest issues was latency. The chatbot could answer many questions correctly, but it still took too long to reply in some cases. This was especially noticeable when the system had to decide between SQL, RAG, and hybrid retrieval before generating the final answer. The experience felt less conversational than intended, even when the answer quality was acceptable.
+One of the biggest issues was latency. The chatbot could answer many questions correctly, but it still took too long to reply in some cases. This was especially noticeable when the system had to decide between SQL, RAG, and hybrid retrieval before generating the final answer. The experience felt less conversational than intended, even when the answer quality was great.
 
 ### General-question answers were often too long
 
