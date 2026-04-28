@@ -129,6 +129,55 @@ flowchart TD
     M --> N[Return response to frontend]
 ```
 
+### Runtime Workflow (Detailed)
+
+This rendering shows the full runtime pipeline from input to output, including the
+conversation-cache shortcut and the different execution paths (`sql`, `rag`, `hybrid`).
+
+![Runtime workflow diagram](docs/diagrams/runtime_workflow.svg)
+
+```mermaid
+flowchart TD
+  A[User types message in UI] --> B[Frontend POST message to API]
+  B --> C[Flask API: api/api_v2.py<br/>/conversations/:id/messages or /chat]
+  C --> D[Load context from MySQL<br/>- thread/messages<br/>- thread_state_json cache]
+
+  D --> E{Needs new data?<br/>_check_if_needs_new_data}
+  E -- No --> F[Answer from history/cache<br/>_answer_from_history]
+  F --> H[Persist + return response<br/>save thread_state_json + messages]
+
+  E -- Yes --> I[Route question<br/>_route_question]
+  I --> J{Route mode}
+
+  %% SQL path
+  J -- sql --> K[SQL agent: _run_sql]
+  K --> K1[Fetch schema snapshot<br/>information_schema.columns]
+  K1 --> K2[LLM generates MySQL SELECT<br/>sql_chat/app4.py]
+  K2 --> K3[Enforce Dorchester-only filter<br/>_ensure_dorchester_filter]
+  K3 --> K4[Execute SQL with retries<br/>MySQL]
+  K4 --> K5[LLM summarizes rows to answer<br/>_llm_generate_answer]
+  K5 --> K6[Update retrieval cache<br/>sql rows + sql query]
+  K6 --> H
+
+  %% RAG path
+  J -- rag --> L[RAG: _run_rag]
+  L --> L1[Chroma retrieval<br/>similarity_search + filters]
+  L1 --> L2[Optional sources queried<br/>RSS + policies + transcripts + cached Boston.gov]
+  L2 --> L3[LLM composes answer from chunks<br/>_compose_rag_answer]
+  L3 --> L4[Optional fallback on low-confidence phrasing<br/>Boston.gov augmentation]
+  L4 --> L5[Update retrieval cache<br/>chunks + metadata]
+  L5 --> H
+
+  %% Hybrid path
+  J -- hybrid --> M[Hybrid: _run_hybrid]
+  M --> M1[Run SQL path]
+  M --> M2[Run RAG path]
+  M2 --> M3[LLM merges SQL + RAG into one answer]
+  M3 --> M4[Optional fallback]
+  M4 --> M5[Update retrieval cache<br/>sql + rag payloads]
+  M5 --> H
+```
+
 ## Data Architecture
 
 The system uses two main storage layers because the data has two very different shapes.
@@ -173,6 +222,44 @@ Its outputs are:
 - **Chroma** for searchable document content
 
 This hybrid ingestion design matches the runtime architecture: structured data goes to SQL, and narrative text goes to vector search.
+
+### Ingestion Pipeline Workflow (Detailed)
+
+This rendering shows the major offline ingestion steps that populate:
+- **MySQL** (structured tables like `weekly_events`, 311/911 tables, etc.)
+- **Chroma** (embedded documents and other unstructured sources)
+
+![Ingestion workflow diagram](docs/diagrams/ingestion_workflow.svg)
+
+```mermaid
+flowchart TD
+  A[Scheduled job or manual run] --> B[main_daily_ingestion.py]
+  B --> P0[Phase 0: Dotnews PDF]
+  P0 --> P0a[Download latest newsletter PDF]
+  P0a --> P0b[Extract events from pages]
+  P0b --> MYSQL1[(MySQL: weekly_events)]
+  B --> P1[Phase 1: Google Drive sync]
+  P1 --> P1a[List files and diff sync state]
+  P1a --> P1b[Download new or updated docs]
+  P1b --> P1c[Chunk and embed docs]
+  P1c --> CH1[(Chroma vector DB)]
+  B --> P2[Phase 2: Gmail newsletters]
+  P2 --> P2a[Fetch emails and parse newsletters]
+  P2a --> P2b[Extract events]
+  P2b --> MYSQL1
+  B --> P3[Phase 3: Boston Open Data sync]
+  P3 --> P3a[Fetch datasets per config]
+  P3a --> MYSQL2[(MySQL: 311 and 911 tables)]
+  B --> P35[Phase 3.5: 311 and Crime to RAG]
+  P35 --> P35a[Generate summary docs for last N days]
+  P35a --> CH1
+  B --> P4[Phase 4: Build or update vector DB]
+  P4 --> P4a[build_vectordb.py]
+  P4a --> CH1
+  CH1 --> Z[Runtime retrieval uses Chroma]
+  MYSQL1 --> Z2[Runtime events and SQL agent use MySQL]
+  MYSQL2 --> Z2
+```
 
 ## Deployment and Infrastructure
 
