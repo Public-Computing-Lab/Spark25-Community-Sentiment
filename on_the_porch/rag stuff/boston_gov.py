@@ -153,22 +153,23 @@ def get_boston_gov_ai_answer(question: str) -> Dict[str, List[Dict[str, str]] | 
     text_parts.extend(bullet_points)
     return {
         "query": final_query,
+        "search_url": search_url,
         "paragraphs": paragraphs,
         "bullet_points": bullet_points,
         "links": links,
         "text": "\n".join(text_parts).strip(),
     }
 
-
 def add_boston_gov_answer_to_vectordb(
     question: str,
     answer: str,
+    link: str = "",
     vectordb_dir: Path | None = None,
 ) -> str:
     """
     Add a Boston.gov-derived answer into the shared Chroma vector DB.
 
-    The document is stored under source="BostonGov" so it can be retrieved later
+    The document is stored under source="Boston.gov" so it can be retrieved later
     by the main RAG pipeline.
     """
     question = _clean_text(question)
@@ -186,15 +187,16 @@ def add_boston_gov_answer_to_vectordb(
     page_content = "\n".join(page_content_parts)
 
     metadata = {
-        "source": "BostonGov",
+        "source": "Boston.gov",
         "doc_type": "boston_gov_answer",
         "tags": "boston.gov",
+        "link": link or "",
     }
 
     document = Document(page_content=page_content, metadata=metadata)
     doc_id = _stable_boston_gov_doc_id(question, answer)
 
-    print(f"  💾 Boston.gov vectordb: saving answer under source=BostonGov id={doc_id}")
+    print(f"  💾 Boston.gov vectordb: saving answer under source=Boston.gov id={doc_id}")
     embeddings = GeminiEmbeddings()
     vectordb = Chroma(
         persist_directory=str(vdb_path),

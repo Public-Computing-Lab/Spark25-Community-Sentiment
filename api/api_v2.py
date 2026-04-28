@@ -183,6 +183,7 @@ DOC_TYPE_DIRS = {
     "policy": urljoin(Config.APP_BASE_URL.rstrip("/") + "/", "Policies/"),
     "transcript": "Data/AI meeting transcripts",
     "calendar_event": "Data/newsletters",
+    "boston_gov_answer": "https://www.boston.gov",
 }
 
 
@@ -1127,7 +1128,11 @@ def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
     elif mode == "rag":
         metadata = result.get("metadata", [])
         seen = set()
-        for meta in metadata[:5]:
+        boston_entries = [m for m in metadata if m.get("doc_type") == "boston_gov_answer"]
+        other_entries = [m for m in metadata if m.get("doc_type") != "boston_gov_answer"]
+        prioritized = boston_entries + other_entries
+        
+        for meta in prioritized[:5]:
             source = meta.get("source", "Unknown")
             doc_type = meta.get("doc_type", "unknown")
             # Dedup by source alone — the same publication ingested via

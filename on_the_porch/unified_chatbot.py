@@ -184,6 +184,21 @@ def _build_boston_gov_fallback_answer(question: str, original_answer: str) -> st
     print("  🏛️ Boston.gov fallback: trigger detected from model answer")
     ai_result = boston_gov.get_boston_gov_ai_answer(question)
     ai_text = str(ai_result.get("text", "") or "").strip()
+    search_url = ai_result.get("search_url", "")
+
+    # Prefer the first real link from the AI summary; fall back to search URL
+    scraped_links = ai_result.get("links", []) or []
+    primary_link = ""
+    for link_obj in scraped_links:
+        href = (link_obj.get("href") or "").strip()
+        if href and href.startswith(("http://", "https://", "/")):
+            if href.startswith("/"):
+                href = f"https://www.boston.gov{href}"
+            primary_link = href
+            break
+    if not primary_link:
+        primary_link = search_url
+
     if not ai_text:
         print("  ⚠️ Boston.gov fallback: no AI answer text found")
         return original_answer
@@ -196,16 +211,20 @@ def _build_boston_gov_fallback_answer(question: str, original_answer: str) -> st
     for line in cleaned_ai_text.splitlines():
         if line.strip():
             print(f"     {line}")
+    print(f"  🔗 Boston.gov fallback: using link {primary_link}")
 
     excerpt = cleaned_ai_text[:2000].strip()
     is_exact_match = _classify_boston_gov_exact_match(question, ai_text)
     if is_exact_match:
         try:
-            boston_gov.add_boston_gov_answer_to_vectordb(question, cleaned_ai_text)
+            boston_gov.add_boston_gov_answer_to_vectordb(
+                question,
+                cleaned_ai_text,
+                link=primary_link,
+            )
         except Exception as exc:
             print(f"  ⚠️ Boston.gov fallback vectordb save failed: {exc}")
         return excerpt
-
     print("  ⚠️ Boston.gov fallback: classifier said scraped AI answer is not an exact match")
     return _regenerate_with_boston_gov_context(question, original_answer, cleaned_ai_text)
 
