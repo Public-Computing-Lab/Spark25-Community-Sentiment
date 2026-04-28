@@ -134,8 +134,6 @@ flowchart TD
 This rendering shows the full runtime pipeline from input to output, including the
 conversation-cache shortcut and the different execution paths (`sql`, `rag`, `hybrid`).
 
-![Runtime workflow diagram](docs/diagrams/runtime_workflow.svg)
-
 ```mermaid
 flowchart TD
   A[User types message in UI] --> B[Frontend POST message to API]
@@ -228,8 +226,6 @@ This hybrid ingestion design matches the runtime architecture: structured data g
 This rendering shows the major offline ingestion steps that populate:
 - **MySQL** (structured tables like `weekly_events`, 311/911 tables, etc.)
 - **Chroma** (embedded documents and other unstructured sources)
-
-![Ingestion workflow diagram](docs/diagrams/ingestion_workflow.svg)
 
 ```mermaid
 flowchart TD
