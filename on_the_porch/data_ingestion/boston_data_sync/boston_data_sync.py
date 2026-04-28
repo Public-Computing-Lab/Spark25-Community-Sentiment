@@ -125,7 +125,7 @@ class BostonDataSyncer:
             ],
             "sync_settings": {
                 "batch_size": 20000,
-                "max_records_per_sync": 100000,
+                "max_records_per_sync": 10000000,
                 "rate_limit_delay": 1.0,
                 "incremental_sync": True,
                 "days_to_sync": 30
