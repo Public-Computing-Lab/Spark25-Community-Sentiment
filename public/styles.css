@@ -1442,6 +1442,25 @@ body[data-events-collapsed='true'] .events-resizer {
   line-height: 1;
 }
 
+#flag-modal .btn-primary,
+#flag-modal .btn-primary.small,
+#flag-submit {
+  background: var(--accent-forest);
+  border-color: var(--accent-forest-strong);
+  color: #f7f3ec;
+  box-shadow: 0 14px 34px rgba(23, 73, 62, 0.18);
+}
+
+#flag-modal .btn-primary:hover,
+#flag-modal .btn-primary.small:hover,
+#flag-submit:hover,
+#flag-modal .btn-primary:focus-visible,
+#flag-modal .btn-primary.small:focus-visible,
+#flag-submit:focus-visible {
+  background: var(--accent-forest-strong);
+  border-color: var(--accent-forest-strong);
+}
+
 .typing-indicator {
   display: inline-flex;
   gap: 8px;

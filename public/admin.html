@@ -32,7 +32,7 @@
       padding: 0;
     }
 
-    body {
+    body:not(.admin-page) {
       min-height: 100vh;
       font-family: var(--sans);
       color: var(--text);
@@ -42,7 +42,7 @@
         linear-gradient(180deg, #07111d 0%, #0c1726 100%);
     }
 
-    body::before {
+    body:not(.admin-page)::before {
       content: '';
       position: fixed;
       inset: 0;
@@ -70,7 +70,7 @@
       display: none !important;
     }
 
-    .shell {
+    body:not(.admin-page) .shell {
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -78,7 +78,7 @@
       padding: 32px;
     }
 
-    .card {
+    body:not(.admin-page) .card {
       width: min(520px, 100%);
       background: linear-gradient(180deg, rgba(13, 22, 37, 0.97), rgba(11, 19, 31, 0.94));
       border: 1px solid var(--border);
@@ -87,7 +87,7 @@
       padding: 32px;
     }
 
-    .badge {
+    body:not(.admin-page) .badge {
       display: inline-flex;
       align-items: center;
       gap: 8px;
@@ -103,48 +103,48 @@
       text-transform: uppercase;
     }
 
-    h1 {
+    body:not(.admin-page) h1 {
       font-size: 30px;
       margin-bottom: 12px;
     }
 
-    p {
+    body:not(.admin-page) p {
       color: var(--muted);
       line-height: 1.6;
     }
 
-    .actions {
+    body:not(.admin-page) .actions {
       display: flex;
       gap: 12px;
       margin-top: 24px;
       flex-wrap: wrap;
     }
 
-    .btn,
-    .btn-ghost,
-    .tab {
+    body:not(.admin-page) .btn,
+    body:not(.admin-page) .btn-ghost,
+    body:not(.admin-page) .tab {
       border-radius: 999px;
       border: 1px solid transparent;
       transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
     }
 
-    .btn {
+    body:not(.admin-page) .btn {
       padding: 11px 16px;
       background: linear-gradient(135deg, #16c784, #34d399);
       color: #03241a;
       font-weight: 700;
     }
 
-    .btn-ghost {
+    body:not(.admin-page) .btn-ghost {
       padding: 11px 16px;
       background: transparent;
       border-color: var(--border);
       color: var(--text);
     }
 
-    .btn:hover,
-    .btn-ghost:hover,
-    .tab:hover {
+    body:not(.admin-page) .btn:hover,
+    body:not(.admin-page) .btn-ghost:hover,
+    body:not(.admin-page) .tab:hover {
       transform: translateY(-1px);
     }
 
@@ -390,9 +390,14 @@
     }
 
     .btn-success { 
-      background: rgba(22,199,132,0.1);
-      border-color: rgba(22,199,132,0.35);
-      color: var(--accent);
+      background: var(--accent-forest);
+      border-color: var(--accent-forest-strong);
+      color: var(--accent-mint);
+    }
+
+    .btn-success:hover {
+      background: var(--accent-forest-strong);
+      border-color: var(--accent-forest-strong);
     }
 
     .flag-expand-row { 
@@ -409,6 +414,11 @@
       grid-template-columns: 1fr 1fr;
       gap: 16px;
       background: rgba(7,17,29,0.6);
+    }
+
+    body.admin-page[data-theme='light'] .flag-expand-inner {
+      background: rgba(255, 255, 255, 0.92);
+      border-top: 1px solid rgba(17, 36, 32, 0.08);
     }
 
     .expand-block label { 
@@ -439,9 +449,15 @@
       resize: vertical;
     }
 
+    body.admin-page[data-theme='light'] .comment-box {
+      background: rgba(255, 255, 255, 0.96);
+      border-color: rgba(17, 36, 32, 0.16);
+      color: var(--text-primary);
+    }
+
     .comment-box:focus { 
       outline: none;
-      border-color: var(--accent);
+      border-color: var(--accent-forest);
     }
 
     .flag-action-row { 
@@ -456,9 +472,9 @@
       display: inline-block;
       padding: 4px 10px;
       border-radius: 999px;
-      background: rgba(22,199,132,0.12);
-      border: 1px solid rgba(22,199,132,0.3);
-      color: var(--accent);
+      background: var(--accent-forest);
+      border: 1px solid var(--accent-forest-strong);
+      color: var(--accent-mint);
       font-size: 11px;
       font-family: var(--mono);
     }
