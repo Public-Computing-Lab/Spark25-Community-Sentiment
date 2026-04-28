@@ -314,42 +314,6 @@ def retrieve_policies(query, k=5, source=None):
     return retrieve(query, k=k, doc_type='policy', source=source)
 
 
-def retrieve_rss(query, k=5, source=None):
-    """
-    Search RSS-ingested content stored in the vector DB.
-
-    RSS entries reuse doc_type='calendar_event' but can be identified by
-    their feed_url metadata, which keeps them distinct from newsletter PDFs.
-    """
-    results = retrieve(query, k=k * 2, doc_type="calendar_event", source=source)
-
-    rss_chunks = []
-    rss_meta = []
-    for chunk, meta in zip(results["chunks"], results["metadata"]):
-        if not meta.get("feed_url"):
-            continue
-        rss_chunks.append(chunk)
-        rss_meta.append(meta)
-        if len(rss_chunks) >= k:
-            break
-
-    if not rss_chunks:
-        fallback = retrieve(query, k=k * 2, doc_type="calendar_event")
-        for chunk, meta in zip(fallback["chunks"], fallback["metadata"]):
-            if not meta.get("feed_url"):
-                continue
-            rss_chunks.append(chunk)
-            rss_meta.append(meta)
-            if len(rss_chunks) >= k:
-                break
-
-    return {
-        "chunks": rss_chunks,
-        "metadata": rss_meta,
-        "scores": None,
-        "query": query,
-    }
-
 
 def format_results(result_dict):
     """Format retrieval results for display."""
@@ -375,49 +339,6 @@ def format_results(result_dict):
     
     return '\n'.join(formatted)
 
-def retrieve_rss(query, k=5, source=None):
-    """
-    Search RSS-ingested content in ChromaDB (doc_type='calendar_event' with feed_url set).
-    
-    Args:
-        query: Search query
-        k: Number of results
-        source: Optional specific feed source name (e.g., 'Dorchester Reporter')
-    
-    Example:
-        retrieve_rss("upcoming events Codman Square")
-    """
-    # RSS docs have doc_type='calendar_event' AND a 'feed_url' metadata field.
-    # We filter by calendar_event and post-filter to only RSS-sourced docs
-    # (newsletter PDFs also use calendar_event but don't have feed_url).
-    results = retrieve(query, k=k * 2, doc_type="calendar_event", source=source)
-
-    # Post-filter: keep only RSS docs (they have feed_url in metadata)
-    rss_chunks = []
-    rss_meta = []
-    for chunk, meta in zip(results["chunks"], results["metadata"]):
-        if meta.get("feed_url"):
-            rss_chunks.append(chunk)
-            rss_meta.append(meta)
-            if len(rss_chunks) >= k:
-                break
-
-    # If source filter returned nothing, fall back to unfiltered RSS docs
-    if not rss_chunks:
-        fallback = retrieve(query, k=k * 2, doc_type="calendar_event")
-        for chunk, meta in zip(fallback["chunks"], fallback["metadata"]):
-            if meta.get("feed_url"):
-                rss_chunks.append(chunk)
-                rss_meta.append(meta)
-                if len(rss_chunks) >= k:
-                    break
-
-    return {
-        "chunks": rss_chunks,
-        "metadata": rss_meta,
-        "scores": None,
-        "query": query,
-    }
 
 def retrieve_rss(query, k=5, source=None):
     """

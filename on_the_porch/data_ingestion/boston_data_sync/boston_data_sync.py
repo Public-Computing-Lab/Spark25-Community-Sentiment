@@ -120,12 +120,12 @@ class BostonDataSyncer:
                     "primary_key": "CASE_ID",
                     "date_field": "OPEN_DATE",
                     "description": "311 service requests (2024)",
-                    "enabled": False
+                    "enabled": True
                 }
             ],
             "sync_settings": {
                 "batch_size": 20000,
-                "max_records_per_sync": 100000,
+                "max_records_per_sync": 10000000,
                 "rate_limit_delay": 1.0,
                 "incremental_sync": True,
                 "days_to_sync": 30
@@ -278,6 +278,11 @@ class BostonDataSyncer:
         
         df = pd.DataFrame(all_records)
         
+        df.columns = [
+            col.replace(' ', '_').replace('-', '_').lower()
+            for col in df.columns
+        ]
+
         # Apply date range filtering client-side if needed
         if date_field and (date_from or date_to) and len(df) > 0:
             # Normalize date_field name
