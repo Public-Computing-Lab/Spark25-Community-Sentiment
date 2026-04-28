@@ -278,6 +278,11 @@ class BostonDataSyncer:
         
         df = pd.DataFrame(all_records)
         
+        df.columns = [
+            col.replace(' ', '_').replace('-', '_').lower()
+            for col in df.columns
+        ]
+
         # Apply date range filtering client-side if needed
         if date_field and (date_from or date_to) and len(df) > 0:
             # Normalize date_field name
