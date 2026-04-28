@@ -120,7 +120,7 @@ class BostonDataSyncer:
                     "primary_key": "CASE_ID",
                     "date_field": "OPEN_DATE",
                     "description": "311 service requests (2024)",
-                    "enabled": False
+                    "enabled": True
                 }
             ],
             "sync_settings": {
