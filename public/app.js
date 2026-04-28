@@ -665,22 +665,104 @@ function createMessageElement(message) {
 }
 
 function renderTypingIndicator() {
+  removeTypingIndicator();
   const wrapper = document.createElement('div');
   wrapper.className = 'message assistant';
   wrapper.id = 'typing-indicator';
+
+  const phrases = [
+    'Thinking',
+    'Retrieving info from sources',
+    'Gathering relevant context',
+    'Checking recent updates',
+    'Drafting a clear answer',
+    'Double-checking details',
+    'Finalizing response',
+  ];
+
+  const longWaitPhrases = [
+    'This is taking longer than usual',
+    'Still working—almost there',
+  ];
+
+  const intervalMs = () => (inLongWaitMode ? 10000 : 5000);
+
   wrapper.innerHTML = `
     <div class="message-avatar message-avatar--assistant">${getAssistantAvatarMarkup()}</div>
-    <div class="message-content">
-      <div class="typing-indicator"><span></span><span></span><span></span></div>
+    <div class="message-content message-content--loading">
+      <div class="loading-status" aria-live="polite" aria-label="Assistant is thinking">
+        <span class="loading-status__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path
+              d="M11.1 2.2h1.8l.5 2.5c.5.1 1 .3 1.5.6l2.2-1.3 1.3 1.3-1.3 2.2c.3.5.5 1 .6 1.5l2.5.5v1.8l-2.5.5c-.1.5-.3 1-.6 1.5l1.3 2.2-1.3 1.3-2.2-1.3c-.5.3-1 .5-1.5.6l-.5 2.5h-1.8l-.5-2.5c-.5-.1-1-.3-1.5-.6l-2.2 1.3-1.3-1.3 1.3-2.2c-.3-.5-.5-1-.6-1.5L2.2 12.9v-1.8l2.5-.5c.1-.5.3-1 .6-1.5L4 6.9l1.3-1.3 2.2 1.3c.5-.3 1-.5 1.5-.6l.5-2.5Z"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M12 15.6a3.6 3.6 0 1 0 0-7.2 3.6 3.6 0 0 0 0 7.2Z"
+              stroke="currentColor"
+              stroke-width="1.6"
+            />
+          </svg>
+        </span>
+        <span class="loading-status__label" id="loading-status-label">${phrases[0]}<span class="loading-status__ellipsis" aria-hidden="true">…</span></span>
+      </div>
     </div>
   `;
   elements.chatMessages.appendChild(wrapper);
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+
+  const label = wrapper.querySelector('#loading-status-label');
+  if (!label) return;
+
+  const stateKey = '__loadingStatusInterval';
+  if (window[stateKey]) {
+    window.clearTimeout(window[stateKey]);
+  }
+
+  let phraseIndex = 0;
+  let longWaitIndex = 0;
+  let inLongWaitMode = false;
+  const advance = () => {
+    if (!inLongWaitMode) {
+      if (phraseIndex < phrases.length - 1) {
+        phraseIndex += 1;
+      } else {
+        inLongWaitMode = true;
+        longWaitIndex = 0;
+      }
+    } else {
+      longWaitIndex = (longWaitIndex + 1) % longWaitPhrases.length;
+    }
+    label.classList.add('is-transitioning');
+    window.setTimeout(() => {
+      const nextText = inLongWaitMode ? longWaitPhrases[longWaitIndex] : phrases[phraseIndex];
+      label.innerHTML = `${nextText}<span class="loading-status__ellipsis" aria-hidden="true">…</span>`;
+      label.classList.remove('is-transitioning');
+    }, 220);
+  };
+
+  // Kick off rotation after a short delay so the first state is stable.
+  const schedule = () => {
+    const ms = intervalMs();
+    window[stateKey] = window.setTimeout(() => {
+      advance();
+      schedule();
+    }, ms);
+  };
+  schedule();
 }
 
 function removeTypingIndicator() {
   const indicator = document.getElementById('typing-indicator');
   if (indicator) indicator.remove();
+
+  const stateKey = '__loadingStatusInterval';
+  if (window[stateKey]) {
+    window.clearTimeout(window[stateKey]);
+    window[stateKey] = null;
+  }
 }
 
 function setChatLoading(loading) {

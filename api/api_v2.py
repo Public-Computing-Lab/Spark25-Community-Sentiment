@@ -1117,17 +1117,18 @@ def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
                 sources.append({"type": "sql", "table": match.group(1)})
 
     elif mode == "rag":
-            metadata = result.get("metadata", [])
-            seen = set()
-            for meta in metadata[:5]:
-                source = meta.get("source", "Unknown")
-                doc_type = meta.get("doc_type", "unknown")
-                # Dedup by source alone — the same publication ingested via
-                # multiple paths (RSS + PDF, etc.) shouldn't show up as
-                # separate citations to the user.
-                if source in seen:
-                    continue
-                seen.add(source)
+        metadata = result.get("metadata", [])
+        seen = set()
+        for meta in metadata[:5]:
+            source = meta.get("source", "Unknown")
+            doc_type = meta.get("doc_type", "unknown")
+            # Dedup by source alone — the same publication ingested via
+            # multiple paths (RSS + PDF, etc.) shouldn't show up as
+            # separate citations to the user.
+            if source in seen:
+                continue
+            seen.add(source)
+
             link = meta.get("link", "")
             base_dir = DOC_TYPE_DIRS.get(doc_type, "Data")
             if link:
