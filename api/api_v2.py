@@ -1109,6 +1109,14 @@ def _update_message_meta(conn, message_id: str, message_meta: Dict[str, Any]) ->
 def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
     sources: List[Dict[str, str]] = []
 
+    def _canonicalize_source_label(raw: str) -> tuple[str, str]:
+        value = (raw or "").strip()
+        lowered = re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+        lowered = re.sub(r"\s+", " ", lowered)
+        if lowered in {"dorchester reporter", "dot reporter"} or "dotnews" in lowered:
+            return ("dorchester reporter", "Dorchester Reporter")
+        return (lowered or value.lower() or "unknown", value or "Unknown")
+
     if mode == "sql":
         sql_query = result.get("sql", "")
         if sql_query:
@@ -1125,24 +1133,22 @@ def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
             # Dedup by source alone — the same publication ingested via
             # multiple paths (RSS + PDF, etc.) shouldn't show up as
             # separate citations to the user.
-            if source in seen:
+            dedupe_key, source_label = _canonicalize_source_label(source)
+            if dedupe_key in seen:
                 continue
-            seen.add(source)
+            seen.add(dedupe_key)
 
             link = meta.get("link", "")
             base_dir = DOC_TYPE_DIRS.get(doc_type, "Data")
             if link:
                 path = link
-                source_label = source
             elif base_dir.startswith(("http://", "https://")):
-                normalized_source = source.replace(" ", "-")
+                normalized_source = source_label.replace(" ", "-")
                 if normalized_source.endswith(".txt"):
                     normalized_source = normalized_source[:-4] + ".html"
                 path = urljoin(base_dir, normalized_source)
-                source_label = source
             else:
-                path = str(Path(base_dir) / source)
-                source_label = source
+                path = str(Path(base_dir) / source_label)
             sources.append({
                 "type": "rag",
                 "source": source_label,
@@ -1164,16 +1170,17 @@ def extract_sources(mode: str, result: Dict[str, Any]) -> List[Dict[str, str]]:
         for meta in rag_metadata[:3]:
             source = meta.get("source", "Unknown")
             doc_type = meta.get("doc_type", "unknown")
-            if source in seen:
+            dedupe_key, source_label = _canonicalize_source_label(source)
+            if dedupe_key in seen:
                 continue
-            seen.add(source)
+            seen.add(dedupe_key)
             link = meta.get("link", "")
             base_dir = DOC_TYPE_DIRS.get(doc_type, "Data")
             sources.append({
                 "type": "rag",
-                "source": source,
+                "source": source_label,
                 "doc_type": doc_type,
-                "path": link or str(Path(base_dir) / source),
+                "path": link or str(Path(base_dir) / source_label),
             })
 
     return sources
