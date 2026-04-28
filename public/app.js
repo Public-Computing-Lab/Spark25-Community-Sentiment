@@ -692,18 +692,8 @@ function renderTypingIndicator() {
     <div class="message-content message-content--loading">
       <div class="loading-status" aria-live="polite" aria-label="Assistant is thinking">
         <span class="loading-status__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path
-              d="M11.1 2.2h1.8l.5 2.5c.5.1 1 .3 1.5.6l2.2-1.3 1.3 1.3-1.3 2.2c.3.5.5 1 .6 1.5l2.5.5v1.8l-2.5.5c-.1.5-.3 1-.6 1.5l1.3 2.2-1.3 1.3-2.2-1.3c-.5.3-1 .5-1.5.6l-.5 2.5h-1.8l-.5-2.5c-.5-.1-1-.3-1.5-.6l-2.2 1.3-1.3-1.3 1.3-2.2c-.3-.5-.5-1-.6-1.5L2.2 12.9v-1.8l2.5-.5c.1-.5.3-1 .6-1.5L4 6.9l1.3-1.3 2.2 1.3c.5-.3 1-.5 1.5-.6l.5-2.5Z"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linejoin="round"
-            />
-            <path
-              d="M12 15.6a3.6 3.6 0 1 0 0-7.2 3.6 3.6 0 0 0 0 7.2Z"
-              stroke="currentColor"
-              stroke-width="1.6"
-            />
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.11-.2-.36-.28-.57-.2l-2.39.96c-.5-.38-1.04-.69-1.64-.92l-.36-2.54A.487.487 0 0 0 14.36 2h-3.72c-.24 0-.44.17-.48.41l-.36 2.54c-.6.23-1.14.54-1.64.92l-2.39-.96c-.21-.08-.46 0-.57.2L3.28 8.43c-.11.2-.06.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L3.4 14.52a.5.5 0 0 0-.12.61l1.92 3.32c.11.2.36.28.57.2l2.39-.96c.5.38 1.04.69 1.64.92l.36 2.54c.04.24.24.41.48.41h3.72c.24 0 .44-.17.48-.41l.36-2.54c.6-.23 1.14-.54 1.64-.92l2.39.96c.21.08.46 0 .57-.2l1.92-3.32a.5.5 0 0 0-.12-.61l-2.03-1.58ZM12 15.5c-1.93 0-3.5-1.57-3.5-3.5S10.07 8.5 12 8.5s3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5Z"/>
           </svg>
         </span>
         <span class="loading-status__label" id="loading-status-label">${phrases[0]}<span class="loading-status__ellipsis" aria-hidden="true">…</span></span>
