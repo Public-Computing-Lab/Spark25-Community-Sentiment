@@ -834,10 +834,26 @@ function updateThreadHeader() {
 }
 
 function formatRichText(text) {
-  const escaped = escapeHtml(String(text || ''))
+  const value = String(text || '');
+  if (window.marked && typeof window.marked.parse === 'function' && window.DOMPurify) {
+    try {
+      window.marked.setOptions({ breaks: true, gfm: true });
+      const html = window.marked.parse(value);
+      return window.DOMPurify.sanitize(String(html || ''), {
+        USE_PROFILES: { html: true },
+      });
+    } catch (error) {
+      // Fall back to safe plain-text formatting below.
+    }
+  }
+
+  const escaped = escapeHtml(value)
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br>');
-  return escaped.split('<br>').map((paragraph) => paragraph.trim() ? `<p>${paragraph}</p>` : '').join('');
+  return escaped
+    .split('<br>')
+    .map((paragraph) => (paragraph.trim() ? `<p>${paragraph}</p>` : ''))
+    .join('');
 }
 
 function escapeHtml(value) {
